@@ -456,22 +456,39 @@ async def cleanup():
     if sumo_client:
         await sumo_client.close()
 
+# Initialize client on startup
+async def initialize_client():
+    """Initialize the Sumo Logic client and test connection."""
+    try:
+        client = await get_sumo_client()
+        logger.info("Sumo Logic MCP Server initialized successfully")
+        return client
+    except Exception as e:
+        logger.error(f"Failed to initialize Sumo Logic client: {str(e)}")
+        raise
+
 # Run the server
-async def main():
+def main():
     try:
         # Test connection on startup
-        client = await get_sumo_client()
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(initialize_client())
+        
         logger.info("Sumo Logic MCP Server starting...")
         
-        # Run the FastMCP server
-        await mcp.run()
+        # Run the FastMCP server (this is synchronous)
+        mcp.run()
     except KeyboardInterrupt:
         logger.info("Server interrupted by user")
     except Exception as e:
         logger.error(f"Server error: {str(e)}")
         raise
     finally:
-        await cleanup()
+        # Clean up
+        if 'loop' in locals():
+            loop.run_until_complete(cleanup())
+            loop.close()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
