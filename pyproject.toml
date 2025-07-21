@@ -92,3 +92,8 @@ testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 addopts = "-v --tb=short"
 asyncio_mode = "auto"
+
+[tool.uv.workspace]
+members = [
+    "missing/sumologic_mcp_server",
+]
