@@ -23,7 +23,7 @@ from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urljoin
 
 import httpx
-from fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel, Field
 
 # Configure logging
