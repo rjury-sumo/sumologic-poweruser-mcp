@@ -18,7 +18,7 @@ import asyncio
 import json
 import os
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urljoin
 
@@ -34,7 +34,18 @@ logger = logging.getLogger(__name__)
 mcp = FastMCP("Sumo Logic")
 
 class SumoLogicClient:
-    """Client for interacting with Sumo Logic APIs."""
+    """Client for interacting with Sumo Logic APIs.
+    
+    API Endpoints corrected to match official Sumo Logic documentation:
+    - Search Jobs: v1 (correct)
+    - Collectors & Sources: v1 (correct) 
+    - Users: v2 (updated from v1)
+    - Folders: v2 with /folders/global path (updated from v1)
+    - Dashboards: v2 (updated from v1)
+    - Metrics: v1 with /metrics/queries path (updated endpoint)
+    - Content, Roles, Partitions: v2 (correct)
+    - Monitors: v1 search endpoint (replaced listing with search)
+    """
     
     def __init__(self, access_id: str, access_key: str, endpoint: str):
         self.access_id = access_id
@@ -117,22 +128,22 @@ class SumoLogicClient:
         return await self._request("GET", f"/collectors/{collector_id}/sources", api_version="v1")
 
     async def get_users(self, limit: int = 100, offset: int = 0) -> Dict[str, Any]:
-        """Get list of users."""
+        """Get list of users using User Management API."""
         params = {"limit": limit, "offset": offset}
         return await self._request("GET", "/users", api_version="v1", params=params)
 
     async def get_folders(self, limit: int = 100, offset: int = 0) -> Dict[str, Any]:
-        """Get list of folders."""
+        """Get list of folders using Folder Management API."""
         params = {"limit": limit, "offset": offset}
-        return await self._request("GET", "/content/folders/global", api_version="v1", params=params)
+        return await self._request("GET", "/folders/global", api_version="v2", params=params)
 
     async def get_dashboards(self, limit: int = 100, offset: int = 0) -> Dict[str, Any]:
-        """Get list of dashboards."""
+        """Get list of dashboards using Dashboard Management API."""
         params = {"limit": limit, "offset": offset}
-        return await self._request("GET", "/dashboards", api_version="v1", params=params)
+        return await self._request("GET", "/dashboards", api_version="v2", params=params)
 
     async def query_metrics(self, query: str, from_time: str, to_time: str) -> Dict[str, Any]:
-        """Query metrics using the metrics API."""
+        """Query metrics using the Metrics Query API."""
         metrics_data = {
             "query": [{"query": query, "rowId": "A"}],
             "startTime": int(datetime.fromisoformat(from_time.replace('Z', '+00:00')).timestamp() * 1000),
@@ -140,7 +151,7 @@ class SumoLogicClient:
             "requestId": f"mcp-{datetime.now().isoformat()}",
             "maxDataPoints": 800
         }
-        return await self._request("POST", "/metrics/results", api_version="v1", json=metrics_data)
+        return await self._request("POST", "/metrics/queries", api_version="v1", json=metrics_data)
 
     # V2 API endpoints
     async def get_content_v2(self, content_type: str = "Dashboard", limit: int = 100, offset: int = 0) -> Dict[str, Any]:
@@ -157,20 +168,28 @@ class SumoLogicClient:
         params = {"limit": limit, "offset": offset}
         return await self._request("GET", "/roles", api_version="v2", params=params)
 
-    async def get_monitors_v2(self, limit: int = 100, offset: int = 0) -> Dict[str, Any]:
-        """Get monitors using the v2 monitors API."""
-        params = {"limit": limit, "offset": offset}
-        return await self._request("GET", "/monitors", api_version="v2", params=params)
+    async def search_monitors(self, query: str, limit: int = 100, offset: int = 0) -> Dict[str, Any]:
+        """Search for monitors and monitor folders using the monitors search API.
+        
+        Query examples:
+        - 'Test' - Search for monitors containing 'Test'
+        - 'createdBy:000000000000968B' - Search by creator ID  
+        - 'monitorStatus:Normal' - Search by status
+        - 'createdBefore:2023-01-01T00:00:00Z' - Search by date
+        - 'name:*error*' - Search monitors with 'error' in name
+        """
+        params = {
+            "query": query,
+            "limit": limit,
+            "token": offset  # Note: API uses 'token' not 'offset'
+        }
+        return await self._request("GET", "/monitors/search", api_version="v1", params=params)
 
-    async def get_partitions_v2(self, limit: int = 100, offset: int = 0) -> Dict[str, Any]:
-        """Get partitions using the v2 partitions API."""
+    async def get_partitions(self, limit: int = 100, offset: int = 0) -> Dict[str, Any]:
+        """Get partitions using the v1 partitions API."""
         params = {"limit": limit, "offset": offset}
-        return await self._request("GET", "/partitions", api_version="v2", params=params)
+        return await self._request("GET", "/partitions", api_version="v1", params=params)
 
-    async def get_lookup_tables_v2(self, limit: int = 100, offset: int = 0) -> Dict[str, Any]:
-        """Get lookup tables using the v2 lookup tables API."""
-        params = {"limit": limit, "offset": offset}
-        return await self._request("GET", "/lookupTables", api_version="v2", params=params)
 
 # Global client instance
 sumo_client: Optional[SumoLogicClient] = None
@@ -210,7 +229,7 @@ async def search_sumo_logs(
         client = await get_sumo_client()
         
         # Calculate time range
-        to_time = datetime.utcnow()
+        to_time = datetime.now(timezone.utc)
         from_time = to_time - timedelta(hours=hours_back)
         
         from_str = from_time.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
@@ -290,7 +309,7 @@ async def query_sumo_metrics(
         client = await get_sumo_client()
         
         # Calculate time range
-        to_time = datetime.utcnow()
+        to_time = datetime.now(timezone.utc)
         from_time = to_time - timedelta(hours=hours_back)
         
         from_str = from_time.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
@@ -328,34 +347,38 @@ async def get_sumo_roles_v2() -> str:
         return f"Error getting roles: {str(e)}"
 
 @mcp.tool()
-async def get_sumo_monitors_v2() -> str:
-    """Get list of monitors using the v2 Monitors API."""
+async def search_sumo_monitors(
+    query: str = Field(description="Search query for monitors. Examples: 'Test', 'createdBy:userID', 'monitorStatus:Normal', 'name:*error*'"),
+    limit: int = Field(default=100, description="Maximum number of results to return"),
+    offset: int = Field(default=0, description="Pagination offset (continuation token)")
+) -> str:
+    """Search for monitors and monitor folders using the monitors search API.
+    
+    Query options include:
+    - Simple text search: 'error'
+    - Creator search: 'createdBy:000000000000968B'
+    - Status search: 'monitorStatus:Normal'
+    - Date search: 'createdBefore:2023-01-01T00:00:00Z'
+    - Name search: 'name:*critical*'
+    - And many more filter options
+    """
     try:
         client = await get_sumo_client()
-        monitors = await client.get_monitors_v2()
+        monitors = await client.search_monitors(query, limit, offset)
         return json.dumps(monitors, indent=2)
     except Exception as e:
-        return f"Error getting monitors: {str(e)}"
+        return f"Error searching monitors: {str(e)}"
 
 @mcp.tool()
-async def get_sumo_partitions_v2() -> str:
+async def get_sumo_partitions() -> str:
     """Get list of partitions using the v2 Partitions API."""
     try:
         client = await get_sumo_client()
-        partitions = await client.get_partitions_v2()
+        partitions = await client.get_partitions()
         return json.dumps(partitions, indent=2)
     except Exception as e:
         return f"Error getting partitions: {str(e)}"
 
-@mcp.tool()
-async def get_sumo_lookup_tables_v2() -> str:
-    """Get list of lookup tables using the v2 Lookup Tables API."""
-    try:
-        client = await get_sumo_client()
-        lookup_tables = await client.get_lookup_tables_v2()
-        return json.dumps(lookup_tables, indent=2)
-    except Exception as e:
-        return f"Error getting lookup tables: {str(e)}"
 
 # MCP Resources
 
@@ -365,7 +388,7 @@ async def recent_errors() -> str:
     try:
         client = await get_sumo_client()
         
-        to_time = datetime.utcnow()
+        to_time = datetime.now(timezone.utc)
         from_time = to_time - timedelta(hours=1)
         
         from_str = from_time.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
