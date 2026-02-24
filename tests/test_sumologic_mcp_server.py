@@ -199,5 +199,166 @@ class TestRateLimiter:
             await limiter.acquire("test_tool")
 
 
+class TestSearchHelpers:
+    """Test cases for search helper functions."""
+
+    def test_detect_query_type_messages(self):
+        """Test detecting message queries (raw logs)."""
+        from sumologic_mcp_server.search_helpers import detect_query_type
+
+        # Raw log queries should return 'messages'
+        assert detect_query_type("_sourceCategory=apache/access") == "messages"
+        assert detect_query_type("error | where severity='high'") == "messages"
+        assert detect_query_type("* | fields message, timestamp") == "messages"
+
+    def test_detect_query_type_records(self):
+        """Test detecting record queries (aggregates)."""
+        from sumologic_mcp_server.search_helpers import detect_query_type
+
+        # Aggregate queries should return 'records'
+        assert detect_query_type("error | count by _sourceHost") == "records"
+        assert detect_query_type("* | timeslice 1h | count") == "records"
+        assert detect_query_type("metric | avg by host") == "records"
+        assert detect_query_type("error | sum(bytes) by user") == "records"
+        assert detect_query_type("logs | min(latency), max(latency)") == "records"
+        assert detect_query_type("* | group by status") == "records"
+        assert detect_query_type("metric | pct(95)") == "records"
+        assert detect_query_type("logs | stddev(duration)") == "records"
+        assert detect_query_type("* | first(message) by host") == "records"
+        assert detect_query_type("* | last(message) by host") == "records"
+
+    def test_parse_relative_time_now(self):
+        """Test parsing 'now' relative time."""
+        from sumologic_mcp_server.search_helpers import parse_relative_time
+        import time
+
+        result = parse_relative_time("now")
+        current_time_ms = int(time.time() * 1000)
+        # Allow 1 second tolerance
+        assert abs(int(result) - current_time_ms) < 1000
+
+    def test_parse_relative_time_hours(self):
+        """Test parsing hours relative time."""
+        from sumologic_mcp_server.search_helpers import parse_relative_time
+        import time
+
+        result = parse_relative_time("-1h")
+        expected = int((time.time() - 3600) * 1000)
+        # Allow 1 second tolerance
+        assert abs(int(result) - expected) < 1000
+
+        result = parse_relative_time("-24h")
+        expected = int((time.time() - 86400) * 1000)
+        assert abs(int(result) - expected) < 1000
+
+    def test_parse_relative_time_minutes(self):
+        """Test parsing minutes relative time."""
+        from sumologic_mcp_server.search_helpers import parse_relative_time
+        import time
+
+        result = parse_relative_time("-30m")
+        expected = int((time.time() - 1800) * 1000)
+        # Allow 1 second tolerance
+        assert abs(int(result) - expected) < 1000
+
+    def test_parse_relative_time_passthrough(self):
+        """Test that times are converted to epoch milliseconds."""
+        from sumologic_mcp_server.search_helpers import parse_relative_time
+
+        # ISO8601 should be converted to epoch milliseconds
+        iso_time = "2024-01-15T10:00:00Z"
+        result = parse_relative_time(iso_time)
+        assert isinstance(result, int)
+        assert result == 1705266000000  # 2024-01-15T10:00:00Z in epoch ms
+
+        # Epoch milliseconds string should be converted to int
+        epoch_ms = "1705315200000"
+        result = parse_relative_time(epoch_ms)
+        assert isinstance(result, int)
+        assert result == 1705315200000
+
+        # Integer epoch milliseconds should stay as-is
+        epoch_ms_int = 1705315200000
+        result = parse_relative_time(epoch_ms_int)
+        assert result == epoch_ms_int
+
+
+class TestSearchJobIntegration:
+    """Integration tests for search job functionality."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.skipif(not os.getenv("SUMO_ACCESS_ID"), reason="Requires SUMO_ACCESS_ID env var")
+    async def test_search_logs_with_aggregate_query(self):
+        """Test search_logs with an aggregate query (requires real credentials)."""
+        from sumologic_mcp_server.sumologic_mcp_server import get_sumo_client
+
+        client = await get_sumo_client("default")
+
+        # This is an aggregate query that should return records
+        result = await client.search_logs(
+            query="* | count",
+            from_time="-1h",
+            to_time="now",
+            timezone_str="UTC"
+        )
+
+        # Verify it detected the correct query type
+        assert result["query_type"] == "records"
+        # Should have records, not messages
+        assert "results" in result
+        # For aggregate queries, recordCount should be > 0 if there's data
+        # Note: might be 0 if no logs in the last hour
+
+    @pytest.mark.asyncio
+    @pytest.mark.skipif(not os.getenv("SUMO_ACCESS_ID"), reason="Requires SUMO_ACCESS_ID env var")
+    async def test_search_logs_with_message_query(self):
+        """Test search_logs with a message query (requires real credentials)."""
+        from sumologic_mcp_server.sumologic_mcp_server import get_sumo_client
+
+        client = await get_sumo_client("default")
+
+        # This is a raw message query
+        result = await client.search_logs(
+            query="*",
+            from_time="-1h",
+            to_time="now",
+            timezone_str="UTC"
+        )
+
+        # Verify it detected the correct query type
+        assert result["query_type"] == "messages"
+        assert "results" in result
+
+    @pytest.mark.asyncio
+    @pytest.mark.skipif(not os.getenv("SUMO_ACCESS_ID"), reason="Requires SUMO_ACCESS_ID env var")
+    async def test_create_search_job_and_check_status(self):
+        """Test creating a search job and checking its status (requires real credentials)."""
+        from sumologic_mcp_server.sumologic_mcp_server import get_sumo_client
+
+        client = await get_sumo_client("default")
+
+        # Create a search job
+        job_info = await client.create_search_job(
+            query="* | count",
+            from_time="-1h",
+            to_time="now",
+            timezone_str="UTC"
+        )
+
+        assert "id" in job_info
+        job_id = job_info["id"]
+
+        # Check status
+        status = await client.get_search_job_status(job_id)
+        assert "state" in status
+        assert status["state"] in [
+            "NOT STARTED",
+            "GATHERING RESULTS",
+            "DONE GATHERING RESULTS",
+            "CANCELLED",
+            "FORCE PAUSED"
+        ]
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

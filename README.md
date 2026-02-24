@@ -20,7 +20,10 @@ This Model Context Protocol (MCP) server provides secure, read-only access to Su
 ## Available Tools
 
 ### Log & Metric Analysis
-- `search_sumo_logs` - Search logs with Sumo Logic query language
+- `search_sumo_logs` - Search logs with Sumo Logic query language (automatically detects query type)
+- `create_sumo_search_job` - Create a search job and return immediately with job ID
+- `get_sumo_search_job_status` - Check status of a search job
+- `get_sumo_search_job_results` - Retrieve results from a completed search job
 - `query_sumo_metrics` - Query metrics with aggregations
 
 ### Configuration & Resources
@@ -144,9 +147,72 @@ Set these in your `.env` file:
 
 ### Basic Log Search
 
+The `search_sumo_logs` tool automatically detects whether your query returns raw messages or aggregate records:
+
 ```
-Search Sumo Logic logs for errors in the last hour:
+# Raw log search - returns individual log messages
+query: _sourceCategory=apache/access | where status_code=500
+
+# Aggregate search - returns summarized records
 query: error | count by _sourceHost
+
+# Time formats
+from_time: "-1h"      # Relative time (1 hour ago)
+to_time: "now"        # Current time
+from_time: "2024-01-15T10:00:00Z"  # ISO8601
+to_time: "1705315200000"           # Epoch milliseconds
+```
+
+### Query Types
+
+**Messages (Raw Logs)**: Queries that return individual log entries
+- Example: `_sourceCategory=prod/app`
+- Example: `error | where severity="high"`
+- Returns: Array of log messages with timestamps and metadata
+
+**Records (Aggregates)**: Queries with aggregation operators
+- Example: `error | count by _sourceHost`
+- Example: `* | timeslice 1h | count by _timeslice`
+- Example: `metric | avg, sum, min, max by dimension`
+- Returns: Array of aggregate records with computed values
+
+### Advanced Search: byReceiptTime
+
+Use `by_receipt_time=true` for:
+- Very recent logs (last few minutes)
+- Delayed log ingestion scenarios
+- Matching Sumo Logic UI behavior for recent searches
+
+```
+query: error
+from_time: "-5m"
+to_time: "now"
+by_receipt_time: true
+```
+
+### Asynchronous Search Jobs
+
+For long-running queries, use the job management tools:
+
+```
+# 1. Create a search job (returns immediately)
+create_sumo_search_job:
+  query: "* | timeslice 1h | count by _timeslice, _sourceHost"
+  from_time: "-24h"
+  to_time: "now"
+# Returns: {"id": "ABC123...", "link": "..."}
+
+# 2. Check status
+get_sumo_search_job_status:
+  job_id: "ABC123..."
+# Returns: {"state": "DONE GATHERING RESULTS", "recordCount": 1500, ...}
+
+# 3. Get results (with pagination)
+get_sumo_search_job_results:
+  job_id: "ABC123..."
+  result_type: "auto"  # or "messages" or "records"
+  offset: 0
+  limit: 1000
 ```
 
 ### Query Metrics

@@ -183,21 +183,49 @@ class SumoLogicClient:
         from_time: str,
         to_time: str,
         timezone_str: str = "UTC",
+        by_receipt_time: bool = False,
         max_attempts: Optional[int] = None
     ) -> Dict[str, Any]:
-        """Create a search job and return results."""
+        """Create a search job and return results.
+
+        Args:
+            query: Sumo Logic query string
+            from_time: Start time (ISO8601 or epoch milliseconds)
+            to_time: End time (ISO8601 or epoch milliseconds)
+            timezone_str: Timezone for the query (default: UTC)
+            by_receipt_time: If True, use receipt time instead of message time (default: False)
+            max_attempts: Maximum polling attempts (default: based on config timeout)
+
+        Returns:
+            Dictionary with job_id, state, counts, and results (messages or records)
+        """
+        from .search_helpers import detect_query_type, parse_relative_time
+
         if max_attempts is None:
             _ensure_config_initialized()
             config = get_config()
             max_attempts = config.server_config.max_search_timeout // 5
 
+        # Detect query type
+        query_type = detect_query_type(query)
+        requires_raw_messages = query_type == "messages"
+
+        # Parse relative time if needed
+        from_time_parsed = parse_relative_time(from_time)
+        to_time_parsed = parse_relative_time(to_time)
+
         # Create search job
         search_data = {
             "query": query,
-            "from": from_time,
-            "to": to_time,
-            "timeZone": timezone_str
+            "from": from_time_parsed,
+            "to": to_time_parsed,
+            "timeZone": timezone_str,
+            "byReceiptTime": by_receipt_time
         }
+
+        # Only add requiresRawMessages if not default (to be compatible with older API versions)
+        if not requires_raw_messages:
+            search_data["requiresRawMessages"] = False
 
         job_response = await self._request("POST", "/search/jobs", api_version="v1", json=search_data)
         job_id = job_response["id"]
@@ -208,18 +236,29 @@ class SumoLogicClient:
             state = status_response["state"]
 
             if state == "DONE GATHERING RESULTS":
-                # Get results
-                results_response = await self._request(
-                    "GET",
-                    f"/search/jobs/{job_id}/messages",
-                    api_version="v1"
-                )
+                # Get results based on query type
+                if query_type == "records":
+                    results_response = await self._request(
+                        "GET",
+                        f"/search/jobs/{job_id}/records",
+                        api_version="v1"
+                    )
+                    results_key = "records"
+                else:
+                    results_response = await self._request(
+                        "GET",
+                        f"/search/jobs/{job_id}/messages",
+                        api_version="v1"
+                    )
+                    results_key = "messages"
+
                 return {
                     "job_id": job_id,
                     "state": state,
+                    "query_type": query_type,
                     "message_count": status_response.get("messageCount", 0),
                     "record_count": status_response.get("recordCount", 0),
-                    "results": results_response.get("messages", [])
+                    "results": results_response.get(results_key, [])
                 }
             elif state in ["CANCELLED", "FORCE PAUSED"]:
                 raise APIError(f"Search job {job_id} was {state.lower()}")
@@ -229,6 +268,110 @@ class SumoLogicClient:
         raise SumoTimeoutError(
             f"Search job {job_id} timed out after {max_attempts * 5} seconds"
         )
+
+    async def get_search_job_records(
+        self,
+        job_id: str,
+        offset: int = 0,
+        limit: int = 10000
+    ) -> Dict[str, Any]:
+        """Get aggregate records from a completed search job.
+
+        Args:
+            job_id: Search job ID
+            offset: Starting offset for pagination (default: 0)
+            limit: Maximum records to return (default: 10000)
+
+        Returns:
+            Dictionary with records array
+        """
+        params = {"offset": offset, "limit": limit}
+        return await self._request(
+            "GET",
+            f"/search/jobs/{job_id}/records",
+            api_version="v1",
+            params=params
+        )
+
+    async def get_search_job_messages(
+        self,
+        job_id: str,
+        offset: int = 0,
+        limit: int = 10000
+    ) -> Dict[str, Any]:
+        """Get raw log messages from a completed search job.
+
+        Args:
+            job_id: Search job ID
+            offset: Starting offset for pagination (default: 0)
+            limit: Maximum messages to return (default: 10000)
+
+        Returns:
+            Dictionary with messages array
+        """
+        params = {"offset": offset, "limit": limit}
+        return await self._request(
+            "GET",
+            f"/search/jobs/{job_id}/messages",
+            api_version="v1",
+            params=params
+        )
+
+    async def get_search_job_status(self, job_id: str) -> Dict[str, Any]:
+        """Get status of a search job.
+
+        Args:
+            job_id: Search job ID
+
+        Returns:
+            Dictionary with job state, counts, and other metadata
+        """
+        return await self._request("GET", f"/search/jobs/{job_id}", api_version="v1")
+
+    async def create_search_job(
+        self,
+        query: str,
+        from_time: str,
+        to_time: str,
+        timezone_str: str = "UTC",
+        by_receipt_time: bool = False
+    ) -> Dict[str, Any]:
+        """Create a search job without waiting for results.
+
+        Args:
+            query: Sumo Logic query string
+            from_time: Start time (ISO8601, epoch milliseconds, or relative like "-1h")
+            to_time: End time (ISO8601, epoch milliseconds, or relative like "now")
+            timezone_str: Timezone for the query (default: UTC)
+            by_receipt_time: If True, use receipt time instead of message time (default: False)
+
+        Returns:
+            Dictionary with job_id and link
+        """
+        from .search_helpers import detect_query_type, parse_relative_time
+
+        # Detect query type
+        query_type = detect_query_type(query)
+        requires_raw_messages = query_type == "messages"
+
+        # Parse relative time if needed
+        from_time_parsed = parse_relative_time(from_time)
+        to_time_parsed = parse_relative_time(to_time)
+
+        # Create search job
+        search_data = {
+            "query": query,
+            "from": from_time_parsed,
+            "to": to_time_parsed,
+            "timeZone": timezone_str,
+            "byReceiptTime": by_receipt_time
+        }
+
+        # Only add requiresRawMessages if not default
+        if not requires_raw_messages:
+            search_data["requiresRawMessages"] = False
+
+        return await self._request("POST", "/search/jobs", api_version="v1", json=search_data)
 
     async def get_collectors(self, limit: int = 100, offset: int = 0) -> Dict[str, Any]:
         """Get list of collectors."""
@@ -330,17 +473,31 @@ def handle_tool_error(e: Exception, tool_name: str) -> str:
 @mcp.tool()
 async def search_sumo_logs(
     query: str = Field(description="Sumo Logic search query"),
-    hours_back: int = Field(default=1, description="Number of hours to search back from now"),
+    hours_back: int = Field(default=1, description="Number of hours to search back from now (ignored if from_time/to_time provided)"),
+    from_time: Optional[str] = Field(default=None, description="Start time: ISO8601, epoch ms, or relative like '-1h' (overrides hours_back)"),
+    to_time: Optional[str] = Field(default=None, description="End time: ISO8601, epoch ms, or relative like 'now' (overrides hours_back)"),
     timezone_param: str = Field(default="UTC", description="Timezone for the search", alias="timezone"),
+    by_receipt_time: bool = Field(default=False, description="Use receipt time instead of message time (for delayed logs)"),
     instance: str = Field(default='default', description="Sumo Logic instance name")
 ) -> str:
     """
-    Search Sumo Logic logs using a query.
+    Search Sumo Logic logs using a query. Automatically detects query type and returns appropriate results.
 
-    Example queries:
-    - _sourceCategory=apache/access
-    - error | count by _sourceHost
-    - _sourceCategory=prod/app | where level="ERROR"
+    Query Types:
+    - Raw log queries: Return individual log messages
+      Example: _sourceCategory=apache/access
+    - Aggregate queries: Return aggregated records (count, sum, avg, etc.)
+      Example: error | count by _sourceHost
+
+    Time Formats:
+    - Relative: "-1h", "-30m", "-24h", "now"
+    - ISO8601: "2024-01-15T10:00:00Z"
+    - Epoch milliseconds: "1705315200000"
+
+    Use by_receipt_time=true when:
+    - Logs are delayed in ingestion
+    - Querying very recent data
+    - Need to match Sumo UI behavior for recent searches
     """
     try:
         # Rate limiting
@@ -351,24 +508,159 @@ async def search_sumo_logs(
 
         # Validate inputs
         query = validate_query_input(query)
-        hours_back = validate_time_range(hours_back)
         instance = validate_instance_name(instance)
 
         client = await get_sumo_client(instance)
 
-        # Calculate time range
-        to_time = datetime.now(timezone.utc)
-        from_time = to_time - timedelta(hours=hours_back)
+        # Determine time range
+        if from_time is not None and to_time is not None:
+            from_str = from_time
+            to_str = to_time
+        else:
+            # Use hours_back
+            hours_back = validate_time_range(hours_back)
+            to_time_dt = datetime.now(timezone.utc)
+            from_time_dt = to_time_dt - timedelta(hours=hours_back)
+            from_str = from_time_dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+            to_str = to_time_dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
-        from_str = from_time.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-        to_str = to_time.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-
-        results = await client.search_logs(query, from_str, to_str, timezone_param)
+        results = await client.search_logs(
+            query,
+            from_str,
+            to_str,
+            timezone_param,
+            by_receipt_time
+        )
 
         return json.dumps(results, indent=2)
 
     except Exception as e:
         return handle_tool_error(e, "search_sumo_logs")
+
+
+@mcp.tool()
+async def create_sumo_search_job(
+    query: str = Field(description="Sumo Logic search query"),
+    from_time: str = Field(description="Start time: ISO8601, epoch ms, or relative like '-1h'"),
+    to_time: str = Field(description="End time: ISO8601, epoch ms, or relative like 'now'"),
+    timezone_param: str = Field(default="UTC", description="Timezone for the search", alias="timezone"),
+    by_receipt_time: bool = Field(default=False, description="Use receipt time instead of message time"),
+    instance: str = Field(default='default', description="Sumo Logic instance name")
+) -> str:
+    """
+    Create a search job and return immediately with job ID. Use get_sumo_search_job_status to check progress
+    and get_sumo_search_job_results to retrieve results once complete.
+
+    This is useful for:
+    - Long-running searches
+    - Asynchronous query execution
+    - Queries that might take more than a few seconds
+    """
+    try:
+        _ensure_config_initialized()
+        config = get_config()
+        limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
+        await limiter.acquire("create_sumo_search_job")
+
+        query = validate_query_input(query)
+        instance = validate_instance_name(instance)
+
+        client = await get_sumo_client(instance)
+        job_info = await client.create_search_job(
+            query,
+            from_time,
+            to_time,
+            timezone_param,
+            by_receipt_time
+        )
+
+        return json.dumps(job_info, indent=2)
+
+    except Exception as e:
+        return handle_tool_error(e, "create_sumo_search_job")
+
+
+@mcp.tool()
+async def get_sumo_search_job_status(
+    job_id: str = Field(description="Search job ID"),
+    instance: str = Field(default='default', description="Sumo Logic instance name")
+) -> str:
+    """
+    Get the status of a search job.
+
+    Returns information including:
+    - state: Job state (e.g., "DONE GATHERING RESULTS", "GATHERING RESULTS")
+    - messageCount: Number of raw messages found
+    - recordCount: Number of aggregate records found
+    - histogramBuckets: Time distribution of results
+    """
+    try:
+        _ensure_config_initialized()
+        config = get_config()
+        limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
+        await limiter.acquire("get_sumo_search_job_status")
+
+        instance = validate_instance_name(instance)
+
+        client = await get_sumo_client(instance)
+        status = await client.get_search_job_status(job_id)
+
+        return json.dumps(status, indent=2)
+
+    except Exception as e:
+        return handle_tool_error(e, "get_sumo_search_job_status")
+
+
+@mcp.tool()
+async def get_sumo_search_job_results(
+    job_id: str = Field(description="Search job ID"),
+    result_type: str = Field(default="auto", description="Result type: 'auto', 'messages', or 'records'"),
+    offset: int = Field(default=0, description="Starting offset for pagination"),
+    limit: int = Field(default=1000, description="Maximum results to return (1-10000)"),
+    instance: str = Field(default='default', description="Sumo Logic instance name")
+) -> str:
+    """
+    Get results from a completed search job. Use 'auto' to automatically detect result type,
+    or specify 'messages' for raw logs or 'records' for aggregates.
+
+    Pagination:
+    - Use offset and limit to retrieve results in chunks
+    - Check messageCount or recordCount in status to know total available
+    """
+    try:
+        _ensure_config_initialized()
+        config = get_config()
+        limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
+        await limiter.acquire("get_sumo_search_job_results")
+
+        instance = validate_instance_name(instance)
+        limit, offset = validate_pagination(limit, offset)
+
+        client = await get_sumo_client(instance)
+
+        # Determine result type
+        if result_type == "auto":
+            # Check job status to determine type
+            status = await client.get_search_job_status(job_id)
+            record_count = status.get("recordCount", 0)
+            message_count = status.get("messageCount", 0)
+
+            # If recordCount > 0, it's an aggregate query
+            if record_count > 0:
+                result_type = "records"
+            else:
+                result_type = "messages"
+
+        # Get appropriate results
+        if result_type == "records":
+            results = await client.get_search_job_records(job_id, offset, limit)
+        else:
+            results = await client.get_search_job_messages(job_id, offset, limit)
+
+        return json.dumps(results, indent=2)
+
+    except Exception as e:
+        return handle_tool_error(e, "get_sumo_search_job_results")
 
 
 @mcp.tool()
