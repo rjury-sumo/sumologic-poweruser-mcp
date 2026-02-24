@@ -1,0 +1,107 @@
+#!/usr/bin/env python3
+"""Quick test script to verify setup is correct."""
+
+import sys
+import os
+
+def test_imports():
+    """Test that all modules can be imported."""
+    print("Testing imports...")
+
+    try:
+        from sumologic_mcp_server import config
+        print("✓ config module imported")
+    except ImportError as e:
+        print(f"✗ Failed to import config: {e}")
+        return False
+
+    try:
+        from sumologic_mcp_server import exceptions
+        print("✓ exceptions module imported")
+    except ImportError as e:
+        print(f"✗ Failed to import exceptions: {e}")
+        return False
+
+    try:
+        from sumologic_mcp_server import validation
+        print("✓ validation module imported")
+    except ImportError as e:
+        print(f"✗ Failed to import validation: {e}")
+        return False
+
+    try:
+        from sumologic_mcp_server import rate_limiter
+        print("✓ rate_limiter module imported")
+    except ImportError as e:
+        print(f"✗ Failed to import rate_limiter: {e}")
+        return False
+
+    try:
+        from sumologic_mcp_server import sumologic_mcp_server
+        print("✓ sumologic_mcp_server module imported")
+    except ImportError as e:
+        print(f"✗ Failed to import sumologic_mcp_server: {e}")
+        return False
+
+    return True
+
+def test_env():
+    """Test that environment variables are configured."""
+    print("\nTesting environment configuration...")
+
+    has_creds = False
+
+    if os.getenv("SUMO_ACCESS_ID") and os.getenv("SUMO_ACCESS_KEY"):
+        print("✓ Default instance credentials found")
+        has_creds = True
+    else:
+        print("⚠ No default instance credentials (SUMO_ACCESS_ID/SUMO_ACCESS_KEY)")
+
+    # Check for additional instances
+    instance_count = 0
+    for key in os.environ.keys():
+        if key.startswith("SUMO_") and key.endswith("_ACCESS_ID"):
+            instance_name = key.replace("SUMO_", "").replace("_ACCESS_ID", "")
+            if instance_name.upper() not in ["ACCESS"]:
+                print(f"✓ Found instance: {instance_name.lower()}")
+                instance_count += 1
+
+    if instance_count == 0 and not has_creds:
+        print("\n⚠ Warning: No Sumo Logic credentials configured!")
+        print("  Create a .env file with your credentials:")
+        print("  cp .env.example .env")
+        print("  # Then edit .env with your actual credentials")
+        return False
+
+    return True
+
+def main():
+    """Run all tests."""
+    print("=" * 60)
+    print("Sumo Logic MCP Server - Setup Test")
+    print("=" * 60)
+
+    imports_ok = test_imports()
+    env_ok = test_env()
+
+    print("\n" + "=" * 60)
+    if imports_ok and env_ok:
+        print("✅ Setup looks good! Ready to run.")
+        print("\nTo start the server:")
+        print("  uv run sumologic-mcp-server")
+        return 0
+    elif imports_ok:
+        print("⚠ Imports OK, but credentials not configured")
+        print("\nNext steps:")
+        print("  1. cp .env.example .env")
+        print("  2. Edit .env with your Sumo Logic credentials")
+        print("  3. Run this test again: uv run python test_setup.py")
+        return 1
+    else:
+        print("❌ Setup issues detected. Please check errors above.")
+        print("\nTry:")
+        print("  uv sync --all-extras")
+        return 1
+
+if __name__ == "__main__":
+    sys.exit(main())
