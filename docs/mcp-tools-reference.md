@@ -1,7 +1,7 @@
 # Sumo Logic MCP Server - Tools Reference
 
 ## Overview
-Total Tools: **27**
+Total Tools: **28**
 
 ---
 
@@ -434,6 +434,47 @@ Export detailed usage report for a date range (async operation). Returns downloa
 
 ---
 
+### 28. `get_estimated_log_search_usage`
+Get estimated data volume that would be scanned for a log search query in Infrequent Data Tier and Flex.
+
+**Parameters:**
+- `query` (str) - Log search query/scope (e.g., "_sourceCategory=prod/app" or "_view=my_view")
+- `from_time` (str, default='-1h') - Start time (ISO8601, epoch ms, or relative like '-1h', '-24h', '-7d')
+- `to_time` (str, default='now') - End time (ISO8601, epoch ms, or relative like 'now')
+- `time_zone` (str, default='UTC') - Timezone for the search
+- `by_view` (bool, default=True) - If True, returns breakdown by partition/view (recommended)
+- `instance` (str, default='default') - Instance name
+
+**Returns:** Detailed breakdown including:
+- Total estimated data to scan (formatted)
+- Per-partition/view breakdown with:
+  - Data tier info (Continuous, Frequent, Infrequent)
+  - Metering tier information
+  - Scan volume in bytes
+- Run by receipt time flag
+- Interval time type
+
+**Use Cases:**
+- Estimate query costs before running expensive queries in Infrequent/Flex tiers
+- Refine search scope to reduce scanned data
+- Understand which partitions/views contribute to scan volume
+- Budget planning for per-query pricing models
+
+**Time Format Examples:**
+- Relative: "-1h", "-24h", "-7d", "-1w", "now"
+- ISO: "2024-01-01T00:00:00Z"
+- Epoch ms: "1704067200000"
+
+**Notes:**
+- In Infrequent Data Tier and Flex, you pay per query based on data scanned
+- Use this endpoint to estimate costs before running queries
+- The `by_view=True` option provides detailed partition/view breakdown
+- Empty partition names are displayed as "sumologic_default"
+
+**API Reference:** https://help.sumologic.com/docs/api/log-search-estimated-usage/
+
+---
+
 ## Tool Categories Summary
 
 | Category | Count | Tools |
@@ -441,7 +482,7 @@ Export detailed usage report for a date range (async operation). Returns downloa
 | **Search & Query** | 6 | Search logs, create jobs, get status/results, query metrics, search audit |
 | **Content Library** | 7 | Personal/folder access, path operations, content export |
 | **Content ID Utilities** | 3 | Hex/decimal conversion, web URL generation |
-| **Account Management** | 3 | Account status, usage forecast, usage report export |
+| **Account Management** | 4 | Account status, usage forecast, usage report export, estimated log search usage |
 | **Collectors & Sources** | 2 | List collectors, get sources |
 | **Users & Roles** | 2 | List users, list roles |
 | **Dashboards & Monitors** | 2 | List dashboards, search monitors |
@@ -474,6 +515,6 @@ Export detailed usage report for a date range (async operation). Returns downloa
 
 ---
 
-**Version:** 1.2
+**Version:** 1.3
 **Last Updated:** 2026-02-26
-**Total Tools:** 27
+**Total Tools:** 28

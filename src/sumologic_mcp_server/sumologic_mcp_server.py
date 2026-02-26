@@ -533,6 +533,46 @@ class SumoLogicClient:
         else:
             return {"status": status.get("status", "Unknown"), "job_id": job_id}
 
+    async def get_estimated_log_search_usage(
+        self,
+        query: str,
+        from_time: int,
+        to_time: int,
+        time_zone: str = "UTC",
+        by_view: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Get estimated data volume that would be scanned for a log search query.
+
+        Args:
+            query: Log search query (scope only, e.g., "_sourceCategory=prod/app")
+            from_time: Start time in epoch milliseconds
+            to_time: End time in epoch milliseconds
+            time_zone: Timezone for the search (default: UTC)
+            by_view: If True, returns breakdown by partition/view with tier info (default: True)
+
+        Returns:
+            Estimated usage with partition/view breakdown if by_view=True
+        """
+        data = {
+            "queryString": query,
+            "timeRange": {
+                "type": "BeginBoundedTimeRange",
+                "from": {
+                    "type": "EpochTimeRangeBoundary",
+                    "epochMillis": from_time
+                },
+                "to": {
+                    "type": "EpochTimeRangeBoundary",
+                    "epochMillis": to_time
+                }
+            },
+            "timezone": time_zone
+        }
+
+        endpoint = "/logSearches/estimatedUsageByView" if by_view else "/logSearches/estimatedUsage"
+        return await self._request("POST", endpoint, api_version="v1", json=data)
+
 
 # Client pool - maps instance name to client
 clients: Dict[str, SumoLogicClient] = {}
@@ -1718,6 +1758,184 @@ async def export_usage_report(
 
     except Exception as e:
         return handle_tool_error(e, "export_usage_report")
+
+
+@mcp.tool()
+async def get_estimated_log_search_usage(
+    query: str,
+    from_time: str = "-1h",
+    to_time: str = "now",
+    time_zone: str = "UTC",
+    by_view: bool = True,
+    instance: str = 'default'
+) -> str:
+    """
+    Get estimated data volume that would be scanned for a log search query.
+
+    This tool helps you understand the cost of running queries in Infrequent Data Tier
+    and Flex tiers where you pay per query based on data scanned.
+
+    Returns detailed breakdown by partition/view including:
+    - Total estimated data to scan
+    - Per-partition/view breakdown with data tier info (Continuous, Frequent, Infrequent)
+    - Metering type information
+    - Scan volume in bytes
+
+    Use this before running expensive queries to:
+    - Estimate query costs
+    - Refine search scope to reduce scanned data
+    - Understand which partitions/views contribute to scan volume
+
+    Args:
+        query: Log search query (scope only, e.g., "_sourceCategory=prod/app" or "_view=my_view")
+        from_time: Start time (ISO8601, epoch ms, or relative like '-1h', '-24h', '-7d')
+        to_time: End time (ISO8601, epoch ms, or relative like 'now')
+        time_zone: Timezone for the search (default: UTC)
+        by_view: If True, returns breakdown by partition/view (default: True, recommended)
+
+    Time Format Examples:
+        - Relative: "-1h", "-24h", "-7d", "-1w", "now"
+        - ISO: "2024-01-01T00:00:00Z"
+        - Epoch ms: "1704067200000"
+
+    API Reference: https://help.sumologic.com/docs/api/log-search-estimated-usage/
+    """
+    try:
+        _ensure_config_initialized()
+        config = get_config()
+        instance = validate_instance_name(instance)
+
+        client = await get_sumo_client(instance)
+        limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
+
+        # Parse time values to epoch milliseconds
+        from_epoch = parse_time_to_epoch(from_time)
+        to_epoch = parse_time_to_epoch(to_time)
+
+        # Validate time range
+        if from_epoch >= to_epoch:
+            raise ValidationError("from_time must be before to_time")
+
+        await limiter.acquire("get_estimated_log_search_usage")
+        result = await client.get_estimated_log_search_usage(
+            query=query,
+            from_time=from_epoch,
+            to_time=to_epoch,
+            time_zone=time_zone,
+            by_view=by_view
+        )
+
+        # Enhance response with formatted information
+        if by_view and "estimatedUsageDetails" in result:
+            # Calculate total from details
+            total_bytes = sum(
+                detail.get("estimatedDataToScanInBytes", 0)
+                for detail in result.get("estimatedUsageDetails", [])
+            )
+            result["totalEstimatedDataToScanInBytes"] = total_bytes
+            result["formatted_total"] = format_bytes(total_bytes)
+
+            # Format each view's usage
+            for detail in result.get("estimatedUsageDetails", []):
+                bytes_val = detail.get("estimatedDataToScanInBytes", 0)
+                detail["formatted_size"] = format_bytes(bytes_val)
+                # Rename empty partition name to "sumologic_default"
+                if detail.get("viewName") == "":
+                    detail["viewName"] = "sumologic_default"
+
+        elif "estimatedDataToScanInBytes" in result:
+            bytes_val = result.get("estimatedDataToScanInBytes", 0)
+            result["formatted_size"] = format_bytes(bytes_val)
+
+        return json.dumps(result, indent=2)
+
+    except Exception as e:
+        return handle_tool_error(e, "get_estimated_log_search_usage")
+
+
+def parse_time_to_epoch(time_value: str) -> int:
+    """
+    Parse time value and convert to epoch milliseconds.
+
+    Supports:
+    - ISO format strings: "2024-01-01T00:00:00Z"
+    - Epoch milliseconds: "1704067200000"
+    - Relative times: "-1h", "-30m", "-2d", "-1w", "now"
+    """
+    import re
+    from datetime import datetime, timedelta
+
+    time_str = str(time_value).strip()
+
+    # Handle "now"
+    if time_str.lower() == "now":
+        return int(datetime.now(timezone.utc).timestamp() * 1000)
+
+    # Handle relative time formats like "-1h", "-30m", "-2d", "-1w"
+    relative_pattern = r'^([+-]?)(\d+)([smhdw])$'
+    match = re.match(relative_pattern, time_str.lower())
+
+    if match:
+        sign, amount, unit = match.groups()
+        amount = int(amount)
+
+        # Default to negative if no sign specified (going back in time)
+        if sign != '+':
+            amount = -amount
+
+        # Convert unit to timedelta
+        unit_map = {
+            's': 'seconds',
+            'm': 'minutes',
+            'h': 'hours',
+            'd': 'days',
+            'w': 'weeks'
+        }
+
+        if unit in unit_map:
+            delta_kwargs = {unit_map[unit]: amount}
+            target_time = datetime.now(timezone.utc) + timedelta(**delta_kwargs)
+            return int(target_time.timestamp() * 1000)
+
+    # Try to parse as ISO format
+    try:
+        for fmt in [
+            '%Y-%m-%dT%H:%M:%SZ',
+            '%Y-%m-%dT%H:%M:%S.%fZ',
+            '%Y-%m-%dT%H:%M:%S',
+            '%Y-%m-%d %H:%M:%S',
+            '%Y-%m-%d'
+        ]:
+            try:
+                dt = datetime.strptime(time_str, fmt)
+                return int(dt.timestamp() * 1000)
+            except ValueError:
+                continue
+
+        # If none of the formats worked, try parsing as epoch milliseconds
+        return int(float(time_str))
+
+    except (ValueError, TypeError):
+        raise ValidationError(
+            f"Invalid time format: {time_value}. "
+            "Supported formats: ISO datetime, epoch milliseconds, or relative time (e.g., '-1h', '-30m', '-2d', 'now')"
+        )
+
+
+def format_bytes(bytes_value: int) -> str:
+    """Format bytes value to human-readable format."""
+    if bytes_value == 0:
+        return "0 B"
+
+    units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
+    value = float(bytes_value)
+    unit_index = 0
+
+    while value >= 1024 and unit_index < len(units) - 1:
+        value /= 1024
+        unit_index += 1
+
+    return f"{value:.2f} {units[unit_index]}"
 
 
 # MCP Resources
