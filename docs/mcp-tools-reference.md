@@ -1,7 +1,7 @@
 # Sumo Logic MCP Server - Tools Reference
 
 ## Overview
-Total Tools: **29**
+Total Tools: **31**
 
 ---
 
@@ -536,6 +536,190 @@ Explore log metadata values for a given scope to discover partitions, source cat
 
 ---
 
+### 30. `analyze_data_volume`
+Analyze data volume ingestion from the Sumo Logic Data Volume Index for capacity planning and cost analysis.
+
+**Parameters:**
+- `dimension` (str, default='sourceCategory') - Metadata dimension to analyze
+- `from_time` (str, default='-24h') - Start time (ISO8601, epoch ms, or relative)
+- `to_time` (str, default='now') - End time
+- `time_zone` (str, default='UTC') - Timezone
+- `include_credits` (bool, default=True) - Calculate credits based on tier rates
+- `include_timeshift` (bool, default=False) - Compare with previous periods
+- `timeshift_days` (int, default=7) - Days to shift back for comparison
+- `timeshift_periods` (int, default=3) - Number of periods to average
+- `sort_by` (str, default='gbytes') - Sort field (gbytes, events, credits)
+- `limit` (int, default=100) - Maximum results
+- `filter_pattern` (str, default='*') - Filter pattern for dimension values
+- `instance` (str, default='default') - Instance name
+
+**Dimension Options:**
+- `sourceCategory` - Volume by source category (most common)
+- `collector` - Volume by collector
+- `source` - Volume by source
+- `sourceHost` - Volume by source host
+- `sourceName` - Volume by source name
+- `view` - Volume by partition/view
+
+**Returns:** JSON with:
+- Dimension value (e.g., sourceCategory, collector)
+- Data tier (Continuous, Frequent, Infrequent, CSE)
+- Events count
+- GB ingested
+- Credits consumed (if include_credits=True)
+- Percentage change vs baseline (if include_timeshift=True)
+- State flags: NEW, GONE, COLLECTING (if include_timeshift=True)
+
+**Credit Rates (Standard Tiered):**
+- Continuous: 20 credits/GB
+- Frequent: 9 credits/GB
+- Infrequent: 0.4 credits/GB
+- CSE: 25 credits/GB
+- Note: Flex customers use different rates
+
+**Use Cases:**
+- **Top consumers**: Find which source categories use most ingestion
+- **Trend analysis**: Detect increases/decreases with timeshift comparison
+- **Stopped collection**: Identify collectors that stopped sending data (state=GONE)
+- **New sources**: Find newly added data sources (state=NEW)
+- **Cost analysis**: Calculate credits consumed per dimension
+- **Capacity planning**: Predict future ingestion needs
+
+**Example Scenarios:**
+
+1. **Find top 10 source categories by ingestion:**
+   ```
+   dimension="sourceCategory", from_time="-24h", sort_by="gbytes", limit=10
+   ```
+
+2. **Detect collectors with increasing ingestion (>50%):**
+   ```
+   dimension="collector", include_timeshift=True, timeshift_days=7, timeshift_periods=3
+   Filter results where pct_increase_gb > 50
+   ```
+
+3. **Find stopped collectors:**
+   ```
+   dimension="collector", include_timeshift=True
+   Filter results where state="GONE"
+   ```
+
+**Notes:**
+- Queries the `sumologic_volume` index with dimension-specific source categories
+- Uses `parse regex multi` for JSON array parsing
+- Timeshift comparison helps detect anomalies and trends
+- Infrequent tier data may take longer to appear in volume index
+- Large accounts with 1000s of values may need shorter time ranges to avoid query memory issues
+
+**Time Format Examples:**
+- Relative: "-1h", "-24h", "-7d", "-30d"
+- ISO: "2024-01-01T00:00:00Z"
+- Epoch ms: "1704067200000"
+
+**API Reference:** https://help.sumologic.com/docs/manage/ingestion-volume/data-volume-index/
+
+---
+
+### 31. `analyze_data_volume_grouped`
+Advanced data volume analysis with cardinality reduction for large-scale environments (5000+ source categories).
+
+**Parameters:**
+- `dimension` (str, default='sourceCategory') - Metadata dimension
+- `from_time` (str, default='-24h') - Start time
+- `to_time` (str, default='now') - End time
+- `time_zone` (str, default='UTC') - Timezone
+- `value_filter` (str, default='*') - Filter pattern (e.g., '*prod*')
+- `tier_filter` (str, default='*') - Data tier filter (Continuous, Frequent, Infrequent, CSE, Flex)
+- `max_chars` (int, default=40) - Max characters for values (longer truncated with '...')
+- `other_threshold_pct` (float, default=0.1) - Rollup threshold percentage (0.1 = 0.1%)
+- `sort_by` (str, default='credits') - Sort field (credits, gbytes, events)
+- `limit` (int, default=100) - Maximum results
+- `instance` (str, default='default') - Instance name
+
+**Cardinality Reduction Features:**
+
+1. **Value Truncation:**
+   - Long values shortened to `max_chars` with "..." suffix
+   - Example: "kubernetes/prod/very/long/path/service" → "kubernetes/prod/very/long/path/se..."
+
+2. **Small Value Rollup:**
+   - Values < `other_threshold_pct` of total GB grouped as "other"
+   - Shows count of rolled-up sources in `categories` field
+   - Default 0.1% means anything < 0.1% rolls into "other"
+
+**Returns:** JSON with:
+- `dataTier` - Data tier name
+- `dimension` - Dimension type (e.g., "sourcecategory")
+- `value` - Dimension value (truncated or "other")
+- `categories` - Count of original values in this entry
+- `events` - Total events count
+- `gbytes` - Total GB ingested
+- `credits` - Total credits consumed
+- `pct_GB` - Percentage of total GB
+- `pct_cr` - Percentage of total credits
+- `cr/gb` - Credits per GB ratio
+
+**Use Cases:**
+- **High-cardinality environments**: Effectively analyze 5000+ source categories
+- **Executive reporting**: Focus on top contributors (>1%), hide noise
+- **Cost optimization**: Identify major credit drivers
+- **Tier analysis**: Filter to specific tiers (Flex, Infrequent, etc.)
+- **Pattern analysis**: Filter by value patterns (*prod*, *k8s*, etc.)
+
+**Example Scenarios:**
+
+1. **Top Flex tier consumers (>1% each):**
+   ```
+   tier_filter="Flex", other_threshold_pct=1.0, sort_by="credits"
+   ```
+
+2. **Infrequent tier with short names:**
+   ```
+   tier_filter="Infrequent", max_chars=30, other_threshold_pct=0.5
+   ```
+
+3. **Production sources only:**
+   ```
+   value_filter="*prod*", other_threshold_pct=0.2
+   ```
+
+4. **Kubernetes sources, top 20:**
+   ```
+   value_filter="*k8s*", limit=20, other_threshold_pct=0.5
+   ```
+
+**Example Output:**
+```json
+{
+  "dataTier": "Flex",
+  "dimension": "sourcecategory",
+  "value": "kubernetes/prod/dependency/operator/depe...",
+  "categories": "1",
+  "credits": "308.82458405569196",
+  "events": "21091665",
+  "gbytes": "15.441229202784598",
+  "pct_GB": "28.820305167502596",
+  "cr/gb": "20",
+  "pct_cr": "27.90802384892889"
+}
+```
+
+**Notes:**
+- Designed for very large deployments (1000s of dimension values)
+- The "other" entry aggregates all small contributors
+- `categories` field shows how many sources rolled into each entry
+- Uses optimized parse regex for better performance
+- Adjust `other_threshold_pct` based on environment size (0.1%-1% typical)
+- Results sorted descending by credits to show top cost drivers first
+
+**Comparison with `analyze_data_volume`:**
+- `analyze_data_volume`: Detailed view, all values, supports timeshift
+- `analyze_data_volume_grouped`: High-level view, reduces cardinality, better for large environments
+
+**API Reference:** https://help.sumologic.com/docs/manage/ingestion-volume/data-volume-index/
+
+---
+
 ## Tool Categories Summary
 
 | Category | Count | Tools |
@@ -543,7 +727,7 @@ Explore log metadata values for a given scope to discover partitions, source cat
 | **Search & Query** | 7 | Search logs, create jobs, get status/results, query metrics, search audit, explore metadata |
 | **Content Library** | 7 | Personal/folder access, path operations, content export |
 | **Content ID Utilities** | 3 | Hex/decimal conversion, web URL generation |
-| **Account Management** | 4 | Account status, usage forecast, usage report export, estimated log search usage |
+| **Account Management** | 6 | Account status, usage forecast, usage report export, estimated log search usage, data volume analysis, grouped data volume analysis |
 | **Collectors & Sources** | 2 | List collectors, get sources |
 | **Users & Roles** | 2 | List users, list roles |
 | **Dashboards & Monitors** | 2 | List dashboards, search monitors |
@@ -576,6 +760,6 @@ Explore log metadata values for a given scope to discover partitions, source cat
 
 ---
 
-**Version:** 1.4
-**Last Updated:** 2026-02-26
-**Total Tools:** 29
+**Version:** 1.6
+**Last Updated:** 2026-02-27
+**Total Tools:** 31

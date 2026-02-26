@@ -2150,6 +2150,464 @@ async def explore_log_metadata(
         return handle_tool_error(e, "explore_log_metadata")
 
 
+@mcp.tool()
+async def analyze_data_volume(
+    dimension: str = "sourceCategory",
+    from_time: str = "-24h",
+    to_time: str = "now",
+    time_zone: str = "UTC",
+    include_credits: bool = True,
+    include_timeshift: bool = False,
+    timeshift_days: int = 7,
+    timeshift_periods: int = 3,
+    sort_by: str = "gbytes",
+    limit: int = 100,
+    filter_pattern: str = "*",
+    instance: str = 'default'
+) -> str:
+    """
+    Analyze data volume ingestion from the Sumo Logic Data Volume Index.
+
+    This tool helps administrators understand ingestion patterns, detect anomalies,
+    and identify new or stopped data sources. Queries the sumologic_volume index
+    which tracks bytes, events, and credits consumed per metadata dimension.
+
+    Args:
+        dimension: Metadata dimension to analyze (default: "sourceCategory")
+            - "sourceCategory": Volume by source category (most common)
+            - "collector": Volume by collector
+            - "source": Volume by source
+            - "sourceHost": Volume by source host
+            - "sourceName": Volume by source name
+            - "view": Volume by partition/view
+        from_time: Start time (ISO8601, epoch ms, or relative like '-24h', '-7d')
+        to_time: End time (default: 'now')
+        time_zone: Timezone (default: 'UTC')
+        include_credits: Calculate credits based on standard tier rates (default: True)
+        include_timeshift: Compare with previous periods to detect changes (default: False)
+        timeshift_days: Days to shift back for comparison (default: 7, used if include_timeshift=True)
+        timeshift_periods: Number of periods to average (default: 3, used if include_timeshift=True)
+        sort_by: Field to sort by (default: 'gbytes', options: 'gbytes', 'events', 'credits')
+        limit: Maximum results to return (default: 100)
+        filter_pattern: Filter pattern for dimension values (default: '*', e.g., '*prod*', 'collector-*')
+        instance: Instance name (default: 'default')
+
+    Returns:
+        JSON with aggregated ingestion data including:
+        - Dimension value (sourceCategory, collector, etc.)
+        - Data tier (Continuous, Frequent, Infrequent, CSE)
+        - Events count
+        - GB ingested
+        - Credits consumed (if include_credits=True)
+        - Percentage change vs baseline (if include_timeshift=True)
+        - State flags: NEW, GONE, COLLECTING (if include_timeshift=True)
+
+    Credit Rates (Standard Tiered):
+        - Continuous: 20 credits/GB
+        - Frequent: 9 credits/GB
+        - Infrequent: 0.4 credits/GB
+        - CSE: 25 credits/GB
+        Note: Flex customers use different rates
+
+    Use Cases:
+        - Top consumers: Find which source categories use most ingestion
+        - Trend analysis: Detect increases/decreases with timeshift comparison
+        - Stopped collection: Identify collectors that stopped sending data
+        - New sources: Find newly added data sources
+        - Cost analysis: Calculate credits consumed per dimension
+
+    Time Format Examples:
+        - Relative: "-1h", "-24h", "-7d", "-30d"
+        - ISO: "2024-01-01T00:00:00Z"
+        - Epoch ms: "1704067200000"
+
+    Example Queries Generated:
+        Basic: Bytes and events by sourceCategory
+        With credits: Adds credit calculation
+        With timeshift: Compares current vs 21d average (3 x 7d)
+    """
+    try:
+        _ensure_config_initialized()
+        config = get_config()
+        instance = validate_instance_name(instance)
+
+        # Map dimension to source category
+        dimension_map = {
+            "sourceCategory": "sourcecategory_and_tier_volume",
+            "collector": "collector_and_tier_volume",
+            "source": "source_and_tier_volume",
+            "sourceHost": "sourcehost_and_tier_volume",
+            "sourceName": "sourcename_and_tier_volume",
+            "view": "view_and_tier_volume"
+        }
+
+        if dimension not in dimension_map:
+            raise ValidationError(
+                f"Invalid dimension '{dimension}'. "
+                f"Valid options: {', '.join(dimension_map.keys())}"
+            )
+
+        source_category = dimension_map[dimension]
+
+        # Map dimension to field name in parsed data
+        field_map = {
+            "sourceCategory": "sourceCategory",
+            "collector": "collector",
+            "source": "source",
+            "sourceHost": "sourceHost",
+            "sourceName": "sourceName",
+            "view": "view"
+        }
+        field_name = field_map[dimension]
+
+        # Build the query
+        query_parts = [
+            f'_index=sumologic_volume _sourceCategory={source_category}',
+            '| parse regex "(?<data>\\{[^\\{]+\\})" multi',
+            f'| json field=data "field","dataTier","sizeInBytes","count" as {field_name}, dataTier, bytes, events',
+            '| bytes/1Gi as gbytes'
+        ]
+
+        # Add filter if specified
+        if filter_pattern != "*":
+            query_parts.append(f'| where {field_name} matches /{filter_pattern}/')
+
+        # Aggregation
+        query_parts.append(f'| sum(events) as events, sum(gbytes) as gbytes by dataTier,{field_name}')
+
+        # Add credits calculation if requested
+        if include_credits:
+            query_parts.extend([
+                '| 20 as credit_rate',
+                '| if(dataTier = "CSE",25,credit_rate) as credit_rate',
+                '| if(dataTier = "Infrequent",0.4,credit_rate) as credit_rate',
+                '| if(dataTier = "Frequent",9,credit_rate) as credit_rate',
+                '| gbytes * credit_rate as credits'
+            ])
+
+        # Add timeshift comparison if requested
+        if include_timeshift:
+            total_days = timeshift_days * timeshift_periods
+            query_parts.append(f'| compare timeshift {timeshift_days}d {timeshift_periods} avg')
+
+            # Handle nulls and calculate percentage changes
+            query_parts.extend([
+                '| if(isNull(gbytes), "GONE", "COLLECTING") as state',
+                '| if(isNull(gbytes), 0, gbytes) as gbytes',
+                f'| if(isNull(gbytes_{total_days}d_avg), "NEW", state) as state',
+                f'| if(isNull(gbytes_{total_days}d_avg), 0, gbytes_{total_days}d_avg) as gbytes_{total_days}d_avg',
+                f'| ((gbytes - gbytes_{total_days}d_avg) / gbytes_{total_days}d_avg) * 100 as pct_increase_gb'
+            ])
+
+            if include_credits:
+                query_parts.extend([
+                    '| if(isNull(credits), 0, credits) as credits',
+                    f'| if(isNull(credits_{total_days}d_avg), 0, credits_{total_days}d_avg) as credits_{total_days}d_avg',
+                    f'| ((credits - credits_{total_days}d_avg) / credits_{total_days}d_avg) * 100 as pct_increase_cr'
+                ])
+
+        # Sorting
+        query_parts.append(f'| sort {sort_by} desc | limit {limit}')
+
+        query = '\n'.join(query_parts)
+
+        # Execute the query
+        client = await get_sumo_client(instance)
+        limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
+
+        # Parse time values
+        from_epoch = parse_time_to_epoch(from_time)
+        to_epoch = parse_time_to_epoch(to_time)
+
+        if from_epoch >= to_epoch:
+            raise ValidationError("from_time must be before to_time")
+
+        await limiter.acquire("analyze_data_volume")
+        logger.info(f"Starting data volume analysis for dimension: {dimension}")
+
+        # Use search_logs to execute the query
+        results = await client.search_logs(
+            query=query,
+            from_time=str(from_epoch),
+            to_time=str(to_epoch),
+            timezone_str=time_zone,
+            by_receipt_time=False
+        )
+
+        # Format the response
+        records = results.get("results", [])
+
+        output = {
+            "dimension": dimension,
+            "time_range": {
+                "from": from_time,
+                "to": to_time,
+                "timezone": time_zone
+            },
+            "query_options": {
+                "include_credits": include_credits,
+                "include_timeshift": include_timeshift,
+                "timeshift_config": {
+                    "days": timeshift_days,
+                    "periods": timeshift_periods,
+                    "total_days": timeshift_days * timeshift_periods
+                } if include_timeshift else None,
+                "sort_by": sort_by,
+                "limit": limit,
+                "filter_pattern": filter_pattern
+            },
+            "summary": {
+                "total_records": len(records),
+                "query_type": results.get("query_type", "records")
+            },
+            "data": []
+        }
+
+        # Extract data from records
+        for record in records:
+            record_map = record.get("map", {})
+            data_entry = {}
+
+            # Extract all fields with case-insensitive matching
+            for key, value in record_map.items():
+                # Skip internal fields
+                if key.startswith("_"):
+                    continue
+                data_entry[key] = value
+
+            output["data"].append(data_entry)
+
+        return json.dumps(output, indent=2)
+
+    except Exception as e:
+        return handle_tool_error(e, "analyze_data_volume")
+
+
+@mcp.tool()
+async def analyze_data_volume_grouped(
+    dimension: str = "sourceCategory",
+    from_time: str = "-24h",
+    to_time: str = "now",
+    time_zone: str = "UTC",
+    value_filter: str = "*",
+    tier_filter: str = "*",
+    max_chars: int = 40,
+    other_threshold_pct: float = 0.1,
+    sort_by: str = "credits",
+    limit: int = 100,
+    instance: str = 'default'
+) -> str:
+    """
+    Advanced data volume analysis with cardinality reduction for large-scale environments.
+
+    This tool is designed for very large Sumo Logic deployments with high cardinality
+    (e.g., 5000+ source categories). It reduces cardinality by:
+    1. Truncating long dimension values to max_chars
+    2. Rolling up small contributors (<other_threshold_pct) into "other"
+
+    This enables effective high-level reporting to understand major drivers of
+    credits and GB changes without being overwhelmed by thousands of small sources.
+
+    Args:
+        dimension: Metadata dimension to analyze (default: "sourceCategory")
+            - "sourceCategory": Volume by source category (most common)
+            - "collector": Volume by collector
+            - "source": Volume by source
+            - "sourceHost": Volume by source host
+            - "sourceName": Volume by source name
+            - "view": Volume by partition/view
+        from_time: Start time (ISO8601, epoch ms, or relative like '-24h', '-7d')
+        to_time: End time (default: 'now')
+        time_zone: Timezone (default: 'UTC')
+        value_filter: Filter pattern for dimension values (default: '*', e.g., '*prod*')
+        tier_filter: Data tier filter (default: '*', options: 'Continuous', 'Frequent', 'Infrequent', 'CSE', 'Flex')
+        max_chars: Maximum characters for dimension values (default: 40, longer values truncated with '...')
+        other_threshold_pct: Percentage threshold for "other" grouping (default: 0.1 = 0.1%)
+        sort_by: Field to sort by (default: 'credits', options: 'credits', 'gbytes', 'events')
+        limit: Maximum results to return (default: 100)
+        instance: Instance name (default: 'default')
+
+    Returns:
+        JSON with aggregated ingestion data including:
+        - Dimension value (truncated if > max_chars)
+        - Data tier
+        - Categories count (number of original values rolled into this entry)
+        - Events count
+        - GB ingested
+        - Credits consumed
+        - Percentage of total GB (pct_GB)
+        - Percentage of total credits (pct_cr)
+        - Credits per GB ratio (cr/gb)
+
+    Cardinality Reduction Features:
+        1. **Value truncation**: Long values shortened to max_chars with "..." suffix
+           Example: "kubernetes/prod/very/long/path/to/service" -> "kubernetes/prod/very/long/path/to/se..."
+
+        2. **Small value rollup**: Values contributing < other_threshold_pct are grouped as "other"
+           - Default 0.1% means anything < 0.1% of total GB is rolled into "other"
+           - Shows total categories count for rolled-up values
+           - Enables focus on major contributors
+
+    Credit Rates:
+        - Continuous/Flex: 20 credits/GB
+        - Frequent: 9 credits/GB
+        - Infrequent: 0.4 credits/GB
+        - CSE: 25 credits/GB
+
+    Use Cases:
+        - **High-cardinality environments**: Analyze 5000+ source categories effectively
+        - **Executive reporting**: Focus on top contributors, hide noise
+        - **Cost optimization**: Identify major credit drivers
+        - **Trend analysis**: Compare period-over-period for top sources
+        - **Tier analysis**: Filter by specific data tiers (Infrequent, Flex, etc.)
+
+    Example Scenarios:
+        1. **Top Flex tier consumers (> 1% each):**
+           ```
+           tier_filter="Flex", other_threshold_pct=1.0, sort_by="credits"
+           ```
+
+        2. **Infrequent tier analysis with short names:**
+           ```
+           tier_filter="Infrequent", max_chars=30, other_threshold_pct=0.5
+           ```
+
+        3. **Production source categories only:**
+           ```
+           value_filter="*prod*", other_threshold_pct=0.2
+           ```
+
+    Notes:
+        - Large accounts with 1000s of values benefit most from this tool
+        - The "other" category shows count of rolled-up sources in categories field
+        - Adjust other_threshold_pct based on your environment (0.1% to 1% typical)
+        - Uses parse regex for better performance than json operator
+        - Results sorted by credits (descending) by default to show top cost drivers
+
+    Time Format Examples:
+        - Relative: "-1h", "-24h", "-7d", "-30d"
+        - ISO: "2024-01-01T00:00:00Z"
+        - Epoch ms: "1704067200000"
+
+    API Reference: https://help.sumologic.com/docs/manage/ingestion-volume/data-volume-index/
+    """
+    try:
+        _ensure_config_initialized()
+        config = get_config()
+        instance = validate_instance_name(instance)
+
+        # Map dimension to source category
+        dimension_map = {
+            "sourceCategory": "sourcecategory",
+            "collector": "collector",
+            "source": "source",
+            "sourceHost": "sourcehost",
+            "sourceName": "sourcename",
+            "view": "view"
+        }
+
+        if dimension not in dimension_map:
+            raise ValidationError(
+                f"Invalid dimension '{dimension}'. "
+                f"Valid options: {', '.join(dimension_map.keys())}"
+            )
+
+        dimension_lower = dimension_map[dimension]
+
+        # Build the advanced query with parameter substitution
+        query = f"""(_index=sumologic_volume) _sourceCategory={dimension_lower}_and_tier_volume
+| parse regex "\\{{\\"field\\":\\"(?<value>[^\\"]+)\\",\\"dataTier\\":\\"(?<dataTier>[^\\"]+)\\",\\"sizeInBytes\\":(?<sizeInBytes>[^\\"]+),\\"count\\":(?<count>[^\\"]+)\\}}" multi
+| where tolowercase(value) matches tolowercase("{value_filter}")
+| where dataTier matches "{tier_filter}"
+| sum(count) as events,sum(sizeInBytes) as bytes by dataTier, value,_sourceCategory
+| bytes /1024/1024/1024 as gb | sort gb
+| parse field=_sourceCategory "*_and_tier_volume" as dimension
+| fields -_sourceCategory,bytes
+| if (length(value) > {max_chars},concat(substring(value,0,{max_chars}),"..."),value) as value
+| count as categories,sum(events) as events,sum(gb) as gbytes by dimension,value,dataTier
+| total gbytes as tgb
+| total gbytes as tgbs by value,dataTier
+| tgbs / tgb as fraction
+| if(( fraction * 100 ) > {other_threshold_pct},value,"other" ) as value
+| fraction * 100 as percent
+| if (dataTier="Frequent",gbytes * 9,gbytes * 20) as credits
+| if (dataTier="Infrequent",gbytes * 0.4,credits) as credits
+| if (dataTier="CSE",gbytes * 25,credits) as credits
+| sum(categories) as categories, sum(credits) as credits, sum(events) as events,sum(gbytes) as gbytes, sum(percent) as pct_GB by dataTier,dimension,value
+| credits/gbytes as %"cr/gb"
+| sort {sort_by} desc
+| total credits as tc | 100 * (credits/tc) as pct_cr | fields -tc
+| limit {limit}"""
+
+        # Execute the query
+        client = await get_sumo_client(instance)
+        limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
+
+        # Parse time values
+        from_epoch = parse_time_to_epoch(from_time)
+        to_epoch = parse_time_to_epoch(to_time)
+
+        if from_epoch >= to_epoch:
+            raise ValidationError("from_time must be before to_time")
+
+        await limiter.acquire("analyze_data_volume_grouped")
+        logger.info(f"Starting grouped data volume analysis for dimension: {dimension}")
+
+        # Use search_logs to execute the query
+        results = await client.search_logs(
+            query=query,
+            from_time=str(from_epoch),
+            to_time=str(to_epoch),
+            timezone_str=time_zone,
+            by_receipt_time=False
+        )
+
+        # Format the response
+        records = results.get("results", [])
+
+        output = {
+            "dimension": dimension,
+            "time_range": {
+                "from": from_time,
+                "to": to_time,
+                "timezone": time_zone
+            },
+            "query_options": {
+                "value_filter": value_filter,
+                "tier_filter": tier_filter,
+                "max_chars": max_chars,
+                "other_threshold_pct": other_threshold_pct,
+                "sort_by": sort_by,
+                "limit": limit
+            },
+            "summary": {
+                "total_records": len(records),
+                "query_type": results.get("query_type", "records"),
+                "note": "Values < {:.1f}% of total GB are grouped as 'other'".format(other_threshold_pct)
+            },
+            "data": []
+        }
+
+        # Extract data from records
+        for record in records:
+            record_map = record.get("map", {})
+            data_entry = {}
+
+            # Extract all fields
+            for key, value in record_map.items():
+                # Skip internal fields
+                if key.startswith("_"):
+                    continue
+                data_entry[key] = value
+
+            output["data"].append(data_entry)
+
+        return json.dumps(output, indent=2)
+
+    except Exception as e:
+        return handle_tool_error(e, "analyze_data_volume_grouped")
+
+
 # MCP Resources
 
 @mcp.resource("sumo://logs/recent-errors")
