@@ -296,8 +296,8 @@ class TestSearchJobIntegration:
 
         # This is an aggregate query that should return records
         result = await client.search_logs(
-            query="* | count",
-            from_time="-1h",
+            query="* | limit 10000 | count",
+            from_time="-24h",
             to_time="now",
             timezone_str="UTC"
         )
@@ -319,8 +319,8 @@ class TestSearchJobIntegration:
 
         # This is a raw message query
         result = await client.search_logs(
-            query="*",
-            from_time="-1h",
+            query="* | limit 1000",
+            from_time="-24h",
             to_time="now",
             timezone_str="UTC"
         )
@@ -339,7 +339,7 @@ class TestSearchJobIntegration:
 
         # Create a search job
         job_info = await client.create_search_job(
-            query="* | count",
+            query="* | limit 10000| count",
             from_time="-1h",
             to_time="now",
             timezone_str="UTC"

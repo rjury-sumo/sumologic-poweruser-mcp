@@ -237,18 +237,22 @@ class SumoLogicClient:
 
             if state == "DONE GATHERING RESULTS":
                 # Get results based on query type
+                config = get_config()
+                max_limit = config.server_config.max_query_limit
                 if query_type == "records":
                     results_response = await self._request(
                         "GET",
                         f"/search/jobs/{job_id}/records",
-                        api_version="v1"
+                        api_version="v1",
+                        params={"offset": 0, "limit": max_limit}
                     )
                     results_key = "records"
                 else:
                     results_response = await self._request(
                         "GET",
                         f"/search/jobs/{job_id}/messages",
-                        api_version="v1"
+                        api_version="v1",
+                        params={"offset": 0, "limit": max_limit}
                     )
                     results_key = "messages"
 
@@ -428,6 +432,107 @@ class SumoLogicClient:
         params = {"limit": limit, "offset": offset}
         return await self._request("GET", "/partitions", api_version="v1", params=params)
 
+    # Content Library API methods
+
+    async def get_personal_folder(self, include_children: bool = True) -> Dict[str, Any]:
+        """Get user's personal folder."""
+        params = {} if include_children else {"includeChildren": "false"}
+        return await self._request("GET", "/content/folders/personal", api_version="v2", params=params)
+
+    async def get_folder_by_id(self, folder_id: str, include_children: bool = True) -> Dict[str, Any]:
+        """Get folder by ID."""
+        params = {} if include_children else {"includeChildren": "false"}
+        return await self._request("GET", f"/content/folders/{folder_id}", api_version="v2", params=params)
+
+    async def get_content_by_path(self, content_path: str) -> Dict[str, Any]:
+        """Get content item by path."""
+        params = {"path": content_path}
+        return await self._request("GET", "/content/path", api_version="v2", params=params)
+
+    async def get_content_path(self, content_id: str) -> Dict[str, Any]:
+        """Get content path by ID."""
+        return await self._request("GET", f"/content/{content_id}/path", api_version="v2")
+
+    async def begin_content_export(self, content_id: str, is_admin_mode: bool = False) -> Dict[str, Any]:
+        """Begin async content export."""
+        params = {"isAdminMode": str(is_admin_mode).lower()} if is_admin_mode else {}
+        return await self._request("POST", f"/content/{content_id}/export", api_version="v2", params=params)
+
+    async def get_content_export_status(self, content_id: str, job_id: str) -> Dict[str, Any]:
+        """Get content export job status."""
+        return await self._request("GET", f"/content/{content_id}/export/{job_id}/status", api_version="v2")
+
+    async def get_content_export_result(self, content_id: str, job_id: str) -> Dict[str, Any]:
+        """Get content export job result."""
+        return await self._request("GET", f"/content/{content_id}/export/{job_id}/result", api_version="v2")
+
+    async def begin_global_folder_export(self, is_admin_mode: bool = False) -> Dict[str, Any]:
+        """Begin async Global folder export."""
+        params = {"isAdminMode": str(is_admin_mode).lower()} if is_admin_mode else {}
+        return await self._request("GET", "/content/folders/global", api_version="v2", params=params)
+
+    async def get_global_folder_export_status(self, job_id: str) -> Dict[str, Any]:
+        """Get Global folder export job status."""
+        return await self._request("GET", f"/content/folders/global/{job_id}/status", api_version="v2")
+
+    async def get_global_folder_export_result(self, job_id: str) -> Dict[str, Any]:
+        """Get Global folder export job result."""
+        return await self._request("GET", f"/content/folders/global/{job_id}/result", api_version="v2")
+
+    async def begin_admin_recommended_export(self, is_admin_mode: bool = False) -> Dict[str, Any]:
+        """Begin async Admin Recommended folder export."""
+        params = {"isAdminMode": str(is_admin_mode).lower()} if is_admin_mode else {}
+        return await self._request("GET", "/content/folders/adminRecommended", api_version="v2", params=params)
+
+    async def get_admin_recommended_export_status(self, job_id: str) -> Dict[str, Any]:
+        """Get Admin Recommended folder export job status."""
+        return await self._request("GET", f"/content/folders/adminRecommended/{job_id}/status", api_version="v2")
+
+    async def get_admin_recommended_export_result(self, job_id: str) -> Dict[str, Any]:
+        """Get Admin Recommended folder export job result."""
+        return await self._request("GET", f"/content/folders/adminRecommended/{job_id}/result", api_version="v2")
+
+    # Account Management API methods
+
+    async def get_account_status(self) -> Dict[str, Any]:
+        """Get account status including subscription, plan type, and usage."""
+        return await self._request("GET", "/account/status", api_version="v1")
+
+    async def get_usage_forecast(self, number_of_days: int) -> Dict[str, Any]:
+        """Get usage forecast for specified number of days."""
+        params = {"numberOfDays": number_of_days}
+        return await self._request("GET", "/account/usageForecast", api_version="v1", params=params)
+
+    async def start_usage_export(
+        self,
+        start_date: str,
+        end_date: str,
+        group_by: str = "day",
+        report_type: str = "standard",
+        include_deployment_charge: bool = False
+    ) -> Dict[str, Any]:
+        """Start async usage report export job."""
+        data = {
+            "groupBy": group_by,
+            "reportType": report_type,
+            "includeDeploymentCharge": include_deployment_charge,
+            "startDate": start_date,
+            "endDate": end_date
+        }
+        return await self._request("POST", "/account/usage/report", api_version="v1", json=data)
+
+    async def get_usage_export_status(self, job_id: str) -> Dict[str, Any]:
+        """Get usage export job status."""
+        return await self._request("GET", f"/account/usage/report/{job_id}/status", api_version="v1")
+
+    async def get_usage_export_result(self, job_id: str) -> Dict[str, Any]:
+        """Get usage export result (download URL when job is complete)."""
+        status = await self.get_usage_export_status(job_id)
+        if status.get("status") == "Success":
+            return status
+        else:
+            return {"status": status.get("status", "Unknown"), "job_id": job_id}
+
 
 # Client pool - maps instance name to client
 clients: Dict[str, SumoLogicClient] = {}
@@ -474,10 +579,10 @@ def handle_tool_error(e: Exception, tool_name: str) -> str:
 async def search_sumo_logs(
     query: str = Field(description="Sumo Logic search query"),
     hours_back: int = Field(default=1, description="Number of hours to search back from now (ignored if from_time/to_time provided)"),
-    from_time: Optional[str] = Field(default=None, description="Start time: ISO8601, epoch ms, or relative like '-1h' (overrides hours_back)"),
-    to_time: Optional[str] = Field(default=None, description="End time: ISO8601, epoch ms, or relative like 'now' (overrides hours_back)"),
-    timezone_param: str = Field(default="UTC", description="Timezone for the search", alias="timezone"),
-    by_receipt_time: bool = Field(default=False, description="Use receipt time instead of message time (for delayed logs)"),
+    from_time: Optional[str] = None,
+    to_time: Optional[str] = None,
+    time_zone: str = "UTC",
+    by_receipt_time: bool = False,
     instance: str = Field(default='default', description="Sumo Logic instance name")
 ) -> str:
     """
@@ -528,7 +633,7 @@ async def search_sumo_logs(
             query,
             from_str,
             to_str,
-            timezone_param,
+            time_zone,
             by_receipt_time
         )
 
@@ -543,8 +648,8 @@ async def create_sumo_search_job(
     query: str = Field(description="Sumo Logic search query"),
     from_time: str = Field(description="Start time: ISO8601, epoch ms, or relative like '-1h'"),
     to_time: str = Field(description="End time: ISO8601, epoch ms, or relative like 'now'"),
-    timezone_param: str = Field(default="UTC", description="Timezone for the search", alias="timezone"),
-    by_receipt_time: bool = Field(default=False, description="Use receipt time instead of message time"),
+    time_zone: str = "UTC",
+    by_receipt_time: bool = False,
     instance: str = Field(default='default', description="Sumo Logic instance name")
 ) -> str:
     """
@@ -570,7 +675,7 @@ async def create_sumo_search_job(
             query,
             from_time,
             to_time,
-            timezone_param,
+            time_zone,
             by_receipt_time
         )
 
@@ -614,9 +719,9 @@ async def get_sumo_search_job_status(
 @mcp.tool()
 async def get_sumo_search_job_results(
     job_id: str = Field(description="Search job ID"),
-    result_type: str = Field(default="auto", description="Result type: 'auto', 'messages', or 'records'"),
-    offset: int = Field(default=0, description="Starting offset for pagination"),
-    limit: int = Field(default=1000, description="Maximum results to return (1-10000)"),
+    result_type: str = "auto",
+    offset: int = 0,
+    limit: int = 1000,
     instance: str = Field(default='default', description="Sumo Logic instance name")
 ) -> str:
     """
@@ -670,6 +775,8 @@ async def get_sumo_collectors(
 ) -> str:
     """Get list of Sumo Logic collectors."""
     try:
+        _ensure_config_initialized()
+        config = get_config()
         limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
         await limiter.acquire("get_sumo_collectors")
 
@@ -690,6 +797,8 @@ async def get_sumo_sources(
 ) -> str:
     """Get sources for a specific Sumo Logic collector."""
     try:
+        _ensure_config_initialized()
+        config = get_config()
         limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
         await limiter.acquire("get_sumo_sources")
 
@@ -710,6 +819,8 @@ async def get_sumo_users(
 ) -> str:
     """Get list of Sumo Logic users."""
     try:
+        _ensure_config_initialized()
+        config = get_config()
         limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
         await limiter.acquire("get_sumo_users")
 
@@ -723,24 +834,254 @@ async def get_sumo_users(
         return handle_tool_error(e, "get_sumo_users")
 
 
+# Content Library Tools (replace old get_sumo_folders)
+
 @mcp.tool()
-async def get_sumo_folders(
-    limit: int = Field(default=100, description="Maximum number of results"),
+async def get_personal_folder(
+    include_children: bool = True,
     instance: str = Field(default='default', description="Sumo Logic instance name")
 ) -> str:
-    """Get list of Sumo Logic content folders."""
+    """
+    Get user's personal folder with optional children.
+
+    This is the fastest way to access personal library content as it uses
+    a synchronous folder API. Returns folder metadata and optionally its children.
+    """
     try:
+        _ensure_config_initialized()
+        config = get_config()
         limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
-        await limiter.acquire("get_sumo_folders")
+        await limiter.acquire("get_personal_folder")
 
-        limit, _ = validate_pagination(limit, 0)
         instance = validate_instance_name(instance)
-
         client = await get_sumo_client(instance)
-        folders = await client.get_folders(limit=limit)
-        return json.dumps(folders, indent=2)
+
+        result = await client.get_personal_folder(include_children)
+        return json.dumps(result, indent=2)
+
     except Exception as e:
-        return handle_tool_error(e, "get_sumo_folders")
+        return handle_tool_error(e, "get_personal_folder")
+
+
+@mcp.tool()
+async def get_folder_by_id(
+    folder_id: str = Field(description="Hex folder ID (16 characters)"),
+    include_children: bool = True,
+    instance: str = Field(default='default', description="Sumo Logic instance name")
+) -> str:
+    """
+    Get a specific folder by ID with optional children.
+
+    Use this to navigate folder hierarchy. Returns folder metadata and
+    optionally its immediate children (folders and content items).
+    """
+    try:
+        _ensure_config_initialized()
+        config = get_config()
+        limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
+        await limiter.acquire("get_folder_by_id")
+
+        instance = validate_instance_name(instance)
+        folder_id = validate_query_input(folder_id)  # Basic validation
+        client = await get_sumo_client(instance)
+
+        result = await client.get_folder_by_id(folder_id, include_children)
+        return json.dumps(result, indent=2)
+
+    except Exception as e:
+        return handle_tool_error(e, "get_folder_by_id")
+
+
+@mcp.tool()
+async def get_content_by_path(
+    content_path: str = Field(description="Full library path (e.g., /Library/Users/user@email.com/MyFolder)"),
+    instance: str = Field(default='default', description="Sumo Logic instance name")
+) -> str:
+    """
+    Get content item by its library path.
+
+    Path format: /Library/Users/<email>/path/to/content
+    or /Library/Global/path/to/content
+    """
+    try:
+        _ensure_config_initialized()
+        config = get_config()
+        limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
+        await limiter.acquire("get_content_by_path")
+
+        instance = validate_instance_name(instance)
+        client = await get_sumo_client(instance)
+
+        result = await client.get_content_by_path(content_path)
+        return json.dumps(result, indent=2)
+
+    except Exception as e:
+        return handle_tool_error(e, "get_content_by_path")
+
+
+@mcp.tool()
+async def get_content_path_by_id(
+    content_id: str = Field(description="Hex content ID"),
+    instance: str = Field(default='default', description="Sumo Logic instance name")
+) -> str:
+    """
+    Get the full library path for a content ID.
+
+    Returns the absolute path in the library hierarchy.
+    Useful for displaying content location or building breadcrumbs.
+    """
+    try:
+        _ensure_config_initialized()
+        config = get_config()
+        limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
+        await limiter.acquire("get_content_path_by_id")
+
+        instance = validate_instance_name(instance)
+        content_id = validate_query_input(content_id)
+        client = await get_sumo_client(instance)
+
+        result = await client.get_content_path(content_id)
+        return json.dumps(result, indent=2)
+
+    except Exception as e:
+        return handle_tool_error(e, "get_content_path_by_id")
+
+
+@mcp.tool()
+async def export_content(
+    content_id: str = Field(description="Hex content ID to export"),
+    is_admin_mode: bool = False,
+    max_wait_seconds: int = 300,
+    instance: str = Field(default='default', description="Sumo Logic instance name")
+) -> str:
+    """
+    Export full content structure (dashboards, searches, etc.) with async job handling.
+
+    This handles the complete async export workflow:
+    1. Start export job
+    2. Poll for completion (default 5 minutes max)
+    3. Return full content structure
+
+    Use this for dashboards, searches, and other content to get their
+    complete definition including nested structures, search queries, dashboard panels, etc.
+
+    Set is_admin_mode=true to export with admin permissions (shows more content).
+    """
+    try:
+        from .async_export_helper import poll_export_job
+
+        _ensure_config_initialized()
+        config = get_config()
+        limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
+        await limiter.acquire("export_content")
+
+        instance = validate_instance_name(instance)
+        content_id = validate_query_input(content_id)
+        client = await get_sumo_client(instance)
+
+        # Start export job
+        job_response = await client.begin_content_export(content_id, is_admin_mode)
+        job_id = job_response['id']
+
+        # Poll for completion
+        result = await poll_export_job(
+            job_id=job_id,
+            content_id=content_id,
+            get_status_func=lambda cid, jid: client.get_content_export_status(cid, jid),
+            get_result_func=lambda cid, jid: client.get_content_export_result(cid, jid),
+            max_wait_seconds=max_wait_seconds
+        )
+
+        return json.dumps(result, indent=2)
+
+    except Exception as e:
+        return handle_tool_error(e, "export_content")
+
+
+@mcp.tool()
+async def export_global_folder(
+    is_admin_mode: bool = False,
+    max_wait_seconds: int = 300,
+    instance: str = Field(default='default', description="Sumo Logic instance name")
+) -> str:
+    """
+    Export Global folder contents (async).
+
+    IMPORTANT: Global folder uses 'data' array instead of 'children' for its contents.
+    This is different from other folders and Admin Recommended.
+
+    Set is_admin_mode=true to see more content (requires admin permissions).
+    """
+    try:
+        from .async_export_helper import poll_folder_export_job
+
+        _ensure_config_initialized()
+        config = get_config()
+        limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
+        await limiter.acquire("export_global_folder")
+
+        instance = validate_instance_name(instance)
+        client = await get_sumo_client(instance)
+
+        # Start export job
+        job_response = await client.begin_global_folder_export(is_admin_mode)
+        job_id = job_response['id']
+
+        # Poll for completion
+        result = await poll_folder_export_job(
+            job_id=job_id,
+            folder_type="Global folder",
+            get_status_func=lambda jid: client.get_global_folder_export_status(jid),
+            get_result_func=lambda jid: client.get_global_folder_export_result(jid),
+            max_wait_seconds=max_wait_seconds
+        )
+
+        return json.dumps(result, indent=2)
+
+    except Exception as e:
+        return handle_tool_error(e, "export_global_folder")
+
+
+@mcp.tool()
+async def export_admin_recommended_folder(
+    is_admin_mode: bool = False,
+    max_wait_seconds: int = 300,
+    instance: str = Field(default='default', description="Sumo Logic instance name")
+) -> str:
+    """
+    Export Admin Recommended folder (async).
+
+    Returns admin-curated content. Unlike Global folder, this uses 'children' array.
+    Set is_admin_mode=true to see more content (requires admin permissions).
+    """
+    try:
+        from .async_export_helper import poll_folder_export_job
+
+        _ensure_config_initialized()
+        config = get_config()
+        limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
+        await limiter.acquire("export_admin_recommended_folder")
+
+        instance = validate_instance_name(instance)
+        client = await get_sumo_client(instance)
+
+        # Start export job
+        job_response = await client.begin_admin_recommended_export(is_admin_mode)
+        job_id = job_response['id']
+
+        # Poll for completion
+        result = await poll_folder_export_job(
+            job_id=job_id,
+            folder_type="Admin Recommended folder",
+            get_status_func=lambda jid: client.get_admin_recommended_export_status(jid),
+            get_result_func=lambda jid: client.get_admin_recommended_export_result(jid),
+            max_wait_seconds=max_wait_seconds
+        )
+
+        return json.dumps(result, indent=2)
+
+    except Exception as e:
+        return handle_tool_error(e, "export_admin_recommended_folder")
 
 
 @mcp.tool()
@@ -750,6 +1091,8 @@ async def get_sumo_dashboards(
 ) -> str:
     """Get list of Sumo Logic dashboards."""
     try:
+        _ensure_config_initialized()
+        config = get_config()
         limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
         await limiter.acquire("get_sumo_dashboards")
 
@@ -778,6 +1121,8 @@ async def query_sumo_metrics(
     - metric=Disk_Used_Percent | where host="web-server-1"
     """
     try:
+        _ensure_config_initialized()
+        config = get_config()
         limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
         await limiter.acquire("query_sumo_metrics")
 
@@ -801,26 +1146,7 @@ async def query_sumo_metrics(
         return handle_tool_error(e, "query_sumo_metrics")
 
 
-@mcp.tool()
-async def get_sumo_content_v2(
-    content_type: str = Field(default="Dashboard", description="Type of content"),
-    limit: int = Field(default=100, description="Maximum number of items to return"),
-    instance: str = Field(default='default', description="Sumo Logic instance name")
-) -> str:
-    """Get content using the v2 Content API. Supports Dashboard, Search, Folder, and other content types."""
-    try:
-        limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
-        await limiter.acquire("get_sumo_content_v2")
-
-        validation = ContentTypeValidation(content_type=content_type)
-        limit, _ = validate_pagination(limit, 0)
-        instance = validate_instance_name(instance)
-
-        client = await get_sumo_client(instance)
-        content = await client.get_content_v2(validation.content_type, limit)
-        return json.dumps(content, indent=2)
-    except Exception as e:
-        return handle_tool_error(e, "get_sumo_content_v2")
+# get_sumo_content_v2 removed - replaced by get_personal_folder, get_folder_by_id, and export_* tools
 
 
 @mcp.tool()
@@ -830,6 +1156,8 @@ async def get_sumo_roles_v2(
 ) -> str:
     """Get list of roles using the v2 Roles API."""
     try:
+        _ensure_config_initialized()
+        config = get_config()
         limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
         await limiter.acquire("get_sumo_roles_v2")
 
@@ -860,6 +1188,8 @@ async def search_sumo_monitors(
     - 'name:*error*' - Search monitors with 'error' in name
     """
     try:
+        _ensure_config_initialized()
+        config = get_config()
         limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
         await limiter.acquire("search_sumo_monitors")
 
@@ -881,6 +1211,8 @@ async def get_sumo_partitions(
 ) -> str:
     """Get list of partitions."""
     try:
+        _ensure_config_initialized()
+        config = get_config()
         limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
         await limiter.acquire("get_sumo_partitions")
 
@@ -898,6 +1230,8 @@ async def get_sumo_partitions(
 async def list_sumo_instances() -> str:
     """List all configured Sumo Logic instances."""
     try:
+        _ensure_config_initialized()
+        config = get_config()
         instances = config.list_instances()
         return json.dumps({
             "instances": instances,
@@ -905,6 +1239,485 @@ async def list_sumo_instances() -> str:
         }, indent=2)
     except Exception as e:
         return handle_tool_error(e, "list_sumo_instances")
+
+
+# Search Audit Tool
+
+@mcp.tool()
+async def run_search_audit_query(
+    from_time: str = "-24h",
+    to_time: str = "now",
+    query_type: str = "*",
+    user_name: str = "*",
+    content_name: str = "*",
+    query_filter: str = "*",
+    query_regex: str = ".*",
+    include_raw_data: bool = False,
+    instance: str = Field(default='default', description="Sumo Logic instance name")
+) -> str:
+    """
+    Run a search audit query to analyze search usage and performance.
+
+    Search audit queries the special index _view=sumologic_search_usage_per_query
+    to provide insights into search patterns, data scanned, execution time, etc.
+
+    Aggregates search usage metrics by user, query, query type, and content.
+    Calculates data scanned (including Infrequent and Flex tiers), runtime,
+    time range, partitions scanned, and result counts.
+
+    Parameters:
+        from_time: Start time (relative like '-24h' or ISO8601)
+        to_time: End time (relative like 'now' or ISO8601)
+        query_type: Filter by query type (* for all, Interactive, Scheduled, etc.)
+        user_name: Filter by username (* for all, use wildcards like 'john*')
+        content_name: Filter by content name (* for all)
+        query_filter: Filter by query text (* for all)
+        query_regex: Regex pattern to filter queries (default: '.*' for all)
+        include_raw_data: Include raw field data in results (default: False)
+        instance: Instance name
+
+    Returns:
+        Aggregated search audit results with metrics:
+        - searches: Number of searches
+        - scan_gb: Total data scanned in GB
+        - inf_scan_gb: Infrequent tier data scanned in GB
+        - flex_scan_gb: Flex tier data scanned in GB
+        - results: Total retrieved message count
+        - avg_partitions: Average partitions scanned
+        - avg_range_h: Average time range in hours
+        - sum_runtime_minutes: Total runtime in minutes
+        - avg_runtime_minutes: Average runtime in minutes
+
+    Example queries:
+        - All searches in last 24h: (defaults)
+        - Interactive searches by user: query_type='Interactive', user_name='john@example.com'
+        - Dashboard searches: query_type='Scheduled', content_name='*Dashboard*'
+        - Expensive searches: query_regex='.*\| count.*' (searches with count operator)
+
+    Reference: https://www.sumologic.com/help/docs/manage/security/audit-indexes/search-audit-index/
+    """
+    try:
+        _ensure_config_initialized()
+        config = get_config()
+        limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
+        await limiter.acquire("run_search_audit_query")
+
+        instance = validate_instance_name(instance)
+        client = await get_sumo_client(instance)
+
+        # Build search audit query
+        query = f"""_view=sumologic_search_usage_per_query
+query_type={query_type}
+user_name={user_name}
+content_name={content_name}
+query={query_filter}
+
+| ((query_end_time - query_start_time ) /1000 / 60 ) as time_range_m
+| json field=scanned_bytes_breakdown "Infrequent" as inf_bytes nodrop
+| json field=scanned_bytes_breakdown "Flex" as flex_bytes nodrop
+| if (isnull(inf_bytes),0,inf_bytes) as inf_bytes
+| if (isnull(flex_bytes),0,flex_bytes) as flex_bytes
+
+| round((data_scanned_bytes /1024/1024/1024) * 10 )/10 as scan_gbytes
+| round((inf_bytes/1024/1024/1024) * 10) / 10 as inf_scan_gb
+| round((flex_bytes/1024/1024/1024) * 10) / 10 as flex_scan_gb
+| execution_duration_ms / ( 1000 * 60) as runtime_minutes
+
+| time_range_m/60 as time_range_h
+| count as searches, sum(scan_gbytes) as scan_gb, sum(inf_scan_gb) as inf_scan_gb, sum(flex_scan_gb) as flex_scan_gb, sum(retrieved_message_count) as results, avg(scanned_partition_count) as avg_partitions,
+ avg(time_range_h) as avg_range_h, sum(runtime_minutes) as sum_runtime_minutes, avg(runtime_minutes) as avg_runtime_minutes by user_name, query, query_type, content_name, content_identifier | sort query asc
+| where query matches /(?i){query_regex}/"""
+
+        # Create search job
+        job_response = await client.create_search_job(
+            query=query,
+            from_time=from_time,
+            to_time=to_time,
+            timezone_str="UTC"
+        )
+
+        job_id = job_response['id']
+
+        # Poll for completion with timeout
+        max_attempts = 300  # 5 minutes
+        for attempt in range(max_attempts):
+            await asyncio.sleep(1)
+
+            status = await client.get_search_job_status(job_id)
+            state = status['state']
+
+            if state == 'DONE GATHERING RESULTS':
+                break
+            elif state == 'CANCELLED':
+                raise APIError("Search job was cancelled")
+
+        # Get records (aggregated results)
+        records_response = await client.get_search_job_records(job_id, limit=10000)
+        records = records_response.get('records', [])
+
+        # Delete the job
+        try:
+            await client.delete_search_job(job_id)
+        except:
+            pass  # Best effort cleanup
+
+        # Helper to safely convert to int
+        def safe_int(value, default=0):
+            try:
+                return int(float(value)) if value else default
+            except (ValueError, TypeError):
+                return default
+
+        # Helper to safely convert to float
+        def safe_float(value, default=0.0):
+            try:
+                return float(value) if value else default
+            except (ValueError, TypeError):
+                return default
+
+        # Format results with summary
+        result = {
+            "query_parameters": {
+                "from_time": from_time,
+                "to_time": to_time,
+                "query_type": query_type,
+                "user_name": user_name,
+                "content_name": content_name,
+                "query_filter": query_filter,
+                "query_regex": query_regex
+            },
+            "summary": {
+                "total_records": len(records),
+                "total_searches": sum(safe_int(r.get('map', {}).get('searches', 0)) for r in records),
+                "total_scan_gb": sum(safe_float(r.get('map', {}).get('scan_gb', 0)) for r in records),
+                "total_inf_scan_gb": sum(safe_float(r.get('map', {}).get('inf_scan_gb', 0)) for r in records),
+                "total_flex_scan_gb": sum(safe_float(r.get('map', {}).get('flex_scan_gb', 0)) for r in records),
+            },
+            "records": []
+        }
+
+        # Process records
+        for record in records:
+            record_map = record.get('map', {})
+            processed_record = {
+                "user_name": record_map.get('user_name'),
+                "query_type": record_map.get('query_type'),
+                "content_name": record_map.get('content_name'),
+                "content_identifier": record_map.get('content_identifier'),
+                "query": record_map.get('query'),
+                "searches": safe_int(record_map.get('searches', 0)),
+                "scan_gb": safe_float(record_map.get('scan_gb', 0)),
+                "inf_scan_gb": safe_float(record_map.get('inf_scan_gb', 0)),
+                "flex_scan_gb": safe_float(record_map.get('flex_scan_gb', 0)),
+                "results": safe_int(record_map.get('results', 0)),
+                "avg_partitions": safe_float(record_map.get('avg_partitions', 0)),
+                "avg_range_h": safe_float(record_map.get('avg_range_h', 0)),
+                "sum_runtime_minutes": safe_float(record_map.get('sum_runtime_minutes', 0)),
+                "avg_runtime_minutes": safe_float(record_map.get('avg_runtime_minutes', 0)),
+            }
+
+            if include_raw_data:
+                processed_record['_raw'] = record
+
+            result["records"].append(processed_record)
+
+        return json.dumps(result, indent=2)
+
+    except Exception as e:
+        return handle_tool_error(e, "run_search_audit_query")
+
+
+# Content ID Utility Tools
+
+@mcp.tool()
+async def convert_content_id_hex_to_decimal(
+    hex_id: str = Field(description="Hex content ID (e.g., 00000000005E5403)")
+) -> str:
+    """
+    Convert hex content ID to decimal format for web UI URLs.
+
+    Sumo Logic stores content IDs as 16-character hex strings but the
+    web UI uses decimal format in URLs. Use this to generate shareable links.
+
+    Example: 00000000005E5403 → 6181891
+    """
+    try:
+        from .content_id_utils import hex_to_decimal, format_content_id
+
+        decimal_id = hex_to_decimal(hex_id)
+
+        return json.dumps({
+            "hex_id": hex_id.upper(),
+            "decimal_id": decimal_id,
+            "formatted": format_content_id(hex_id)
+        }, indent=2)
+
+    except Exception as e:
+        return handle_tool_error(e, "convert_content_id_hex_to_decimal")
+
+
+@mcp.tool()
+async def convert_content_id_decimal_to_hex(
+    decimal_id: str = Field(description="Decimal content ID (e.g., 6181891)")
+) -> str:
+    """
+    Convert decimal content ID to hex format for API calls.
+
+    Use this when you have a content ID from the web UI (decimal)
+    and need to call an API (requires hex format).
+
+    Example: 6181891 → 00000000005E5403
+    """
+    try:
+        from .content_id_utils import decimal_to_hex, format_content_id
+
+        hex_id = decimal_to_hex(decimal_id)
+
+        return json.dumps({
+            "hex_id": hex_id,
+            "decimal_id": decimal_id,
+            "formatted": format_content_id(hex_id)
+        }, indent=2)
+
+    except Exception as e:
+        return handle_tool_error(e, "convert_content_id_decimal_to_hex")
+
+
+@mcp.tool()
+async def get_content_web_url(
+    content_id: str = Field(description="Content ID (hex or decimal)"),
+    instance: str = Field(default='default', description="Sumo Logic instance name")
+) -> str:
+    """
+    Generate web UI URL for a content item.
+
+    Accepts either hex or decimal content ID and generates the appropriate
+    web UI URL for the specified instance.
+
+    Returns a URL like: https://instance.sumologic.com/library/6181891
+    """
+    try:
+        from .content_id_utils import hex_to_decimal, is_valid_hex_id, normalize_to_hex
+
+        _ensure_config_initialized()
+        config = get_config()
+        instance = validate_instance_name(instance)
+
+        # Normalize to hex, then convert to decimal for URL
+        hex_id = normalize_to_hex(content_id)
+        decimal_id = hex_to_decimal(hex_id)
+
+        # Get instance endpoint
+        instance_config = config.get_instance(instance)
+        base_url = instance_config.endpoint.rstrip('/')
+
+        # Remove /api suffix if present
+        if base_url.endswith('/api'):
+            base_url = base_url[:-4]
+
+        # Construct library URL
+        url = f"{base_url}/library/{decimal_id}"
+
+        return json.dumps({
+            "url": url,
+            "hex_id": hex_id,
+            "decimal_id": decimal_id,
+            "instance": instance
+        }, indent=2)
+
+    except Exception as e:
+        return handle_tool_error(e, "get_content_web_url")
+
+
+# Account Management Tools
+
+@mcp.tool()
+async def get_account_status(
+    instance: str = Field(default='default', description="Sumo Logic instance name")
+) -> str:
+    """
+    Get account status including subscription, plan type, and usage information.
+
+    Returns account details including:
+    - Plan type (Trial, Essentials, Enterprise Operations, etc.)
+    - Total credits and usage
+    - Subscription period (start/end dates)
+    - Account creation date
+    - Organization ID
+
+    This is useful for understanding current subscription status and credit usage.
+
+    API Reference: https://api.sumologic.com/docs/#operation/getStatus
+    """
+    try:
+        _ensure_config_initialized()
+        config = get_config()
+        instance = validate_instance_name(instance)
+
+        client = await get_sumo_client(instance)
+        limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
+
+        await limiter.acquire("get_account_status")
+        result = await client.get_account_status()
+
+        return json.dumps(result, indent=2)
+
+    except Exception as e:
+        return handle_tool_error(e, "get_account_status")
+
+
+@mcp.tool()
+async def get_usage_forecast(
+    number_of_days: int = Field(description="Number of days to forecast (e.g., 7, 30, 90)"),
+    instance: str = Field(default='default', description="Sumo Logic instance name")
+) -> str:
+    """
+    Get usage forecast for specified number of days.
+
+    Provides projected usage based on recent consumption patterns:
+    - Forecasted total credits
+    - Forecasted continuous ingest
+    - Forecasted frequent ingest
+    - Forecasted storage
+    - Forecasted metrics ingest
+
+    Useful for capacity planning and predicting credit consumption.
+
+    Args:
+        number_of_days: Number of days to forecast (typically 7, 30, or 90)
+
+    API Reference: https://api.sumologic.com/docs/#operation/getUsageForecast
+    """
+    try:
+        _ensure_config_initialized()
+        config = get_config()
+        instance = validate_instance_name(instance)
+
+        # Validate number_of_days
+        if number_of_days < 1 or number_of_days > 365:
+            raise ValidationError("number_of_days must be between 1 and 365")
+
+        client = await get_sumo_client(instance)
+        limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
+
+        await limiter.acquire("get_usage_forecast")
+        result = await client.get_usage_forecast(number_of_days)
+
+        return json.dumps(result, indent=2)
+
+    except Exception as e:
+        return handle_tool_error(e, "get_usage_forecast")
+
+
+@mcp.tool()
+async def export_usage_report(
+    start_date: str,
+    end_date: str,
+    group_by: str = "day",
+    report_type: str = "standard",
+    include_deployment_charge: bool = False,
+    max_wait_seconds: int = 300,
+    poll_interval_seconds: int = 5,
+    instance: str = 'default'
+) -> str:
+    """
+    Export detailed usage report for a date range (async operation).
+
+    This starts an async export job, polls for completion, and returns the download URL.
+    The download URL is a presigned S3 URL valid for 10 minutes.
+
+    Returns:
+    - Download URL for CSV report
+    - Job status and timing information
+    - Report metadata (date range, grouping)
+
+    The CSV report includes detailed usage breakdowns:
+    - Daily/weekly/monthly totals
+    - Usage by product line (continuous ingest, frequent ingest, storage, metrics, etc.)
+    - Credit consumption details
+
+    Note: The download URL expires after 10 minutes. Download the CSV immediately.
+
+    API Reference: https://api.sumologic.com/docs/#operation/exportUsageReport
+    """
+    try:
+        from .async_export_helper import poll_folder_export_job
+
+        _ensure_config_initialized()
+        config = get_config()
+        instance = validate_instance_name(instance)
+
+        # Validate dates
+        try:
+            datetime.strptime(start_date, "%Y-%m-%d")
+            datetime.strptime(end_date, "%Y-%m-%d")
+        except ValueError as e:
+            raise ValidationError(f"Invalid date format. Use YYYY-MM-DD: {str(e)}")
+
+        # Validate group_by
+        if group_by not in ["day", "week", "month"]:
+            raise ValidationError("group_by must be 'day', 'week', or 'month'")
+
+        # Validate report_type
+        if report_type not in ["standard", "detailed", "childDetailed"]:
+            raise ValidationError("report_type must be 'standard', 'detailed', or 'childDetailed'")
+
+        client = await get_sumo_client(instance)
+        limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
+
+        # Start export job
+        await limiter.acquire("export_usage_report")
+        logger.info(f"Starting usage export job: {start_date} to {end_date}")
+        start_result = await client.start_usage_export(
+            start_date=start_date,
+            end_date=end_date,
+            group_by=group_by,
+            report_type=report_type,
+            include_deployment_charge=include_deployment_charge
+        )
+
+        job_id = start_result.get("jobId")
+        if not job_id:
+            raise APIError(f"No job ID returned from export start: {start_result}")
+
+        logger.info(f"Export job started: {job_id}")
+
+        # Poll for completion
+        async def get_status(jid: str) -> Dict[str, Any]:
+            await limiter.acquire("export_usage_report_poll")
+            return await client.get_usage_export_status(jid)
+
+        async def get_result(jid: str) -> Dict[str, Any]:
+            return await client.get_usage_export_result(jid)
+
+        final_result = await poll_folder_export_job(
+            job_id=job_id,
+            folder_type="Usage Report",
+            get_status_func=get_status,
+            get_result_func=get_result,
+            max_wait_seconds=max_wait_seconds,
+            poll_interval_seconds=poll_interval_seconds
+        )
+
+        # Extract download URL (field is reportDownloadURL)
+        download_url = final_result.get("reportDownloadURL")
+
+        result = {
+            "job_id": job_id,
+            "status": final_result.get("status"),
+            "download_url": download_url,
+            "start_date": start_date,
+            "end_date": end_date,
+            "group_by": group_by,
+            "report_type": report_type,
+            "note": "Download URL is valid for 10 minutes. Download the CSV immediately.",
+            "instance": instance
+        }
+
+        return json.dumps(result, indent=2)
+
+    except Exception as e:
+        return handle_tool_error(e, "export_usage_report")
 
 
 # MCP Resources

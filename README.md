@@ -113,19 +113,40 @@ Add to your Claude Desktop configuration file:
 **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
 **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
 
+**Option A: Using wrapper script (Recommended - keeps credentials in .env)**
+
 ```json
 {
   "mcpServers": {
     "sumologic": {
-      "command": "uv",
-      "args": ["--directory", "/path/to/sumologic-python-mcp", "run", "sumologic-mcp-server"],
-      "env": {}
+      "command": "/absolute/path/to/sumologic-python-mcp/scripts/run-with-env.sh",
+      "args": []
     }
   }
 }
 ```
 
-The server will automatically load credentials from your `.env` file.
+Replace `/absolute/path/to/sumologic-python-mcp` with your actual project path. The wrapper script will load credentials from your `.env` file.
+
+**Option B: Specify credentials directly in config**
+
+```json
+{
+  "mcpServers": {
+    "sumologic": {
+      "command": "uv",
+      "args": ["--directory", "/absolute/path/to/sumologic-python-mcp", "run", "sumologic-mcp-server"],
+      "env": {
+        "SUMO_ACCESS_ID": "your_access_id",
+        "SUMO_ACCESS_KEY": "your_access_key",
+        "SUMO_ENDPOINT": "https://api.sumologic.com"
+      }
+    }
+  }
+}
+```
+
+**⚠️ Security Note:** Option A is more secure as credentials stay in `.env` instead of the config file.
 
 4. **Restart Claude Desktop**
 
