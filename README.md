@@ -19,30 +19,48 @@ This Model Context Protocol (MCP) server provides secure, read-only access to Su
 
 ## Available Tools
 
-### Log & Metric Analysis
-- `search_sumo_logs` - Search logs with Sumo Logic query language (automatically detects query type)
-- `create_sumo_search_job` - Create a search job and return immediately with job ID
-- `get_sumo_search_job_status` - Check status of a search job
-- `get_sumo_search_job_results` - Retrieve results from a completed search job
-- `query_sumo_metrics` - Query metrics with aggregations
+**Total: 31 MCP Tools** organized into 8 categories
 
-### Configuration & Resources
-- `get_sumo_collectors` - List data collectors
-- `get_sumo_sources` - Get sources for a collector
-- `get_sumo_users` - List users
-- `get_sumo_folders` - List content folders
-- `get_sumo_dashboards` - List dashboards
-- `get_sumo_partitions` - List partitions
-- `get_sumo_roles_v2` - List roles
-- `get_sumo_content_v2` - Get content by type
+For complete tool documentation with parameters, examples, and use cases, see **[MCP Tools Reference](docs/mcp-tools-reference.md)**.
 
-### Monitoring
-- `search_sumo_monitors` - Search monitors and monitor folders
+### Quick Overview
 
-### Multi-Instance
-- `list_sumo_instances` - List all configured instances
+| Category | Count | Description |
+|----------|-------|-------------|
+| **Search & Query** | 7 | Log search, job management, metrics, search audit, metadata exploration |
+| **Content Library** | 7 | Folder/content access, path operations, export with async job handling |
+| **Content ID Utilities** | 3 | Hex/decimal conversion, web URL generation |
+| **Account Management** | 6 | Account status, usage forecasting, credit analysis, data volume analysis |
+| **Collectors & Sources** | 2 | List collectors, get sources |
+| **Users & Roles** | 2 | List users, list roles |
+| **Dashboards & Monitors** | 2 | List dashboards, search monitors |
+| **System** | 2 | List partitions, list instances |
+
+### Featured Tools
+
+**Log Search & Analysis:**
+- `search_sumo_logs` - Intelligent search with auto query-type detection
+- `explore_log_metadata` - Discover partitions, source categories, and metadata mappings
+- `run_search_audit_query` - Analyze search usage patterns
+
+**Data Volume & Cost Analysis:**
+- `analyze_data_volume` - Standard volume analysis with timeshift comparison
+- `analyze_data_volume_grouped` - Advanced analysis with cardinality reduction for large environments (5000+ sources)
+- `get_estimated_log_search_usage` - Estimate scan costs before running queries
+
+**Account Management:**
+- `get_account_status` - Account and subscription information
+- `get_usage_forecast` - Predict future usage and credits
+- `export_usage_report` - Detailed usage reports with CSV export
+
+**Content Library:**
+- `get_personal_folder` - Fast access to user's content library
+- `export_content` - Full content export with async job polling
+- `get_content_web_url` - Generate shareable content links
 
 All tools support an `instance` parameter to target specific Sumo Logic deployments.
+
+📖 **[View Complete Tool Documentation →](docs/mcp-tools-reference.md)**
 
 ## Setup
 
