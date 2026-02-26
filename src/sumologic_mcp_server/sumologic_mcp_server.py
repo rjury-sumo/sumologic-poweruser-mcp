@@ -1938,6 +1938,218 @@ def format_bytes(bytes_value: int) -> str:
     return f"{value:.2f} {units[unit_index]}"
 
 
+@mcp.tool()
+async def explore_log_metadata(
+    scope: str = "*",
+    from_time: str = "-15m",
+    to_time: str = "now",
+    time_zone: str = "UTC",
+    metadata_fields: str = "_view,_sourceCategory",
+    sort_by: str = "_sourceCategory",
+    max_results: int = 1000,
+    instance: str = 'default'
+) -> str:
+    """
+    Explore log metadata values for a given scope to help build efficient queries.
+
+    This tool helps you discover:
+    - Which partitions/views (_view, _index) contain your logs
+    - What source categories (_sourceCategory) exist in your scope
+    - Mapping of collectors, sources, and other metadata dimensions
+    - Message counts per metadata combination
+
+    Use this to learn your log structure before building queries, especially important
+    for Flex/Infrequent tier accounts where scan volume affects cost.
+
+    Args:
+        scope: Log search scope (e.g., "*", "_sourceCategory=*cloudtrail*", "sqlexception", "_index=sumologic_default")
+        from_time: Start time (ISO8601, epoch ms, or relative like '-15m', '-1h', '-24h')
+        to_time: End time (ISO8601, epoch ms, or relative like 'now')
+        time_zone: Timezone for the search (default: UTC)
+        metadata_fields: Comma-separated metadata fields to aggregate by (default: "_view,_sourceCategory")
+        sort_by: Field to sort results by (default: "_sourceCategory")
+        max_results: Maximum results to return (default: 1000)
+        instance: Instance name (default: 'default')
+
+    Common Metadata Fields:
+        - _view: Partition name (also accessible as _index)
+        - _sourceCategory: Source category assigned to logs
+        - _collector: Collector name
+        - _source: Source name
+        - _sourceHost: Source host
+        - _sourceName: Source name (alternative)
+
+    Scope Examples:
+        - "*" - All logs (use with caution, short time range recommended)
+        - "_sourceCategory=*cloudtrail*" - Any CloudTrail source categories
+        - "sqlexception" - Keyword search
+        - "_dataTier=infrequent _sourceCategory=*k8s*" - K8s logs in infrequent tier
+        - "_index=sumologic_default" - All logs in default partition
+
+    Metadata Field Examples:
+        - "_view,_sourceCategory" - Basic partition and category mapping (fast)
+        - "_view,_sourceCategory,_collector,_source" - Include collector/source info
+        - "_view,_sourceCategory,_collector,_source,_sourceName" - Comprehensive mapping (slower)
+
+    Returns:
+        Aggregated metadata with message counts, sorted by specified field.
+        Results include total unique combinations found and total messages.
+
+    Notes:
+        - Keep time range short (<60m) for large instances or many metadata dimensions
+        - Infrequent tier searches incur scan charges - scope queries well
+        - More metadata fields = higher cardinality = longer query time
+        - Results can be filtered/analyzed client-side after retrieval
+
+    Time Format Examples:
+        - Relative: "-15m", "-1h", "-24h", "-7d"
+        - ISO: "2024-01-01T00:00:00Z"
+        - Epoch ms: "1704067200000"
+    """
+    try:
+        _ensure_config_initialized()
+        config = get_config()
+        instance = validate_instance_name(instance)
+
+        # Validate and parse metadata fields
+        fields = [f.strip() for f in metadata_fields.split(",")]
+        if not fields:
+            raise ValidationError("At least one metadata field must be specified")
+
+        # Validate sort_by is in fields
+        if sort_by not in fields:
+            raise ValidationError(f"sort_by field '{sort_by}' must be one of the metadata fields: {metadata_fields}")
+
+        # Build the query
+        # Format: <scope> | count by field1,field2,... | sort field asc | limit N
+        group_by_clause = ", ".join(fields)
+        query = f"{scope} | count by {group_by_clause} | sort {sort_by} asc | limit {max_results}"
+
+        # Use the existing search_sumo_logs functionality
+        client = await get_sumo_client(instance)
+        limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
+
+        # Parse time values
+        from_epoch = parse_time_to_epoch(from_time)
+        to_epoch = parse_time_to_epoch(to_time)
+
+        # Validate time range
+        if from_epoch >= to_epoch:
+            raise ValidationError("from_time must be before to_time")
+
+        # Create and wait for search job
+        await limiter.acquire("explore_log_metadata")
+        logger.info(f"Starting metadata exploration: {query}")
+
+        job_result = await client.create_search_job(
+            query=query,
+            from_time=from_epoch,
+            to_time=to_epoch,
+            timezone_str=time_zone,
+            by_receipt_time=False
+        )
+
+        search_id = job_result.get("id")
+        if not search_id:
+            raise APIError(f"No search job ID returned: {job_result}")
+
+        # Poll for completion
+        max_wait = 300  # 5 minutes
+        poll_interval = 2
+        max_attempts = max_wait // poll_interval
+
+        for attempt in range(max_attempts):
+            await asyncio.sleep(poll_interval)
+            await limiter.acquire("explore_log_metadata_poll")
+
+            status = await client.get_search_job_status(search_id)
+            state = status.get("state", "")
+
+            if state == "DONE GATHERING RESULTS":
+                # Get results
+                await limiter.acquire("explore_log_metadata_results")
+                results = await client.get_search_job_records(
+                    job_id=search_id,
+                    limit=max_results,
+                    offset=0
+                )
+
+                # Format response
+                records = results.get("records", [])
+                total_records = len(records)
+                total_messages = sum(
+                    int(record.get("map", {}).get("_count", 0))
+                    for record in records
+                )
+
+                # Build formatted output
+                output = {
+                    "scope": scope,
+                    "metadata_fields": fields,
+                    "time_range": {
+                        "from": from_time,
+                        "to": to_time,
+                        "timezone": time_zone
+                    },
+                    "summary": {
+                        "unique_combinations": total_records,
+                        "total_messages": total_messages,
+                        "truncated": total_records >= max_results
+                    },
+                    "metadata": []
+                }
+
+                # Extract and format metadata
+                for record in records:
+                    record_map = record.get("map", {})
+
+                    # Debug: log the first record's keys to understand field naming
+                    if len(output["metadata"]) == 0 and record_map:
+                        logger.debug(f"First record keys: {list(record_map.keys())}")
+
+                    metadata_entry = {
+                        "count": int(record_map.get("_count", 0))
+                    }
+
+                    # Add each metadata field - handle case insensitivity
+                    # Sumo returns fields in lowercase typically
+                    for field in fields:
+                        # Try exact match first
+                        value = record_map.get(field)
+
+                        # If not found, try case-insensitive lookup
+                        if value is None:
+                            # Create case-insensitive lookup
+                            field_lower = field.lower()
+                            for key in record_map.keys():
+                                if key.lower() == field_lower:
+                                    value = record_map.get(key)
+                                    break
+
+                        # Default to empty string if still not found
+                        if value is None:
+                            value = ""
+
+                        # Handle empty partition name
+                        if field.lower() in ["_view", "_index"] and value == "":
+                            value = "sumologic_default"
+
+                        metadata_entry[field] = value
+
+                    output["metadata"].append(metadata_entry)
+
+                return json.dumps(output, indent=2)
+
+            elif state in ["CANCELLED", "FAILED"]:
+                raise APIError(f"Search job {state.lower()}: {status}")
+
+        # Timeout
+        raise SumoTimeoutError(f"Metadata exploration timed out after {max_wait} seconds")
+
+    except Exception as e:
+        return handle_tool_error(e, "explore_log_metadata")
+
+
 # MCP Resources
 
 @mcp.resource("sumo://logs/recent-errors")

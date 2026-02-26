@@ -1,7 +1,7 @@
 # Sumo Logic MCP Server - Tools Reference
 
 ## Overview
-Total Tools: **28**
+Total Tools: **29**
 
 ---
 
@@ -475,11 +475,72 @@ Get estimated data volume that would be scanned for a log search query in Infreq
 
 ---
 
+### 29. `explore_log_metadata`
+Explore log metadata values for a given scope to discover partitions, source categories, and other metadata dimensions.
+
+**Parameters:**
+- `scope` (str, default='*') - Log search scope
+- `from_time` (str, default='-15m') - Start time (ISO8601, epoch ms, or relative)
+- `to_time` (str, default='now') - End time
+- `time_zone` (str, default='UTC') - Timezone
+- `metadata_fields` (str, default='_view,_sourceCategory') - Comma-separated metadata fields to aggregate
+- `sort_by` (str, default='_sourceCategory') - Field to sort results by
+- `max_results` (int, default=1000) - Maximum results to return
+- `instance` (str, default='default') - Instance name
+
+**Common Metadata Fields:**
+- `_view` / `_index` - Partition name
+- `_sourceCategory` - Source category assigned to logs
+- `_collector` - Collector name
+- `_source` - Source name
+- `_sourceHost` - Source host
+- `_sourceName` - Source name (alternative)
+
+**Scope Examples:**
+- `"*"` - All logs (use with caution, short time range recommended)
+- `"_sourceCategory=*cloudtrail*"` - Any CloudTrail source categories
+- `"sqlexception"` - Keyword search
+- `"_dataTier=infrequent _sourceCategory=*k8s*"` - K8s logs in infrequent tier
+- `"_index=sumologic_default"` - All logs in default partition
+
+**Metadata Field Examples:**
+- `"_view,_sourceCategory"` - Basic partition and category mapping (fast)
+- `"_view,_sourceCategory,_collector,_source"` - Include collector/source info
+- `"_view,_sourceCategory,_collector,_source,_sourceName"` - Comprehensive mapping (slower)
+
+**Returns:** JSON with:
+- `summary`: Unique combinations count, total messages, truncation flag
+- `metadata`: Array of metadata combinations with message counts
+- `time_range`: Query time range info
+- `scope`: Query scope used
+
+**Use Cases:**
+- Discover which partitions/views contain specific logs
+- Map source categories to partitions for query optimization
+- Understand collector and source structure
+- Build efficient queries by learning metadata relationships
+- Essential for Flex/Infrequent tier accounts to scope queries before incurring scan charges
+
+**Notes:**
+- Keep time range short (<60m) for large instances or many metadata dimensions
+- More metadata fields = higher cardinality = longer query time
+- Infrequent tier searches incur scan charges - scope well
+- Empty partition names displayed as "sumologic_default"
+- Results can be filtered/analyzed client-side
+- Uses Sumo Logic search job API with automatic polling
+
+**Time Format Examples:**
+- Relative: "-15m", "-1h", "-24h", "-7d"
+- ISO: "2024-01-01T00:00:00Z"
+- Epoch ms: "1704067200000"
+
+---
+
 ## Tool Categories Summary
 
 | Category | Count | Tools |
 |----------|-------|-------|
-| **Search & Query** | 6 | Search logs, create jobs, get status/results, query metrics, search audit |
+| **Search & Query** | 7 | Search logs, create jobs, get status/results, query metrics, search audit, explore metadata |
 | **Content Library** | 7 | Personal/folder access, path operations, content export |
 | **Content ID Utilities** | 3 | Hex/decimal conversion, web URL generation |
 | **Account Management** | 4 | Account status, usage forecast, usage report export, estimated log search usage |
@@ -515,6 +576,6 @@ Get estimated data volume that would be scanned for a log search query in Infreq
 
 ---
 
-**Version:** 1.3
+**Version:** 1.4
 **Last Updated:** 2026-02-26
-**Total Tools:** 28
+**Total Tools:** 29
