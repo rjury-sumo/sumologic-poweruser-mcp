@@ -1418,14 +1418,17 @@ async def run_search_audit_query(
     content_name: str = "*",
     query_filter: str = "*",
     query_regex: str = ".*",
+    scope_filters: Optional[list[str]] = None,
+    where_filters: Optional[list[str]] = None,
     include_raw_data: bool = False,
     instance: str = Field(default='default', description="Sumo Logic instance name")
 ) -> str:
     """
     Run a search audit query to analyze search usage and performance.
 
-    Search audit queries the special index _view=sumologic_search_usage_per_query
-    to provide insights into search patterns, data scanned, execution time, etc.
+    IMPORTANT: The _view=sumologic_search_usage_per_query special view does NOT support
+    keyword/freetext search. You must use field=value scope expressions or | where filters
+    to query this view. See scope_filters and where_filters parameters below.
 
     Aggregates search usage metrics by user, query, query type, and content.
     Calculates data scanned (including Infrequent and Flex tiers), runtime,
@@ -1435,10 +1438,55 @@ async def run_search_audit_query(
         from_time: Start time (relative like '-24h' or ISO8601)
         to_time: End time (relative like 'now' or ISO8601)
         query_type: Filter by query type (* for all, Interactive, Scheduled, etc.)
+                    NOTE: This is a legacy parameter. For more precise filtering, use scope_filters instead.
         user_name: Filter by username (* for all, use wildcards like 'john*')
+                   NOTE: This is a legacy parameter. For more precise filtering, use scope_filters instead.
         content_name: Filter by content name (* for all)
+                      NOTE: This is a legacy parameter. For more precise filtering, use scope_filters instead.
         query_filter: Filter by query text (* for all)
+                      NOTE: This is a legacy parameter. For more precise filtering, use scope_filters instead.
         query_regex: Regex pattern to filter queries (default: '.*' for all)
+        scope_filters: (NEW) One or more field=value scope keyword expressions for FAST index-level
+                      filtering. These are injected into the scope line alongside _view=sumologic_search_usage_per_query.
+
+                      Supported fields: user_name, query_type, content_name, query, analytics_tier,
+                                       status_message, session_id, remote_ip
+
+                      Examples:
+                        - ["query=*threatip*"] - Find searches using threatip operator
+                        - ["user_name=rick@example.com"] - Filter to specific user
+                        - ["query_type=Interactive"] - Interactive searches only
+                        - ["query_type=int*"] - Glob match on query_type
+                        - ["content_name=*Dashboard*"] - Content name contains Dashboard
+                        - ["analytics_tier=*infrequent*"] - Searches on Infrequent tier
+
+                      Multiple expressions are AND-combined. Glob wildcards (*) supported.
+                      Values with spaces must be quoted.
+
+                      NOTE: scope_filters override the legacy user_name/query_type/content_name/query_filter
+                            parameters when provided.
+
+        where_filters: (NEW) One or more | where clause expressions for FLEXIBLE post-pipe filtering.
+                      These are slower than scope_filters but support numeric comparisons, regex, and
+                      complex logic. Each string should be the expression AFTER "| where" (don't include
+                      the pipe or "where" keyword).
+
+                      Supported fields:
+                        - Numeric: execution_duration_ms, data_scanned_bytes, data_retrieved_bytes,
+                                  scanned_message_count, retrieved_message_count, scanned_partition_count,
+                                  query_start_time, query_end_time
+                        - Boolean: is_aggregate, is_emulated_search
+                        - String: status_message, content_name, query, user_name, query_type, analytics_tier
+
+                      Examples:
+                        - ["execution_duration_ms > 30000"] - Searches longer than 30 seconds
+                        - ["status_message matches \"*Fail*\""] - Failed searches
+                        - ["data_scanned_bytes > 1073741824"] - Scanned more than 1GB
+                        - ["is_aggregate = true"] - Aggregate queries only
+                        - ["scanned_partition_count > 5"] - Scanned many partitions
+
+                      Multiple expressions are AND-combined (each becomes a separate | where clause).
+
         include_raw_data: Include raw field data in results (default: False)
         instance: Instance name
 
@@ -1458,9 +1506,21 @@ async def run_search_audit_query(
         - All searches in last 24h: (defaults)
         - Interactive searches by user: query_type='Interactive', user_name='john@example.com'
         - Dashboard searches: query_type='Scheduled', content_name='*Dashboard*'
+        - Slow failing searches: scope_filters=["user_name=rick@acme.com", "query_type=Interactive"],
+                                where_filters=["execution_duration_ms > 60000", "status_message matches \"*Fail*\""]
+        - Searches using threatip: scope_filters=["query=*threatip*"]
+        - Large scheduled searches: scope_filters=["query_type=Scheduled"],
+                                   where_filters=["data_scanned_bytes > 1099511627776"]
         - Expensive searches: query_regex='.*\| count.*' (searches with count operator)
 
     Reference: https://www.sumologic.com/help/docs/manage/security/audit-indexes/search-audit-index/
+
+    Full field reference for _view=sumologic_search_usage_per_query:
+    Scope-filterable: analytics_tier, content_name, query, query_type, remote_ip, session_id, status_message, user_name
+    Where-filterable: All above plus content_identifier, data_retrieved_bytes, data_scanned_bytes, execution_duration_ms,
+                     is_aggregate, is_emulated_search, query_end_time, query_start_time, retrieved_message_count,
+                     scanned_bytes_breakdown, scanned_bytes_breakdown_by_metering_type, scanned_message_count,
+                     scanned_partition_count
     """
     try:
         _ensure_config_initialized()
@@ -1471,13 +1531,104 @@ async def run_search_audit_query(
         instance = validate_instance_name(instance)
         client = await get_sumo_client(instance)
 
-        # Build search audit query
-        query = f"""_view=sumologic_search_usage_per_query
+        # Validate and build scope filters
+        def validate_scope_filters(filters: Optional[list[str]]) -> list[str]:
+            """Validate scope filter expressions."""
+            if not filters:
+                return []
+
+            allowed_fields = {
+                "user_name", "query_type", "content_name", "query",
+                "analytics_tier", "status_message", "session_id", "remote_ip"
+            }
+
+            validated = []
+            for f in filters:
+                f = f.strip()
+                if not f:
+                    continue
+
+                # Check for injection attempts
+                if '\n' in f or '\r' in f:
+                    raise ValidationError("Scope filters cannot contain newlines")
+                if '| delete' in f.lower() or '| create' in f.lower() or '| save' in f.lower():
+                    raise ValidationError("Scope filters cannot contain write operators")
+
+                # Must contain = sign
+                if "=" not in f:
+                    raise ValidationError(
+                        f"Invalid scope filter '{f}': must be in field=value format"
+                    )
+
+                # Extract field name and validate
+                field = f.split("=")[0].strip()
+                if field not in allowed_fields:
+                    raise ValidationError(
+                        f"Field '{field}' is not supported as a scope filter. "
+                        f"Supported fields: {', '.join(sorted(allowed_fields))}. "
+                        f"For other fields use where_filters instead."
+                    )
+
+                validated.append(f)
+
+            return validated
+
+        # Validate and build where filters
+        def validate_where_filters(filters: Optional[list[str]]) -> list[str]:
+            """Validate where filter expressions."""
+            if not filters:
+                return []
+
+            validated = []
+            for f in filters:
+                f = f.strip()
+                if not f:
+                    continue
+
+                # Check for injection attempts
+                if '| delete' in f.lower() or '| create' in f.lower() or '| save' in f.lower():
+                    raise ValidationError("Where filters cannot contain write operators")
+
+                # Should not start with | or where
+                if f.startswith('|') or f.lower().startswith('where '):
+                    raise ValidationError(
+                        f"Where filter '{f}' should not start with '|' or 'where'. "
+                        "Provide only the expression (e.g., 'execution_duration_ms > 30000')"
+                    )
+
+                validated.append(f)
+
+            return validated
+
+        # Process scope filters - new filters take precedence over legacy parameters
+        validated_scope_filters = validate_scope_filters(scope_filters)
+
+        # Build scope line
+        if validated_scope_filters:
+            # Use new scope_filters (they override legacy parameters)
+            scope_line = "_view=sumologic_search_usage_per_query " + " ".join(validated_scope_filters)
+        else:
+            # Use legacy parameters for backward compatibility
+            scope_line = f"""_view=sumologic_search_usage_per_query
 query_type={query_type}
 user_name={user_name}
 content_name={content_name}
-query={query_filter}
+query={query_filter}"""
 
+        # Process where filters
+        validated_where_filters = validate_where_filters(where_filters)
+        where_clauses_str = "\n".join(f"| where {f}" for f in validated_where_filters)
+
+        # Build search audit query
+        # Structure: scope_line -> where_clauses -> field extractions -> aggregations
+        # Note: scope_line is already complete (single line or multi-line based on legacy vs new filters)
+        query_parts = [scope_line]
+
+        if where_clauses_str:
+            query_parts.append(where_clauses_str)
+
+        # Add the rest of the pipeline (field extractions and aggregations)
+        query_parts.append(f"""
 | ((query_end_time - query_start_time ) /1000 / 60 ) as time_range_m
 | json field=scanned_bytes_breakdown "Infrequent" as inf_bytes nodrop
 | json field=scanned_bytes_breakdown "Flex" as flex_bytes nodrop
@@ -1492,7 +1643,10 @@ query={query_filter}
 | time_range_m/60 as time_range_h
 | count as searches, sum(scan_gbytes) as scan_gb, sum(inf_scan_gb) as inf_scan_gb, sum(flex_scan_gb) as flex_scan_gb, sum(retrieved_message_count) as results, avg(scanned_partition_count) as avg_partitions,
  avg(time_range_h) as avg_range_h, sum(runtime_minutes) as sum_runtime_minutes, avg(runtime_minutes) as avg_runtime_minutes by user_name, query, query_type, content_name, content_identifier | sort query asc
-| where query matches /(?i){query_regex}/"""
+| where query matches /(?i){query_regex}/""")
+
+        # Combine all query parts
+        query = "\n".join(query_parts)
 
         # Create search job
         job_response = await client.create_search_job(
@@ -1550,7 +1704,9 @@ query={query_filter}
                 "user_name": user_name,
                 "content_name": content_name,
                 "query_filter": query_filter,
-                "query_regex": query_regex
+                "query_regex": query_regex,
+                "scope_filters": validated_scope_filters if validated_scope_filters else None,
+                "where_filters": validated_where_filters if validated_where_filters else None
             },
             "summary": {
                 "total_records": len(records),
