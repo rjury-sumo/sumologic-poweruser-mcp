@@ -19,7 +19,7 @@ This Model Context Protocol (MCP) server provides secure, read-only access to Su
 
 ## Available Tools
 
-**Total: 32 MCP Tools** organized into 8 categories
+**Total: 35 MCP Tools** organized into 9 categories
 
 For complete tool documentation with parameters, examples, and use cases, see **[MCP Tools Reference](docs/mcp-tools-reference.md)**.
 
@@ -34,6 +34,7 @@ For complete tool documentation with parameters, examples, and use cases, see **
 | **Collectors & Sources** | 2 | List collectors, get sources |
 | **Users & Roles** | 2 | List users, list roles |
 | **Dashboards & Monitors** | 2 | List dashboards, search monitors |
+| **Field Management** | 3 | Custom fields, field extraction rules |
 | **System** | 2 | List partitions, list instances |
 
 ### Featured Tools
@@ -58,6 +59,11 @@ For complete tool documentation with parameters, examples, and use cases, see **
 - `get_personal_folder` - Fast access to user's content library
 - `export_content` - Full content export with async job polling
 - `get_content_web_url` - Generate shareable content links
+
+**Field Management:**
+- `list_custom_fields` - List all custom fields defined in the organization
+- `list_field_extraction_rules` - List field extraction rules (FERs) for pre-parsing
+- `get_field_extraction_rule` - Get detailed information about a specific FER
 
 All tools support an `instance` parameter to target specific Sumo Logic deployments.
 

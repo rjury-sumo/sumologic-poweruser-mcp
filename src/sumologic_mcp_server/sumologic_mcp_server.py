@@ -432,6 +432,21 @@ class SumoLogicClient:
         params = {"limit": limit, "offset": offset}
         return await self._request("GET", "/partitions", api_version="v1", params=params)
 
+    # Field Management API methods
+
+    async def list_custom_fields(self) -> Dict[str, Any]:
+        """Get list of custom fields defined in the organization."""
+        return await self._request("GET", "/fields", api_version="v1")
+
+    async def list_field_extraction_rules(self, limit: int = 100, offset: int = 0) -> Dict[str, Any]:
+        """Get list of field extraction rules."""
+        params = {"limit": limit, "offset": offset}
+        return await self._request("GET", "/extractionRules", api_version="v1", params=params)
+
+    async def get_field_extraction_rule(self, rule_id: str) -> Dict[str, Any]:
+        """Get a specific field extraction rule by ID."""
+        return await self._request("GET", f"/extractionRules/{rule_id}", api_version="v1")
+
     # Content Library API methods
 
     async def get_personal_folder(self, include_children: bool = True) -> Dict[str, Any]:
@@ -1264,6 +1279,117 @@ async def get_sumo_partitions(
         return json.dumps(partitions, indent=2)
     except Exception as e:
         return handle_tool_error(e, "get_sumo_partitions")
+
+
+@mcp.tool()
+async def list_custom_fields(
+    instance: str = Field(default='default', description="Sumo Logic instance name")
+) -> str:
+    """
+    Get list of custom fields defined in the organization.
+
+    Fields can be defined by administrators to enable field names in the UI,
+    or through field extraction rules. Returns all custom fields with their
+    properties including name, data type, and state.
+
+    Returns:
+        List of custom fields with properties:
+        - fieldId: Unique identifier
+        - fieldName: Name of the field
+        - dataType: Field data type (String, Long, Int, Double, Boolean)
+        - state: Field state (Enabled, Disabled)
+    """
+    try:
+        _ensure_config_initialized()
+        config = get_config()
+        limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
+        await limiter.acquire("list_custom_fields")
+
+        instance = validate_instance_name(instance)
+        client = await get_sumo_client(instance)
+        fields = await client.list_custom_fields()
+        return json.dumps(fields, indent=2)
+    except Exception as e:
+        return handle_tool_error(e, "list_custom_fields")
+
+
+@mcp.tool()
+async def list_field_extraction_rules(
+    limit: int = Field(default=100, description="Maximum number of results"),
+    instance: str = Field(default='default', description="Sumo Logic instance name")
+) -> str:
+    """
+    Get list of field extraction rules (FERs) defined in the organization.
+
+    Field extraction rules are created by administrators to simplify query
+    experience by pre-parsing fields, or to speed up query performance.
+    Pre-parsed fields stored in partitions as indexed data are much faster
+    to query than repeating field parsing at search time.
+
+    Returns:
+        List of field extraction rules with properties:
+        - id: Unique identifier
+        - name: Rule name
+        - scope: Where the rule applies (e.g., _sourceCategory=prod/app)
+        - parseExpression: Regex or parse expression to extract fields
+        - enabled: Whether the rule is active
+        - createdAt/modifiedAt: Timestamps
+    """
+    try:
+        _ensure_config_initialized()
+        config = get_config()
+        limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
+        await limiter.acquire("list_field_extraction_rules")
+
+        limit, _ = validate_pagination(limit, 0)
+        instance = validate_instance_name(instance)
+
+        client = await get_sumo_client(instance)
+        rules = await client.list_field_extraction_rules(limit=limit)
+        return json.dumps(rules, indent=2)
+    except Exception as e:
+        return handle_tool_error(e, "list_field_extraction_rules")
+
+
+@mcp.tool()
+async def get_field_extraction_rule(
+    rule_id: str = Field(description="Field extraction rule ID"),
+    instance: str = Field(default='default', description="Sumo Logic instance name")
+) -> str:
+    """
+    Get a specific field extraction rule by ID.
+
+    Returns detailed information about a field extraction rule including
+    its configuration, scope, parse expression, and enabled status.
+
+    Parameters:
+        rule_id: The unique identifier of the field extraction rule
+        instance: Instance name
+
+    Returns:
+        Field extraction rule details:
+        - id: Unique identifier
+        - name: Rule name
+        - scope: Where the rule applies (e.g., _sourceCategory=prod/app)
+        - parseExpression: Regex or parse expression to extract fields
+        - enabled: Whether the rule is active
+        - createdAt/modifiedAt: Timestamps
+        - createdBy/modifiedBy: User information
+    """
+    try:
+        _ensure_config_initialized()
+        config = get_config()
+        limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
+        await limiter.acquire("get_field_extraction_rule")
+
+        instance = validate_instance_name(instance)
+        rule_id = validate_query_input(rule_id)
+        client = await get_sumo_client(instance)
+
+        rule = await client.get_field_extraction_rule(rule_id)
+        return json.dumps(rule, indent=2)
+    except Exception as e:
+        return handle_tool_error(e, "get_field_extraction_rule")
 
 
 @mcp.tool()
