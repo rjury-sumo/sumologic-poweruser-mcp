@@ -1467,6 +1467,391 @@ query={query_filter}
         return handle_tool_error(e, "run_search_audit_query")
 
 
+@mcp.tool()
+async def analyze_search_scan_cost(
+    from_time: str = "-24h",
+    to_time: str = "now",
+    query_type: str = "*",
+    user_name: str = "*",
+    content_name: str = "*",
+    analytics_tier_filter: str = "*",
+    breakdown_type: str = "auto",
+    group_by: str = "user_query",
+    include_scope_parsing: bool = True,
+    scan_credit_rate: float = 0.016,
+    min_scan_gb: float = 0.0,
+    sort_by: str = "scan_credits",
+    limit: int = 100,
+    instance: str = 'default'
+) -> str:
+    """
+    Analyze search scan costs with detailed tier/metering breakdown for Infrequent and Flex customers.
+
+    This tool is specifically designed for analyzing pay-per-search costs in:
+    - Infrequent tier (pay per GB scanned)
+    - Flex tier (free ingestion, pay per search scan)
+
+    Parses scanned_bytes_breakdown or scanned_bytes_breakdown_by_metering_type to provide
+    detailed scan cost analysis by user, query, scope, and content.
+
+    Parameters:
+        from_time: Start time (relative like '-24h' or ISO8601)
+        to_time: End time (relative like 'now' or ISO8601)
+        query_type: Filter by query type (* for all, Interactive, Scheduled, etc.)
+        user_name: Filter by username (* for all)
+        content_name: Filter by content name (* for all, use wildcards)
+        analytics_tier_filter: Filter by analytics_tier field (* for all, *infrequent*, *flex*, etc.)
+        breakdown_type: 'auto' (auto-detect), 'tier' (Continuous/Frequent/Infrequent), or 'metering' (Flex/FlexSecurity/CSE/etc.)
+                       **IMPORTANT**: Flex organizations MUST use 'metering' breakdown. Using 'tier' on Flex orgs
+                       returns near-zero scan data. Default 'auto' detects organization type automatically.
+        group_by: Grouping level - 'user', 'user_query', 'user_scope_query', 'user_content', 'content'
+        include_scope_parsing: Extract scope (_index/_view/_datatier) from query text (default: True)
+        scan_credit_rate: Credits per GB scanned (default: 0.016 cr/GB = 16 cr/TB). Only used for Infrequent tier
+                         (tiered accounts) where 0.016 is the standard rate. For Flex metering breakdown, credits
+                         are NOT calculated since rates are highly contract-specific.
+        min_scan_gb: Minimum scan GB threshold to include in results (default: 0.0)
+        sort_by: Sort field - 'scan_credits', 'total_scan_gb', 'queries', 'billable_scan_gb' (default: scan_credits)
+        limit: Maximum number of results (default: 100)
+        instance: Instance name
+
+    Breakdown Types:
+        - 'auto': Automatically detects organization type (Flex vs Tiered) and selects appropriate breakdown
+
+        - 'tier': Data tier breakdown (for TIERED customers ONLY)
+          - Continuous: Always-on analytics tier
+          - Frequent: Medium access tier
+          - Infrequent: Low-cost, pay-per-search tier
+          **WARNING**: Returns near-zero data on Flex organizations!
+
+        - 'metering': Metering type breakdown (for FLEX customers - REQUIRED for accurate data)
+          - Flex: Billable log search
+          - FlexSecurity: Security logs (not billable for search)
+          - Continuous: Legacy continuous tier
+          - Frequent: Legacy frequent tier
+          - Infrequent: Legacy infrequent tier
+          - Security: Legacy security tier (not billable for search)
+          - Tracing: Tracing data (not billable for search)
+
+    Group By Options:
+        - 'user': Aggregate by user_name only
+        - 'user_query': Group by user_name and query text
+        - 'user_scope_query': Group by user_name, scope (_index/_view), and query
+        - 'user_content': Group by user_name and content_name (for dashboards/scheduled searches)
+        - 'content': Group by content_name only (for scheduled search analysis)
+
+    Returns:
+        JSON with scan cost analysis including:
+        - queries: Number of searches
+        - total_scan_gb: Total data scanned across all tiers
+        - tier_breakdown: GB scanned per tier (varies by breakdown_type)
+        - billable_scan_gb: Billable scan volume in GB (for Flex metering type)
+        - billable_scan_tb: Billable scan volume in TB (for Flex metering type)
+        - non_billable_scan_gb: Non-billable scan volume (for Flex metering type)
+        - scan_credits: Estimated credits (tier breakdown only - Infrequent tier)
+        - credits_per_query: Average credits per query (tier breakdown only)
+
+        Note: For Flex metering breakdown, credits are NOT included since rates vary by contract.
+        TB values are provided as the primary unit for Flex scan volumes.
+
+    Use Cases:
+        1. Infrequent tier cost analysis:
+           breakdown_type='tier', analytics_tier_filter='*infrequent*', group_by='user_query'
+
+        2. Flex billable vs non-billable analysis:
+           breakdown_type='metering', group_by='user_scope_query'
+
+        3. Expensive dashboard analysis:
+           group_by='content', query_type='Scheduled'
+
+        4. User cost ranking:
+           group_by='user', sort_by='scan_credits'
+
+    Credit Rate Examples:
+        - Infrequent tier: ~0.016 credits/GB (varies by contract)
+        - Flex tier: ~0.016-0.02 credits/GB billable scan
+        - Adjust scan_credit_rate parameter to match your contract
+
+    Reference: https://www.sumologic.com/help/docs/manage/security/audit-indexes/search-audit-index/
+    """
+    try:
+        _ensure_config_initialized()
+        config = get_config()
+        limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
+        await limiter.acquire("analyze_search_scan_cost")
+
+        instance = validate_instance_name(instance)
+        client = await get_sumo_client(instance)
+
+        # Auto-detect breakdown type if set to 'auto'
+        original_breakdown_type = breakdown_type
+        detected_org_type = None
+
+        if breakdown_type == "auto":
+            try:
+                # Get account status to determine if Flex or Tiered
+                account_status = await client.get_account_status()
+                log_model = account_status.get("logModel", "").lower()
+
+                if log_model == "flex":
+                    breakdown_type = "metering"
+                    detected_org_type = "Flex"
+                else:
+                    # Default to tier for Tiered, or unknown org types
+                    breakdown_type = "tier"
+                    detected_org_type = "Tiered"
+
+            except Exception as e:
+                # If account status check fails, default to metering (safer for Flex orgs)
+                breakdown_type = "metering"
+                detected_org_type = "Unknown (defaulted to metering)"
+
+        # Validate breakdown_type after auto-detection
+        if breakdown_type not in ["tier", "metering"]:
+            raise ValueError(f"Invalid breakdown_type after auto-detection: {breakdown_type}. Must be 'auto', 'tier', or 'metering'")
+
+        # Build JSON field parsing based on breakdown type
+        if breakdown_type == "tier":
+            # Parse data tier breakdown
+            json_parsing = """| json field=scanned_bytes_breakdown "Continuous" as scan_continuous nodrop
+| json field=scanned_bytes_breakdown "Frequent" as scan_frequent nodrop
+| json field=scanned_bytes_breakdown "Infrequent" as scan_infrequent nodrop
+| if (isnull(scan_continuous),0,scan_continuous) as scan_continuous
+| if (isnull(scan_frequent),0,scan_frequent) as scan_frequent
+| if (isnull(scan_infrequent),0,scan_infrequent) as scan_infrequent
+| scan_continuous + scan_frequent + scan_infrequent as total_scan_bytes"""
+
+            tier_aggregations = "sum(scan_continuous) as scan_continuous, sum(scan_frequent) as scan_frequent, sum(scan_infrequent) as scan_infrequent"
+
+        elif breakdown_type == "metering":
+            # Parse metering type breakdown
+            json_parsing = """| json field=scanned_bytes_breakdown_by_metering_type "Flex" as scan_flex nodrop
+| json field=scanned_bytes_breakdown_by_metering_type "Continuous" as scan_continuous nodrop
+| json field=scanned_bytes_breakdown_by_metering_type "Frequent" as scan_frequent nodrop
+| json field=scanned_bytes_breakdown_by_metering_type "Infrequent" as scan_infrequent nodrop
+| json field=scanned_bytes_breakdown_by_metering_type "FlexSecurity" as scan_flex_security nodrop
+| json field=scanned_bytes_breakdown_by_metering_type "Security" as scan_security nodrop
+| json field=scanned_bytes_breakdown_by_metering_type "Tracing" as scan_tracing nodrop
+| if (isnull(scan_flex),0,scan_flex) as scan_flex
+| if (isnull(scan_continuous),0,scan_continuous) as scan_continuous
+| if (isnull(scan_frequent),0,scan_frequent) as scan_frequent
+| if (isnull(scan_infrequent),0,scan_infrequent) as scan_infrequent
+| if (isnull(scan_flex_security),0,scan_flex_security) as scan_flex_security
+| if (isnull(scan_security),0,scan_security) as scan_security
+| if (isnull(scan_tracing),0,scan_tracing) as scan_tracing
+| scan_flex + scan_continuous + scan_frequent + scan_infrequent as billable_scan_bytes
+| scan_flex_security + scan_security + scan_tracing as non_billable_scan_bytes
+| billable_scan_bytes + non_billable_scan_bytes as total_scan_bytes"""
+
+            tier_aggregations = "sum(scan_flex) as scan_flex, sum(scan_continuous) as scan_continuous, sum(scan_frequent) as scan_frequent, sum(scan_infrequent) as scan_infrequent, sum(scan_flex_security) as scan_flex_security, sum(scan_security) as scan_security, sum(scan_tracing) as scan_tracing, sum(billable_scan_bytes) as billable_scan_bytes, sum(non_billable_scan_bytes) as non_billable_scan_bytes"
+        else:
+            raise ValueError(f"Invalid breakdown_type: {breakdown_type}. Must be 'tier' or 'metering'")
+
+        # Build scope parsing if enabled
+        scope_parsing = ""
+        if include_scope_parsing:
+            scope_parsing = '| parse regex field=query "(?i)(?<scope>(?:_datatier|_index|_view) *= *[a-zA-Z_0-9]+)" nodrop\n| if(isNull(scope),"no_scope",scope) as scope'
+
+        # Build grouping clause based on group_by parameter
+        group_fields = []
+        if group_by == "user":
+            group_fields = ["user_name"]
+        elif group_by == "user_query":
+            group_fields = ["user_name", "query"]
+        elif group_by == "user_scope_query":
+            if include_scope_parsing:
+                group_fields = ["user_name", "scope", "query"]
+            else:
+                group_fields = ["user_name", "query"]
+        elif group_by == "user_content":
+            group_fields = ["user_name", "content_name"]
+        elif group_by == "content":
+            group_fields = ["content_name", "query_type"]
+        else:
+            raise ValueError(f"Invalid group_by: {group_by}. Must be one of: user, user_query, user_scope_query, user_content, content")
+
+        group_by_clause = ", ".join(group_fields)
+
+        # Build query
+        query = f"""_view=sumologic_search_usage_per_query
+query_type={query_type}
+user_name={user_name}
+content_name={content_name}
+analytics_tier={analytics_tier_filter}
+
+| ((query_end_time - query_start_time ) /1000 / 60 / 60 / 24 ) as range_days
+{json_parsing}
+{scope_parsing}
+
+| total_scan_bytes / (1024*1024*1024) as total_scan_gb
+| count as queries, sum(total_scan_gb) as total_scan_gb, {tier_aggregations} by {group_by_clause}
+
+| total_scan_gb * {scan_credit_rate} as scan_credits
+| scan_credits / queries as credits_per_query
+| where total_scan_gb >= {min_scan_gb}
+| sort by {sort_by} desc
+| limit {limit}"""
+
+        # Create search job
+        job_response = await client.create_search_job(
+            query=query,
+            from_time=from_time,
+            to_time=to_time,
+            timezone_str="UTC"
+        )
+
+        job_id = job_response['id']
+
+        # Poll for completion with timeout
+        max_attempts = 300  # 5 minutes
+        for attempt in range(max_attempts):
+            await asyncio.sleep(1)
+
+            status = await client.get_search_job_status(job_id)
+            state = status['state']
+
+            if state == 'DONE GATHERING RESULTS':
+                break
+            elif state == 'CANCELLED':
+                raise APIError("Search job was cancelled")
+
+        # Get records
+        records_response = await client.get_search_job_records(job_id, limit=limit)
+        records = records_response.get('records', [])
+
+        # Delete the job
+        try:
+            await client.delete_search_job(job_id)
+        except:
+            pass
+
+        # Helper to safely convert values
+        def safe_float(value, default=0.0):
+            try:
+                return float(value) if value else default
+            except (ValueError, TypeError):
+                return default
+
+        def safe_int(value, default=0):
+            try:
+                return int(float(value)) if value else default
+            except (ValueError, TypeError):
+                return default
+
+        # Format results
+        result = {
+            "query_parameters": {
+                "from_time": from_time,
+                "to_time": to_time,
+                "query_type": query_type,
+                "user_name": user_name,
+                "content_name": content_name,
+                "analytics_tier_filter": analytics_tier_filter,
+                "breakdown_type": breakdown_type,
+                "breakdown_type_requested": original_breakdown_type,
+                "group_by": group_by,
+                "scan_credit_rate": scan_credit_rate,
+                "min_scan_gb": min_scan_gb
+            },
+            "summary": {
+                "total_records": len(records),
+                "total_queries": sum(safe_int(r.get('map', {}).get('queries', 0)) for r in records),
+                "total_scan_gb": round(sum(safe_float(r.get('map', {}).get('total_scan_gb', 0)) for r in records), 2),
+            },
+            "records": []
+        }
+
+        # Add organization type detection info if auto-detected
+        if detected_org_type:
+            result["query_parameters"]["detected_org_type"] = detected_org_type
+            result["query_parameters"]["auto_detection_used"] = True
+
+        # Add metering-specific summary if applicable (Flex)
+        if breakdown_type == "metering":
+            total_billable_gb = round(
+                sum(safe_float(r.get('map', {}).get('billable_scan_bytes', 0)) / (1024**3) for r in records), 2
+            )
+            result["summary"]["total_billable_scan_gb"] = total_billable_gb
+            result["summary"]["total_billable_scan_tb"] = round(total_billable_gb / 1024, 4)
+            result["summary"]["total_non_billable_scan_gb"] = round(
+                sum(safe_float(r.get('map', {}).get('non_billable_scan_bytes', 0)) / (1024**3) for r in records), 2
+            )
+            result["summary"]["flex_billing_note"] = (
+                "Credits NOT calculated for Flex metering - rates are highly contract-specific. "
+                "Contact Sumo Logic for your contracted scan rate."
+            )
+        else:
+            # Only add credits for tier breakdown (Infrequent tier)
+            result["summary"]["total_scan_credits"] = round(
+                sum(safe_float(r.get('map', {}).get('scan_credits', 0)) for r in records), 2
+            )
+
+        # Detect potential Flex org using 'tier' breakdown incorrectly
+        if breakdown_type == "tier":
+            total_queries = result["summary"]["total_queries"]
+            total_scan_gb = result["summary"]["total_scan_gb"]
+
+            # If many queries but suspiciously low scan data, likely Flex org using wrong breakdown
+            if total_queries > 1000 and total_scan_gb < 1.0:
+                warning = {
+                    "type": "POSSIBLE_FLEX_ORG_USING_TIER_BREAKDOWN",
+                    "message": (
+                        f"WARNING: Found {total_queries} queries but only {total_scan_gb} GB scanned. "
+                        "This pattern suggests you may be on a Flex organization using 'tier' breakdown, "
+                        "which returns near-zero scan data for Flex logs. "
+                        "Please retry with breakdown_type='metering' or 'auto' for accurate Flex scan costs."
+                    ),
+                    "recommendation": "Use breakdown_type='metering' or 'auto' for Flex organizations",
+                    "queries_analyzed": total_queries,
+                    "scan_gb_found": total_scan_gb
+                }
+                result["warning"] = warning
+
+        # Process records
+        for record in records:
+            record_map = record.get('map', {})
+
+            processed_record = {
+                "queries": safe_int(record_map.get('queries', 0)),
+                "total_scan_gb": round(safe_float(record_map.get('total_scan_gb', 0)), 2),
+            }
+
+            # Add grouping fields
+            for field in group_fields:
+                processed_record[field] = record_map.get(field, '')
+
+            # Add tier breakdown (includes credits for Infrequent tier)
+            if breakdown_type == "tier":
+                processed_record["scan_credits"] = round(safe_float(record_map.get('scan_credits', 0)), 2)
+                processed_record["credits_per_query"] = round(safe_float(record_map.get('credits_per_query', 0)), 4)
+                processed_record["tier_breakdown_gb"] = {
+                    "continuous": round(safe_float(record_map.get('scan_continuous', 0)) / (1024**3), 2),
+                    "frequent": round(safe_float(record_map.get('scan_frequent', 0)) / (1024**3), 2),
+                    "infrequent": round(safe_float(record_map.get('scan_infrequent', 0)) / (1024**3), 2),
+                }
+            elif breakdown_type == "metering":
+                # Flex metering - NO credits, add TB values
+                billable_gb = round(safe_float(record_map.get('billable_scan_bytes', 0)) / (1024**3), 2)
+                processed_record["billable_scan_gb"] = billable_gb
+                processed_record["billable_scan_tb"] = round(billable_gb / 1024, 4)
+                processed_record["non_billable_scan_gb"] = round(safe_float(record_map.get('non_billable_scan_bytes', 0)) / (1024**3), 2)
+                processed_record["metering_breakdown_gb"] = {
+                    "flex": round(safe_float(record_map.get('scan_flex', 0)) / (1024**3), 2),
+                    "continuous": round(safe_float(record_map.get('scan_continuous', 0)) / (1024**3), 2),
+                    "frequent": round(safe_float(record_map.get('scan_frequent', 0)) / (1024**3), 2),
+                    "infrequent": round(safe_float(record_map.get('scan_infrequent', 0)) / (1024**3), 2),
+                    "flex_security": round(safe_float(record_map.get('scan_flex_security', 0)) / (1024**3), 2),
+                    "security": round(safe_float(record_map.get('scan_security', 0)) / (1024**3), 2),
+                    "tracing": round(safe_float(record_map.get('scan_tracing', 0)) / (1024**3), 2),
+                }
+
+            result["records"].append(processed_record)
+
+        return json.dumps(result, indent=2)
+
+    except Exception as e:
+        return handle_tool_error(e, "analyze_search_scan_cost")
+
+
 # Content ID Utility Tools
 
 @mcp.tool()

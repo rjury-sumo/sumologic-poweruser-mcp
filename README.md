@@ -19,7 +19,7 @@ This Model Context Protocol (MCP) server provides secure, read-only access to Su
 
 ## Available Tools
 
-**Total: 31 MCP Tools** organized into 8 categories
+**Total: 32 MCP Tools** organized into 8 categories
 
 For complete tool documentation with parameters, examples, and use cases, see **[MCP Tools Reference](docs/mcp-tools-reference.md)**.
 
@@ -27,7 +27,7 @@ For complete tool documentation with parameters, examples, and use cases, see **
 
 | Category | Count | Description |
 |----------|-------|-------------|
-| **Search & Query** | 7 | Log search, job management, metrics, search audit, metadata exploration |
+| **Search & Query** | 8 | Log search, job management, metrics, search audit, scan cost analysis, metadata exploration |
 | **Content Library** | 7 | Folder/content access, path operations, export with async job handling |
 | **Content ID Utilities** | 3 | Hex/decimal conversion, web URL generation |
 | **Account Management** | 6 | Account status, usage forecasting, credit analysis, data volume analysis |
@@ -42,6 +42,7 @@ For complete tool documentation with parameters, examples, and use cases, see **
 - `search_sumo_logs` - Intelligent search with auto query-type detection
 - `explore_log_metadata` - Discover partitions, source categories, and metadata mappings
 - `run_search_audit_query` - Analyze search usage patterns
+- `analyze_search_scan_cost` - Analyze pay-per-search costs for Infrequent/Flex tiers with billable breakdown
 
 **Data Volume & Cost Analysis:**
 - `analyze_data_volume` - Standard volume analysis with timeshift comparison

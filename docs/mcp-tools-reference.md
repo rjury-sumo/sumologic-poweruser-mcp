@@ -1,11 +1,11 @@
 # Sumo Logic MCP Server - Tools Reference
 
 ## Overview
-Total Tools: **31**
+Total Tools: **32**
 
 ---
 
-## Search & Query Tools (6)
+## Search & Query Tools (8)
 
 ### 1. `search_sumo_logs`
 Search Sumo Logic logs using a query. Automatically detects query type (raw messages or aggregated records) and returns appropriate results.
@@ -105,9 +105,79 @@ Run a search audit query to analyze search usage and performance. Queries the sp
 
 ---
 
+### 7. `analyze_search_scan_cost`
+Analyze search scan costs with detailed tier/metering breakdown for Infrequent and Flex customers. Specifically designed for analyzing pay-per-search costs.
+
+**⚠️ IMPORTANT FOR FLEX ORGANIZATIONS**: Flex orgs MUST use `breakdown_type='metering'` or `'auto'` (default). Using `'tier'` returns near-zero scan data for Flex logs.
+
+**Parameters:**
+- `from_time` (str, default='-24h') - Start time (relative or ISO8601)
+- `to_time` (str, default='now') - End time (relative or ISO8601)
+- `query_type` (str, default='*') - Filter by type (Interactive, Scheduled, etc.)
+- `user_name` (str, default='*') - Filter by username
+- `content_name` (str, default='*') - Filter by content name
+- `analytics_tier_filter` (str, default='*') - Filter by analytics_tier (*infrequent*, *flex*, etc.)
+- `breakdown_type` (str, default='auto') - 'auto' (auto-detect), 'tier', or 'metering'
+- `group_by` (str, default='user_query') - 'user', 'user_query', 'user_scope_query', 'user_content', 'content'
+- `include_scope_parsing` (bool, default=True) - Extract scope (_index/_view) from query
+- `scan_credit_rate` (float, default=0.016) - Credits per GB scanned (0.016 cr/GB = 16 cr/TB). Only used for Infrequent tier (tiered accounts). Not used for Flex metering breakdown.
+- `min_scan_gb` (float, default=0.0) - Minimum scan GB threshold
+- `sort_by` (str, default='scan_credits') - Sort field (scan_credits for tier breakdown, billable_scan_gb for metering)
+- `limit` (int, default=100) - Max results
+- `instance` (str, default='default') - Instance name
+
+**Breakdown Types:**
+- **auto** (DEFAULT): Automatically detects organization type (Flex vs Tiered) via account status API and selects appropriate breakdown
+- **tier** (Tiered customers ONLY): Continuous, Frequent, Infrequent data tier breakdown. **WARNING**: Returns near-zero data on Flex orgs!
+- **metering** (Flex customers - REQUIRED): Flex, FlexSecurity, Continuous, Frequent, Infrequent, Security, Tracing breakdown with billable vs non-billable calculation
+
+**Group By Options:**
+- **user**: Aggregate by user_name only
+- **user_query**: Group by user_name and query text
+- **user_scope_query**: Group by user_name, scope (_index/_view), and query
+- **user_content**: Group by user_name and content_name (dashboards/scheduled searches)
+- **content**: Group by content_name only (scheduled search analysis)
+
+**Returns:** JSON with scan cost analysis including:
+
+**For Tier Breakdown (Infrequent tier):**
+- queries: Number of searches
+- total_scan_gb: Total data scanned
+- scan_credits: Estimated credits (0.016 cr/GB standard rate)
+- credits_per_query: Average credits per query
+- tier_breakdown_gb: GB per tier (continuous/frequent/infrequent)
+
+**For Metering Breakdown (Flex):**
+- queries: Number of searches
+- total_scan_gb: Total data scanned
+- billable_scan_gb: Billable scan volume in GB
+- **billable_scan_tb**: Billable scan volume in TB (primary unit for Flex)
+- non_billable_scan_gb: Non-billable scan volume
+- metering_breakdown_gb: GB per metering type
+- flex_billing_note: Note that credits are NOT calculated (contract-specific)
+
+**Both:**
+- detected_org_type: Organization type if auto-detected (Flex/Tiered)
+- warning: Alert if using 'tier' breakdown on suspected Flex org
+
+**Use Cases:**
+1. **Auto-detect and analyze** (RECOMMENDED): `breakdown_type='auto'` (default)
+2. **Infrequent tier cost analysis**: `analytics_tier_filter='*infrequent*'`, `group_by='user_query'`
+3. **Flex billable scan analysis**: `breakdown_type='metering'`, `group_by='user_scope_query'`
+4. **Expensive dashboard analysis**: `group_by='content'`, `query_type='Scheduled'`
+5. **User scan ranking**: `group_by='user'`, `sort_by='billable_scan_gb'` (Flex) or `'scan_credits'` (Tiered)
+
+**Important Notes:**
+- **Infrequent tier**: Credits calculated using 0.016 cr/GB (16 cr/TB) standard rate
+- **Flex tier**: Credits NOT calculated - rates vary by contract. Use TB values for cost estimation.
+
+**Reference:** [Search Audit Index Docs](https://www.sumologic.com/help/docs/manage/security/audit-indexes/search-audit-index/)
+
+---
+
 ## Content Library Tools (7)
 
-### 7. `get_personal_folder`
+### 8. `get_personal_folder`
 Get user's personal folder with optional children. Fast synchronous access to personal library.
 
 **Parameters:**
@@ -122,7 +192,7 @@ Get user's personal folder with optional children. Fast synchronous access to pe
 
 ---
 
-### 8. `get_folder_by_id`
+### 9. `get_folder_by_id`
 Get a specific folder by ID with optional children. Navigate folder hierarchy.
 
 **Parameters:**
@@ -138,7 +208,7 @@ Get a specific folder by ID with optional children. Navigate folder hierarchy.
 
 ---
 
-### 9. `get_content_by_path`
+### 10. `get_content_by_path`
 Get content item by its library path.
 
 **Parameters:**
@@ -153,7 +223,7 @@ Get content item by its library path.
 
 ---
 
-### 10. `get_content_path_by_id`
+### 11. `get_content_path_by_id`
 Get the full library path for a content ID.
 
 **Parameters:**
@@ -168,7 +238,7 @@ Get the full library path for a content ID.
 
 ---
 
-### 11. `export_content`
+### 12. `export_content`
 Export full content structure (dashboards, searches, etc.) with async job handling.
 
 **Parameters:**
@@ -187,7 +257,7 @@ Export full content structure (dashboards, searches, etc.) with async job handli
 
 ---
 
-### 12. `export_global_folder`
+### 13. `export_global_folder`
 Export Global folder contents (async). **IMPORTANT:** Uses 'data' array instead of 'children'.
 
 **Parameters:**
@@ -203,7 +273,7 @@ Export Global folder contents (async). **IMPORTANT:** Uses 'data' array instead 
 
 ---
 
-### 13. `export_admin_recommended_folder`
+### 14. `export_admin_recommended_folder`
 Export Admin Recommended folder (async). Uses 'children' array (unlike Global folder).
 
 **Parameters:**
@@ -221,7 +291,7 @@ Export Admin Recommended folder (async). Uses 'children' array (unlike Global fo
 
 ## Content ID Utilities (3)
 
-### 14. `convert_content_id_hex_to_decimal`
+### 15. `convert_content_id_hex_to_decimal`
 Convert hex content ID to decimal format for web UI URLs.
 
 **Parameters:**
@@ -237,7 +307,7 @@ Convert hex content ID to decimal format for web UI URLs.
 
 ---
 
-### 15. `convert_content_id_decimal_to_hex`
+### 16. `convert_content_id_decimal_to_hex`
 Convert decimal content ID to hex format for API calls.
 
 **Parameters:**
@@ -253,7 +323,7 @@ Convert decimal content ID to hex format for API calls.
 
 ---
 
-### 16. `get_content_web_url`
+### 17. `get_content_web_url`
 Generate web UI URL for a content item.
 
 **Parameters:**
@@ -273,7 +343,7 @@ Generate web UI URL for a content item.
 
 ## Collectors & Sources Tools (2)
 
-### 17. `get_sumo_collectors`
+### 18. `get_sumo_collectors`
 Get list of Sumo Logic collectors.
 
 **Parameters:**
@@ -284,7 +354,7 @@ Get list of Sumo Logic collectors.
 
 ---
 
-### 18. `get_sumo_sources`
+### 19. `get_sumo_sources`
 Get sources for a specific Sumo Logic collector.
 
 **Parameters:**
@@ -297,7 +367,7 @@ Get sources for a specific Sumo Logic collector.
 
 ## Users & Roles Tools (2)
 
-### 19. `get_sumo_users`
+### 20. `get_sumo_users`
 Get list of Sumo Logic users.
 
 **Parameters:**
@@ -308,7 +378,7 @@ Get list of Sumo Logic users.
 
 ---
 
-### 20. `get_sumo_roles_v2`
+### 21. `get_sumo_roles_v2`
 Get list of roles using the v2 Roles API.
 
 **Parameters:**
@@ -321,7 +391,7 @@ Get list of roles using the v2 Roles API.
 
 ## Dashboards & Monitors Tools (2)
 
-### 21. `get_sumo_dashboards`
+### 22. `get_sumo_dashboards`
 Get list of Sumo Logic dashboards.
 
 **Parameters:**
@@ -332,7 +402,7 @@ Get list of Sumo Logic dashboards.
 
 ---
 
-### 22. `search_sumo_monitors`
+### 23. `search_sumo_monitors`
 Search for monitors and monitor folders.
 
 **Parameters:**
@@ -353,7 +423,7 @@ Search for monitors and monitor folders.
 
 ## System Tools (2)
 
-### 23. `get_sumo_partitions`
+### 24. `get_sumo_partitions`
 Get list of partitions.
 
 **Parameters:**
@@ -364,7 +434,7 @@ Get list of partitions.
 
 ---
 
-### 24. `list_sumo_instances`
+### 25. `list_sumo_instances`
 List all configured Sumo Logic instances.
 
 **Parameters:** None
@@ -375,7 +445,7 @@ List all configured Sumo Logic instances.
 
 ## Account Management Tools (3)
 
-### 25. `get_account_status`
+### 26. `get_account_status`
 Get account status including subscription, plan type, and usage information.
 
 **Parameters:**
@@ -392,7 +462,7 @@ Get account status including subscription, plan type, and usage information.
 
 ---
 
-### 26. `get_usage_forecast`
+### 27. `get_usage_forecast`
 Get usage forecast for specified number of days based on recent consumption patterns.
 
 **Parameters:**
@@ -410,7 +480,7 @@ Get usage forecast for specified number of days based on recent consumption patt
 
 ---
 
-### 27. `export_usage_report`
+### 28. `export_usage_report`
 Export detailed usage report for a date range (async operation). Returns download URL for CSV report.
 
 **Parameters:**
@@ -434,7 +504,7 @@ Export detailed usage report for a date range (async operation). Returns downloa
 
 ---
 
-### 28. `get_estimated_log_search_usage`
+### 29. `get_estimated_log_search_usage`
 Get estimated data volume that would be scanned for a log search query in Infrequent Data Tier and Flex.
 
 **Parameters:**
@@ -475,7 +545,7 @@ Get estimated data volume that would be scanned for a log search query in Infreq
 
 ---
 
-### 29. `explore_log_metadata`
+### 30. `explore_log_metadata`
 Explore log metadata values for a given scope to discover partitions, source categories, and other metadata dimensions.
 
 **Parameters:**
@@ -536,7 +606,7 @@ Explore log metadata values for a given scope to discover partitions, source cat
 
 ---
 
-### 30. `analyze_data_volume`
+### 31. `analyze_data_volume`
 Analyze data volume ingestion from the Sumo Logic Data Volume Index for capacity planning and cost analysis.
 
 **Parameters:**
@@ -620,7 +690,7 @@ Analyze data volume ingestion from the Sumo Logic Data Volume Index for capacity
 
 ---
 
-### 31. `analyze_data_volume_grouped`
+### 32. `analyze_data_volume_grouped`
 Advanced data volume analysis with cardinality reduction for large-scale environments (5000+ source categories).
 
 **Parameters:**
