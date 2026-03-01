@@ -19,7 +19,7 @@ This Model Context Protocol (MCP) server provides secure, read-only access to Su
 
 ## Available Tools
 
-**Total: 35 MCP Tools** organized into 9 categories
+**Total: 37 MCP Tools** organized into 10 categories
 
 For complete tool documentation with parameters, examples, and use cases, see **[MCP Tools Reference](docs/mcp-tools-reference.md)**.
 
@@ -28,6 +28,7 @@ For complete tool documentation with parameters, examples, and use cases, see **
 | Category | Count | Description |
 |----------|-------|-------------|
 | **Search & Query** | 8 | Log search, job management, metrics, search audit, scan cost analysis, metadata exploration |
+| **Log Volume Analysis** | 2 | Raw log volume analysis using _size field, schema profiling with facets |
 | **Content Library** | 7 | Folder/content access, path operations, export with async job handling |
 | **Content ID Utilities** | 3 | Hex/decimal conversion, web URL generation |
 | **Account Management** | 6 | Account status, usage forecasting, credit analysis, data volume analysis |
@@ -64,6 +65,10 @@ For complete tool documentation with parameters, examples, and use cases, see **
 - `list_custom_fields` - List all custom fields defined in the organization
 - `list_field_extraction_rules` - List field extraction rules (FERs) for pre-parsing
 - `get_field_extraction_rule` - Get detailed information about a specific FER
+
+**Log Volume Analysis:**
+- `analyze_log_volume` - Analyze raw log volume using _size field to optimize Infrequent tier usage
+- `profile_log_schema` - Discover available fields and suggest good dimensions for volume analysis using facets operator
 
 All tools support an `instance` parameter to target specific Sumo Logic deployments.
 

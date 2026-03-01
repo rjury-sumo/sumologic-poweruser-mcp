@@ -2818,6 +2818,397 @@ async def explore_log_metadata(
 
 
 @mcp.tool()
+async def analyze_log_volume(
+    scope: str = Field(description="Search scope expression (e.g., '_index=prod_app_logs', '_sourceCategory=*cloudtrail*')"),
+    aggregate_by: list[str] = Field(description="List of fields to aggregate by (e.g., ['_sourceCategory'], ['eventname', 'eventsource'])"),
+    from_time: str = "-24h",
+    to_time: str = "now",
+    additional_fields: Optional[list[str]] = None,
+    top_n: int = 100,
+    include_percentage: bool = True,
+    instance: str = Field(default='default', description="Sumo Logic instance name")
+) -> str:
+    """
+    Analyze raw log volume using the _size field to understand ingestion drivers.
+
+    This tool helps optimize Infrequent tier usage and partition scoping by identifying
+    high-volume log sources and dimensions. Uses the internal _size field to measure
+    actual bytes for log events.
+
+    Use Cases:
+    1. Find top volume drivers within a partition by metadata:
+       scope="_index=prod_app_logs"
+       aggregate_by=["_sourceCategory"]
+
+    2. Analyze CloudTrail volume by event type:
+       scope="_sourceCategory=*cloudtrail*"
+       aggregate_by=["eventname"]
+
+    3. Multi-dimensional analysis with sampling:
+       scope="_sourceCategory=apache-access"
+       aggregate_by=["status_code", "vhost"]
+       additional_fields=["url"]  # Sample URLs with values() operator
+
+    4. Parse and analyze complex logs:
+       scope='_sourceCategory=apache-access | parse "..." as field1, field2'
+       aggregate_by=["field1"]
+
+    Parameters:
+        scope: Search scope - can include parse/json operators for search-time field extraction
+        aggregate_by: One or more fields to aggregate _size by (metadata or custom fields)
+        from_time: Start time (relative like '-24h' or ISO8601)
+        to_time: End time (relative like 'now' or ISO8601)
+        additional_fields: Optional fields to sample values from using values() operator
+        top_n: Number of top results to return (default: 100)
+        include_percentage: Calculate percentage of total volume (default: True)
+        instance: Instance name
+
+    Returns:
+        Volume analysis with:
+        - bytes: Raw byte count
+        - mb/gb/tb: Human-readable sizes
+        - percentage: % of total volume (if enabled)
+        - Additional sampled field values (if specified)
+
+    Examples:
+        # Find what source categories drive volume in a partition
+        analyze_log_volume(
+            scope="_index=prod_app_logs",
+            aggregate_by=["_sourceCategory"]
+        )
+
+        # Analyze CloudTrail by eventName and eventSource
+        analyze_log_volume(
+            scope="_sourceCategory=*cloudtrail*",
+            aggregate_by=["eventname", "eventsource"],
+            additional_fields=["arn"]  # Sample ARNs
+        )
+
+        # Parse Apache logs and analyze by status code
+        analyze_log_volume(
+            scope='_sourceCategory=apache | parse "* * *" as method, url, status',
+            aggregate_by=["status", "method"]
+        )
+
+    Reference: https://www.sumologic.com/blog/optimize-value-of-cloudtrail-logs-with-infrequent-tier
+    """
+    try:
+        _ensure_config_initialized()
+        config = get_config()
+        limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
+        await limiter.acquire("analyze_log_volume")
+
+        instance = validate_instance_name(instance)
+        client = await get_sumo_client(instance)
+
+        # Build aggregation clause
+        agg_fields = ", ".join(aggregate_by)
+
+        # Build additional fields clause using values() operator
+        additional_clause = ""
+        if additional_fields:
+            values_clauses = [f"values({field}) as {field}_samples" for field in additional_fields]
+            additional_clause = ", " + ", ".join(values_clauses)
+
+        # Build query
+        query = f"""{scope}
+| sum(_size) as bytes{additional_clause} by {agg_fields}
+| bytes / 1024 / 1024 as mb
+| bytes / 1024 / 1024 / 1024 as gb
+| bytes / 1024 / 1024 / 1024 / 1024 as tb
+| sort by bytes desc
+| limit {top_n}"""
+
+        # Create search job
+        job_response = await client.create_search_job(
+            query=query,
+            from_time=from_time,
+            to_time=to_time,
+            timezone_str="UTC"
+        )
+
+        job_id = job_response['id']
+
+        # Poll for completion
+        max_attempts = 300  # 5 minutes
+        for attempt in range(max_attempts):
+            await asyncio.sleep(1)
+
+            status = await client.get_search_job_status(job_id)
+            state = status['state']
+
+            if state == 'DONE GATHERING RESULTS':
+                break
+            elif state == 'CANCELLED':
+                raise APIError("Search job was cancelled")
+
+        # Get records
+        records_response = await client.get_search_job_records(job_id, limit=top_n)
+        records = records_response.get('records', [])
+
+        # Delete the job
+        try:
+            await client.delete_search_job(job_id)
+        except:
+            pass
+
+        # Calculate total if percentage requested
+        total_bytes = 0
+        if include_percentage:
+            total_bytes = sum(float(r.get('map', {}).get('bytes', 0)) for r in records)
+
+        # Format results
+        result = {
+            "query_parameters": {
+                "scope": scope,
+                "aggregate_by": aggregate_by,
+                "from_time": from_time,
+                "to_time": to_time,
+                "additional_fields": additional_fields,
+                "top_n": top_n
+            },
+            "summary": {
+                "total_records": len(records),
+                "total_bytes": int(total_bytes),
+                "total_gb": round(total_bytes / 1024 / 1024 / 1024, 2) if total_bytes > 0 else 0,
+                "total_tb": round(total_bytes / 1024 / 1024 / 1024 / 1024, 3) if total_bytes > 0 else 0
+            },
+            "results": []
+        }
+
+        for record in records:
+            record_map = record.get('map', {})
+
+            result_entry = {}
+
+            # Add aggregation fields
+            for field in aggregate_by:
+                result_entry[field] = record_map.get(field, "")
+
+            # Add volume metrics
+            bytes_val = float(record_map.get('bytes', 0))
+            result_entry["bytes"] = int(bytes_val)
+            result_entry["mb"] = round(float(record_map.get('mb', 0)), 2)
+            result_entry["gb"] = round(float(record_map.get('gb', 0)), 3)
+            result_entry["tb"] = round(float(record_map.get('tb', 0)), 4)
+
+            if include_percentage and total_bytes > 0:
+                result_entry["percentage"] = round((bytes_val / total_bytes) * 100, 2)
+
+            # Add additional sampled fields
+            if additional_fields:
+                for field in additional_fields:
+                    sample_key = f"{field}_samples"
+                    result_entry[sample_key] = record_map.get(sample_key, "")
+
+            result["results"].append(result_entry)
+
+        return json.dumps(result, indent=2)
+
+    except Exception as e:
+        return handle_tool_error(e, "analyze_log_volume")
+
+
+@mcp.tool()
+async def profile_log_schema(
+    scope: str = Field(description="Search scope expression (e.g., '_sourceCategory=*cloudtrail*')"),
+    from_time: str = "-1h",
+    to_time: str = "now",
+    mode: str = "summary",
+    min_cardinality: int = 0,
+    max_cardinality: int = 1000000,
+    suggest_candidates: bool = True,
+    instance: str = Field(default='default', description="Sumo Logic instance name")
+) -> str:
+    """
+    Profile log schema using the facets operator to discover available fields and their characteristics.
+
+    This tool helps understand log structure before performing volume analysis. The facets operator
+    returns metadata about all fields available in the query scope (built-in fields, indexed fields,
+    and search-time fields from auto-json or parse statements).
+
+    Use Cases:
+    1. Discover what fields exist in a log type:
+       scope="_sourceCategory=*cloudtrail*"
+       mode="summary"
+
+    2. Find medium-cardinality fields good for volume breakdown:
+       scope="_sourceCategory=*cloudtrail*"
+       suggest_candidates=True
+       min_cardinality=10
+       max_cardinality=1000
+
+    3. Get full facets output with value samples:
+       scope="_sourceCategory=apache"
+       mode="full"
+
+    Parameters:
+        scope: Search scope - can include parse/json operators for search-time fields
+        from_time: Start time (shorter ranges recommended for facets)
+        to_time: End time
+        mode: 'summary' returns just field names/types/cardinalities,
+              'full' returns all facets data including value samples
+        min_cardinality: Filter to fields with at least this many unique values
+        max_cardinality: Filter to fields with at most this many unique values
+        suggest_candidates: Automatically identify good fields for volume analysis
+                           (medium cardinality: 2-1000 unique values, non-system fields)
+        instance: Instance name
+
+    Returns:
+        Field schema information:
+        - fieldName: Name of the field
+        - fieldType: Data type (string, long, int, double, boolean)
+        - cardinality: Number of unique values (in summary mode)
+        - suggested: Boolean indicating if field is good for volume analysis
+        - Full facets data in 'full' mode
+
+    Examples:
+        # Discover CloudTrail fields
+        profile_log_schema(
+            scope="_sourceCategory=*cloudtrail*",
+            mode="summary"
+        )
+
+        # Find good dimensions for Apache log analysis
+        profile_log_schema(
+            scope="_sourceCategory=apache",
+            min_cardinality=2,
+            max_cardinality=500,
+            suggest_candidates=True
+        )
+
+        # Parse and discover fields from custom logs
+        profile_log_schema(
+            scope='_sourceCategory=app | parse "level=* user=*" as level, user',
+            mode="summary"
+        )
+
+    Note: Built-in Sumo Logic fields start with underscore (_sourceCategory, _collector, etc.)
+    """
+    try:
+        _ensure_config_initialized()
+        config = get_config()
+        limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
+        await limiter.acquire("profile_log_schema")
+
+        instance = validate_instance_name(instance)
+        client = await get_sumo_client(instance)
+
+        # Build query based on mode
+        if mode == "summary":
+            query = f"""{scope}
+| facets
+| count by _fieldName, _fieldType, _fieldCardinality
+| sort by _fieldName asc"""
+        else:  # full mode
+            query = f"""{scope}
+| facets"""
+
+        # Create search job
+        job_response = await client.create_search_job(
+            query=query,
+            from_time=from_time,
+            to_time=to_time,
+            timezone_str="UTC"
+        )
+
+        job_id = job_response['id']
+
+        # Poll for completion
+        max_attempts = 300
+        for attempt in range(max_attempts):
+            await asyncio.sleep(1)
+
+            status = await client.get_search_job_status(job_id)
+            state = status['state']
+
+            if state == 'DONE GATHERING RESULTS':
+                break
+            elif state == 'CANCELLED':
+                raise APIError("Search job was cancelled")
+
+        # Get records
+        records_response = await client.get_search_job_records(job_id, limit=10000)
+        records = records_response.get('records', [])
+
+        # Delete the job
+        try:
+            await client.delete_search_job(job_id)
+        except:
+            pass
+
+        # Format results based on mode
+        result = {
+            "query_parameters": {
+                "scope": scope,
+                "from_time": from_time,
+                "to_time": to_time,
+                "mode": mode,
+                "min_cardinality": min_cardinality,
+                "max_cardinality": max_cardinality
+            },
+            "summary": {
+                "total_fields": len(records)
+            }
+        }
+
+        if mode == "summary":
+            fields = []
+            suggested_fields = []
+
+            for record in records:
+                record_map = record.get('map', {})
+
+                field_name = record_map.get('_fieldname', record_map.get('_fieldName', ''))
+                field_type = record_map.get('_fieldtype', record_map.get('_fieldType', ''))
+                cardinality = int(record_map.get('_fieldcardinality', record_map.get('_fieldCardinality', 0)))
+
+                # Apply cardinality filters
+                if cardinality < min_cardinality or cardinality > max_cardinality:
+                    continue
+
+                field_info = {
+                    "fieldName": field_name,
+                    "fieldType": field_type,
+                    "cardinality": cardinality
+                }
+
+                # Determine if this is a good candidate for volume analysis
+                is_suggested = False
+                if suggest_candidates:
+                    # Good candidates: medium cardinality (2-1000), not system fields
+                    # System fields start with _ (except a few exceptions like _raw which we want to exclude)
+                    is_system_field = field_name.startswith('_')
+                    if not is_system_field and 2 <= cardinality <= 1000:
+                        is_suggested = True
+                        suggested_fields.append(field_name)
+
+                field_info["suggested_for_analysis"] = is_suggested
+
+                fields.append(field_info)
+
+            result["fields"] = fields
+            result["summary"]["filtered_fields"] = len(fields)
+
+            if suggest_candidates:
+                result["suggested_analysis_fields"] = suggested_fields
+                result["suggestion_rationale"] = (
+                    "Suggested fields have medium cardinality (2-1000 unique values) "
+                    "and are non-system fields, making them good candidates for _size aggregation analysis."
+                )
+
+        else:  # full mode
+            result["facets"] = []
+            for record in records:
+                result["facets"].append(record.get('map', {}))
+
+        return json.dumps(result, indent=2)
+
+    except Exception as e:
+        return handle_tool_error(e, "profile_log_schema")
+
+
+@mcp.tool()
 async def analyze_data_volume(
     dimension: str = "sourceCategory",
     from_time: str = "-24h",
