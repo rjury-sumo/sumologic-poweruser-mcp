@@ -151,6 +151,11 @@ sumo_mcp_audit.log
 # Query examples database - decompressed version (auto-generated from .gz)
 logs_searches.json
 
+# Test and development files
+tests/integration/*.py
+tests/debug/*.py
+tests/utilities/*.py
+
 # Spyder project settings
 .spyderproject
 .spyproject
