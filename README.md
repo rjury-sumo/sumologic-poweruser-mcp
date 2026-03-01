@@ -19,7 +19,7 @@ This Model Context Protocol (MCP) server provides secure, read-only access to Su
 
 ## Available Tools
 
-**Total: 37 MCP Tools** organized into 10 categories
+**Total: 38 MCP Tools + 1 Resource** organized into 11 categories
 
 For complete tool documentation with parameters, examples, and use cases, see **[MCP Tools Reference](docs/mcp-tools-reference.md)**.
 
@@ -28,6 +28,7 @@ For complete tool documentation with parameters, examples, and use cases, see **
 | Category | Count | Description |
 |----------|-------|-------------|
 | **Search & Query** | 8 | Log search, job management, metrics, search audit, scan cost analysis, metadata exploration |
+| **Query Examples** | 1 tool + 1 resource | Search 1000s of real Sumo Logic queries from published apps |
 | **Log Volume Analysis** | 2 | Raw log volume analysis using _size field, schema profiling with facets |
 | **Content Library** | 7 | Folder/content access, path operations, export with async job handling |
 | **Content ID Utilities** | 3 | Hex/decimal conversion, web URL generation |
@@ -69,6 +70,10 @@ For complete tool documentation with parameters, examples, and use cases, see **
 **Log Volume Analysis:**
 - `analyze_log_volume` - Analyze raw log volume using _size field to optimize Infrequent tier usage
 - `profile_log_schema` - Discover available fields and suggest good dimensions for volume analysis using facets operator
+
+**Query Examples:**
+- `search_query_examples` - Search through 11,000+ real Sumo Logic queries from 280+ published apps by app name, use case, or keywords
+- Resource: `sumo://query-examples` - Browse sample query examples via MCP resources (returns 20 diverse examples)
 
 All tools support an `instance` parameter to target specific Sumo Logic deployments.
 
@@ -287,6 +292,68 @@ instance: prod
 ```
 Use the list_sumo_instances tool to see all configured instances.
 ```
+
+### Search Query Examples
+
+Search 11,000+ real Sumo Logic queries from 280+ published apps using intelligent scoring and relevance ranking.
+
+**Note:** The query examples database is included as `logs_searches.json.gz` (2.9MB compressed). It will automatically decompress on first use to `logs_searches.json` (13MB).
+
+**Search Features:**
+- 🎯 **Natural language search** - Just describe what you want: "apache 4xx errors by server"
+- 🏆 **Relevance scoring** - Results ranked by how well they match your criteria
+- 🔤 **Tokenized search** - Multi-word searches automatically split and match
+- 🏷️ **Technology aliases** - k8s→Kubernetes, httpd→Apache, eks→Kubernetes
+- 📊 **Match metadata** - See exactly why each result matched
+- 🔄 **Smart fallback** - Auto-relaxes filters when no results found
+
+**Examples:**
+
+```bash
+# Natural language search (RECOMMENDED)
+search_query_examples:
+  query: "apache 4xx errors by server"
+  max_results: 5
+# Returns: 1,133 matches, scored and ranked by relevance
+
+# Kubernetes scheduling issues
+search_query_examples:
+  query: "k8s unschedulable pods"
+  max_results: 5
+# Aliases work: k8s → kubernetes
+
+# Pattern + technology
+search_query_examples:
+  query: "count by timeslice"
+  app_name: "AWS"
+  query_type: "Logs"
+# Combines natural search with filters
+
+# Multi-word keyword search
+search_query_examples:
+  keywords: "status_code bytes"
+  max_results: 10
+# Finds queries containing either "status_code" OR "bytes"
+
+# Strict AND mode (all filters must match)
+search_query_examples:
+  app_name: "Apache"
+  use_case: "performance"
+  match_mode: "all"
+# Only returns queries matching ALL criteria
+
+# Fuzzy mode with auto-fallback
+search_query_examples:
+  app_name: "Windows"
+  keywords: "error"
+  match_mode: "fuzzy"
+# If no results, automatically relaxes filters
+```
+
+**Match Modes:**
+- `any` (default) - Scores by relevance, more matches = higher rank
+- `all` - Strict AND, all filters must match
+- `fuzzy` - Auto-relaxes filters if zero results
 
 ## Security Best Practices
 

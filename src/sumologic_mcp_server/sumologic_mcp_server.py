@@ -3698,6 +3698,340 @@ async def collectors_config() -> str:
         return handle_tool_error(e, "collectors_config")
 
 
+@mcp.resource("sumo://query-examples")
+async def query_examples() -> str:
+    """
+    Browse sample Sumo Logic query examples from published apps.
+
+    This resource returns a sample of 20 diverse query examples to get started.
+    For more targeted searching with filters (app name, use case, keywords, etc.),
+    use the search_query_examples tool instead.
+
+    The tool allows filtering by:
+    - Application name (Windows, AWS, Kubernetes, etc.)
+    - Use case keywords (security, performance, traffic, etc.)
+    - Query text keywords (count, timeslice, error, etc.)
+    - Query type (Logs or Metrics)
+    """
+    try:
+        from pathlib import Path
+
+        # Load query examples from repo
+        query_db_path = Path(__file__).parent.parent.parent / "logs_searches.json"
+        query_db_path_gz = Path(__file__).parent.parent.parent / "logs_searches.json.gz"
+
+        # Auto-decompress if only .gz exists
+        if not query_db_path.exists() and query_db_path_gz.exists():
+            import gzip
+            import shutil
+            with gzip.open(query_db_path_gz, 'rb') as f_in:
+                with open(query_db_path, 'wb') as f_out:
+                    shutil.copyfileobj(f_in, f_out)
+            logger.info(f"Decompressed {query_db_path_gz} to {query_db_path}")
+
+        if not query_db_path.exists():
+            return json.dumps({
+                "error": "Query examples database not found",
+                "expected_path": str(query_db_path),
+                "suggestion": "Ensure logs_searches.json or logs_searches.json.gz is in the repo root directory"
+            }, indent=2)
+
+        # Load and return a sample
+        with open(query_db_path, 'r') as f:
+            all_queries = json.load(f)
+
+        # Get a diverse sample - take every Nth query to get variety
+        sample_size = 20
+        step = max(1, len(all_queries) // sample_size)
+        sample = all_queries[::step][:sample_size]
+
+        # Get list of unique apps for reference
+        all_apps = sorted(list(set([q.get('app', '') for q in all_queries if q.get('app')])))
+
+        return json.dumps({
+            "info": "This is a sample of query examples. Use search_query_examples tool for filtered searches.",
+            "total_available": len(all_queries),
+            "sample_size": len(sample),
+            "available_apps": all_apps[:50],  # First 50 apps
+            "total_apps": len(all_apps),
+            "examples": sample
+        }, indent=2)
+
+    except Exception as e:
+        return json.dumps({
+            "error": str(e),
+            "suggestion": "Use the search_query_examples tool for searching examples"
+        }, indent=2)
+
+
+# Query Examples Tool (companion to resource above)
+
+@mcp.tool()
+async def search_query_examples(
+    query: Optional[str] = Field(default=None, description="Free-text search across all fields (app name, use case, query name, query text). Best for natural queries like 'apache 4xx errors' or 'kubernetes pod scheduling'"),
+    app_name: Optional[str] = Field(default=None, description="Narrow to specific app (e.g., 'Apache', 'AWS', 'Kubernetes'). Also matches 'httpd', 'k8s' aliases"),
+    use_case: Optional[str] = Field(default=None, description="Narrow to use case (e.g., 'security', 'performance', 'latency', 'error')"),
+    keywords: Optional[str] = Field(default=None, description="Search query text for operators/patterns (e.g., 'count by', 'timeslice', 'where status_code')"),
+    query_type: Optional[str] = Field(default=None, description="Filter by type: 'Logs' or 'Metrics'"),
+    match_mode: str = Field(default="any", description="Match mode: 'any' (score by relevance, default), 'all' (strict AND), 'fuzzy' (relaxed matching)"),
+    max_results: int = Field(default=10, description="Maximum number of examples to return (1-50)")
+) -> str:
+    """
+    Search 11,000+ real Sumo Logic queries from published apps using intelligent scoring.
+
+    **Best Practice:** Use the `query` parameter for natural language searches. It searches across
+    app names, use cases, query names, and query text simultaneously, returning results ranked by relevance.
+
+    **Match Modes:**
+    - "any" (default): Scores results by how many filters match. More matches = higher ranking.
+    - "all": Strict AND - all specified filters must match (may return zero results)
+    - "fuzzy": Relaxed matching with auto-fallback if no results found
+
+    **Search Examples:**
+    - Natural search: query="apache 4xx errors by server"
+    - App-specific: query="kubernetes unschedulable pods"
+    - Pattern search: query="count by timeslice" + query_type="Logs"
+    - Combined: app_name="AWS", keywords="CloudTrail", use_case="security"
+
+    **Automatic Features:**
+    - Tokenizes multi-word searches ("status code 500" → searches "status", "code", "500")
+    - Alias matching (k8s→Kubernetes, httpd→Apache, latency→response time)
+    - Auto-fallback with relaxation when zero results found
+    - Returns relevance scores showing why each result matched
+
+    Returns ranked results with match metadata showing which fields matched.
+    """
+    try:
+        from pathlib import Path
+        import re
+
+        # Validate max_results
+        max_results = max(1, min(max_results, 50))
+
+        # Load query examples from repo
+        query_db_path = Path(__file__).parent.parent.parent / "logs_searches.json"
+        query_db_path_gz = Path(__file__).parent.parent.parent / "logs_searches.json.gz"
+
+        # Auto-decompress if only .gz exists
+        if not query_db_path.exists() and query_db_path_gz.exists():
+            import gzip
+            import shutil
+            with gzip.open(query_db_path_gz, 'rb') as f_in:
+                with open(query_db_path, 'wb') as f_out:
+                    shutil.copyfileobj(f_in, f_out)
+            logger.info(f"Decompressed {query_db_path_gz} to {query_db_path}")
+
+        if not query_db_path.exists():
+            return json.dumps({
+                "error": "Query examples database not found",
+                "expected_path": str(query_db_path),
+                "suggestion": "Ensure logs_searches.json or logs_searches.json.gz is in the repo root directory"
+            }, indent=2)
+
+        # Load queries
+        with open(query_db_path, 'r') as f:
+            all_queries = json.load(f)
+
+        # Technology/app aliases
+        aliases = {
+            'k8s': 'kubernetes',
+            'httpd': 'apache',
+            'apache2': 'apache',
+            'eks': 'kubernetes',
+            'gke': 'kubernetes',
+            'aks': 'kubernetes',
+            'ec2': 'aws',
+            's3': 'aws',
+            'lambda': 'aws',
+            'vm': 'azure',
+            'latency': 'response time',
+            'timetaken': 'response time',
+        }
+
+        # Helper: expand aliases
+        def expand_aliases(text):
+            if not text or not isinstance(text, str):
+                return text
+            text_lower = text.lower()
+            for alias, canonical in aliases.items():
+                if alias in text_lower:
+                    text_lower = text_lower.replace(alias, canonical)
+            return text_lower
+
+        # Helper: tokenize search terms
+        def tokenize(text):
+            if not text or not isinstance(text, str):
+                return []
+            # Split on whitespace and common separators, filter empty
+            tokens = re.split(r'[\s,;|]+', text.lower())
+            return [t for t in tokens if t and len(t) > 1]
+
+        # Score a query against search criteria
+        def score_query(q):
+            score = 0
+            matched_fields = []
+
+            # Free-text query searches everything
+            if query and isinstance(query, str):
+                query_tokens = tokenize(expand_aliases(query))
+                for token in query_tokens:
+                    # Search in app name
+                    if token in expand_aliases(q.get('app', '')):
+                        score += 3
+                        matched_fields.append(f"app:{token}")
+                    # Search in use case
+                    if token in expand_aliases(q.get('use_case', '')):
+                        score += 2
+                        matched_fields.append(f"use_case:{token}")
+                    # Search in search name
+                    if token in expand_aliases(q.get('search_name', '')):
+                        score += 2
+                        matched_fields.append(f"name:{token}")
+                    # Search in query text
+                    if token in expand_aliases(q.get('search', '')):
+                        score += 1
+                        matched_fields.append(f"query:{token}")
+
+            # App name filter (with aliases)
+            if app_name and isinstance(app_name, str):
+                expanded_app = expand_aliases(app_name)
+                if expanded_app in expand_aliases(q.get('app', '')):
+                    score += 5
+                    matched_fields.append(f"app_filter")
+
+            # Use case filter
+            if use_case and isinstance(use_case, str):
+                use_case_tokens = tokenize(use_case)
+                for token in use_case_tokens:
+                    if token in q.get('use_case', '').lower():
+                        score += 3
+                        matched_fields.append(f"use_case_filter:{token}")
+
+            # Keywords - tokenized search in query text
+            if keywords and isinstance(keywords, str):
+                keyword_tokens = tokenize(keywords)
+                query_text = q.get('search', '').lower()
+                for token in keyword_tokens:
+                    if token in query_text:
+                        score += 2
+                        matched_fields.append(f"keyword:{token}")
+
+            # Query type - exact match
+            if query_type and isinstance(query_type, str):
+                if query_type.lower() == q.get('type', '').lower():
+                    score += 1
+                    matched_fields.append(f"type:{query_type}")
+
+            return score, matched_fields
+
+        # Score all queries
+        scored_results = []
+        for q in all_queries:
+            score, matched_fields = score_query(q)
+            if score > 0:  # Only include if any match
+                result = q.copy()
+                result['_score'] = score
+                result['_matched_on'] = matched_fields
+                scored_results.append(result)
+
+        # Handle match modes
+        original_count = len(scored_results)
+        relaxed_filters = []
+
+        # Ensure match_mode is a string
+        match_mode_str = str(match_mode) if match_mode and isinstance(match_mode, str) else "any"
+
+        if match_mode_str == "all":
+            # Strict AND - only keep results that matched all specified filters
+            filter_count = sum([
+                1 if query and isinstance(query, str) else 0,
+                1 if app_name and isinstance(app_name, str) else 0,
+                1 if use_case and isinstance(use_case, str) else 0,
+                1 if keywords and isinstance(keywords, str) else 0,
+                1 if query_type and isinstance(query_type, str) else 0
+            ])
+            if filter_count > 0:
+                scored_results = [r for r in scored_results if len(set(r['_matched_on'])) >= filter_count]
+
+        elif match_mode_str == "fuzzy" and len(scored_results) == 0:
+            # Auto-fallback: relax most restrictive filter
+            if keywords:
+                relaxed_filters.append("keywords")
+                # Retry without keywords
+                scored_results_retry = []
+                for q in all_queries:
+                    score_retry = 0
+                    matched_retry = []
+                    # Re-score without keywords
+                    if query and isinstance(query, str):
+                        query_tokens = tokenize(expand_aliases(query))
+                        for token in query_tokens:
+                            if token in expand_aliases(q.get('app', '')):
+                                score_retry += 3
+                                matched_retry.append(f"app:{token}")
+                    if app_name and isinstance(app_name, str):
+                        if expand_aliases(app_name) in expand_aliases(q.get('app', '')):
+                            score_retry += 5
+                            matched_retry.append(f"app_filter")
+                    if score_retry > 0:
+                        result = q.copy()
+                        result['_score'] = score_retry
+                        result['_matched_on'] = matched_retry
+                        scored_results_retry.append(result)
+                scored_results = scored_results_retry
+
+        # Sort by score descending
+        scored_results.sort(key=lambda x: x['_score'], reverse=True)
+
+        # Limit results
+        results = scored_results[:max_results]
+
+        # Convert params to strings for JSON serialization
+        def to_str(val):
+            return str(val) if val and isinstance(val, str) else None
+
+        response = {
+            "summary": {
+                "total_database_size": len(all_queries),
+                "matches_found": original_count,
+                "returned": len(results),
+                "match_mode": match_mode_str,
+                "search_params": {
+                    "query": to_str(query),
+                    "app_name": to_str(app_name),
+                    "use_case": to_str(use_case),
+                    "keywords": to_str(keywords),
+                    "query_type": to_str(query_type)
+                }
+            },
+            "results": results
+        }
+
+        # Add relaxation info if fallback occurred
+        if relaxed_filters:
+            response["summary"]["relaxed_filters"] = relaxed_filters
+            response["summary"]["note"] = f"Zero results found. Automatically relaxed filters: {', '.join(relaxed_filters)}"
+
+        # Add helpful suggestions if no results
+        if len(scored_results) == 0:
+            response["suggestion"] = "No matches found. Try:"
+            response["suggestions"] = [
+                "Use broader search terms in 'query' parameter",
+                "Try match_mode='fuzzy' for auto-fallback",
+                "Search by app name only first to see what's available",
+                "Use query_type='Logs' or 'Metrics' to narrow by type"
+            ]
+            # Get sample app names
+            sample_apps = sorted(list(set([q.get('app', '') for q in all_queries if q.get('app')])))[:20]
+            response["available_apps_sample"] = sample_apps
+
+        return json.dumps(response, indent=2)
+
+    except Exception as e:
+        logger.error(f"Error searching query examples: {str(e)}")
+        return json.dumps({"error": str(e)}, indent=2)
+
+
 # MCP Prompts (keeping original prompts)
 
 @mcp.prompt()

@@ -148,6 +148,9 @@ venv.bak/
 sumo_mcp_audit.log
 *.log
 
+# Query examples database - decompressed version (auto-generated from .gz)
+logs_searches.json
+
 # Spyder project settings
 .spyderproject
 .spyproject
