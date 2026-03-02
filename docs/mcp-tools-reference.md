@@ -780,12 +780,25 @@ Analyze data volume ingestion from the Sumo Logic Data Volume Index for capacity
    Filter results where state="GONE"
    ```
 
+**Implementation Details:**
+- Uses centralized query patterns from `query_patterns.py` module
+- Timeshift pattern includes null-safe math and division-by-zero handling
+- Ensures accurate detection of GONE/NEW/COLLECTING states even with missing historical data
+- Query patterns are unit tested and shared across multiple tools
+
 **Notes:**
 - Queries the `sumologic_volume` index with dimension-specific source categories
 - Uses `parse regex multi` for JSON array parsing
 - Timeshift comparison helps detect anomalies and trends
 - Infrequent tier data may take longer to appear in volume index
 - Large accounts with 1000s of values may need shorter time ranges to avoid query memory issues
+
+**Null Handling:**
+When `include_timeshift=True`, the tool handles edge cases properly:
+- **GONE detection**: Sources with no current data (null → 0) but with historical baseline are marked state="GONE"
+- **NEW detection**: Sources with current data but no historical baseline (null → 0) are marked state="NEW"
+- **Division by zero**: When baseline=0, percentage change is 100% if current>0, or 0% if current=0
+- This ensures stopped/low collection scenarios are detected correctly
 
 **Time Format Examples:**
 - Relative: "-1h", "-24h", "-7d", "-30d"

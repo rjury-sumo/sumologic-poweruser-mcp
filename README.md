@@ -447,9 +447,15 @@ sumologic-python-mcp/
 │   ├── config.py                 # Configuration management
 │   ├── exceptions.py             # Custom exception classes
 │   ├── validation.py             # Input validation models
-│   └── rate_limiter.py           # Rate limiting implementation
+│   ├── rate_limiter.py           # Rate limiting implementation
+│   ├── query_patterns.py         # Reusable Sumo query patterns
+│   ├── search_helpers.py         # Search utility functions
+│   ├── content_id_utils.py       # Content ID manipulation
+│   └── async_export_helper.py    # Async job polling helpers
 ├── tests/
-│   └── test_sumologic_mcp_server.py
+│   ├── integration/              # Integration tests
+│   ├── utilities/                # Unit tests for helpers
+│   └── debug/                    # Debug test scripts
 ├── .env.example                  # Configuration template
 ├── .gitignore
 ├── SECURITY.md                   # Security policy
@@ -457,6 +463,50 @@ sumologic-python-mcp/
 ├── README.md
 └── pyproject.toml
 ```
+
+### Query Patterns Library
+
+The `query_patterns.py` module provides reusable Sumo Logic query patterns that ensure consistent behavior across tools, especially for edge cases like null handling and division by zero.
+
+**Key Pattern Classes:**
+
+- **`TimeshiftPattern`** - Compare current data with historical baselines using `compare with timeshift`
+  - Handles null values from missing historical data
+  - Detects states: GONE (stopped collection), NEW (newly appeared), COLLECTING (active)
+  - Safe division preventing null results from zero baselines
+
+- **`NullSafeOperations`** - Null-safe mathematical operations
+  - `safe_divide()` - Division with null and zero guards
+  - `coalesce()` - Convert nulls to default values
+  - `percentage_change()` - Calculate % change with edge case handling
+
+- **`AggregationPatterns`** - Common aggregation and sorting
+  - `volume_by_dimension()` - Standard volume aggregation
+  - `top_n()` - Top results with sorting
+  - `timeslice_aggregation()` - Time-series aggregations
+
+- **`CreditCalculation`** - Sumo Logic credit rate calculations
+  - Standard tiered pricing (Continuous: 20, Frequent: 9, Infrequent: 0.4, CSE: 25 credits/GB)
+  - Customizable rates for different pricing models
+
+**Usage Example:**
+
+```python
+from query_patterns import TimeshiftPattern, AggregationPatterns, CreditCalculation
+
+# Build a query with reusable patterns
+query_parts = ['_index=sumologic_volume']
+query_parts.append(AggregationPatterns.volume_by_dimension('sourceCategory'))
+query_parts.extend(CreditCalculation.add_credit_calculation())
+query_parts.extend(TimeshiftPattern.compare_with_timeshift('gbytes', days=7, periods=3))
+query_parts.append(AggregationPatterns.top_n('gbytes', limit=100))
+```
+
+These patterns centralize complex query logic, making it easier to:
+- Fix bugs in one place and have fixes propagate everywhere
+- Ensure consistent null handling across all timeshift queries
+- Write unit tests for query generation
+- Document query patterns with clear examples
 
 ## Troubleshooting
 

@@ -3285,6 +3285,8 @@ async def analyze_data_volume(
         With timeshift: Compares current vs 21d average (3 x 7d)
     """
     try:
+        from .query_patterns import TimeshiftPattern, AggregationPatterns, CreditCalculation
+
         _ensure_config_initialized()
         config = get_config()
         instance = validate_instance_name(instance)
@@ -3331,41 +3333,27 @@ async def analyze_data_volume(
             query_parts.append(f'| where {field_name} matches /{filter_pattern}/')
 
         # Aggregation
-        query_parts.append(f'| sum(events) as events, sum(gbytes) as gbytes by dataTier,{field_name}')
+        query_parts.append(AggregationPatterns.volume_by_dimension(field_name, include_tier=True))
 
         # Add credits calculation if requested
         if include_credits:
-            query_parts.extend([
-                '| 20 as credit_rate',
-                '| if(dataTier = "CSE",25,credit_rate) as credit_rate',
-                '| if(dataTier = "Infrequent",0.4,credit_rate) as credit_rate',
-                '| if(dataTier = "Frequent",9,credit_rate) as credit_rate',
-                '| gbytes * credit_rate as credits'
-            ])
+            query_parts.extend(CreditCalculation.add_credit_calculation())
 
         # Add timeshift comparison if requested
         if include_timeshift:
-            total_days = timeshift_days * timeshift_periods
-            query_parts.append(f'| compare timeshift {timeshift_days}d {timeshift_periods} avg')
+            # Add timeshift for gbytes (includes compare operator and state field)
+            query_parts.extend(
+                TimeshiftPattern.compare_with_timeshift('gbytes', timeshift_days, timeshift_periods, include_state=True)
+            )
 
-            # Handle nulls and calculate percentage changes
-            query_parts.extend([
-                '| if(isNull(gbytes), "GONE", "COLLECTING") as state',
-                '| if(isNull(gbytes), 0, gbytes) as gbytes',
-                f'| if(isNull(gbytes_{total_days}d_avg), "NEW", state) as state',
-                f'| if(isNull(gbytes_{total_days}d_avg), 0, gbytes_{total_days}d_avg) as gbytes_{total_days}d_avg',
-                f'| ((gbytes - gbytes_{total_days}d_avg) / gbytes_{total_days}d_avg) * 100 as pct_increase_gb'
-            ])
-
+            # Add timeshift for credits if requested (no compare operator, no state field)
             if include_credits:
-                query_parts.extend([
-                    '| if(isNull(credits), 0, credits) as credits',
-                    f'| if(isNull(credits_{total_days}d_avg), 0, credits_{total_days}d_avg) as credits_{total_days}d_avg',
-                    f'| ((credits - credits_{total_days}d_avg) / credits_{total_days}d_avg) * 100 as pct_increase_cr'
-                ])
+                query_parts.extend(
+                    TimeshiftPattern.compare_with_timeshift('credits', timeshift_days, timeshift_periods, include_state=False)
+                )
 
         # Sorting
-        query_parts.append(f'| sort {sort_by} desc | limit {limit}')
+        query_parts.append(AggregationPatterns.top_n(sort_by, limit=limit, direction='desc'))
 
         query = '\n'.join(query_parts)
 
