@@ -1,7 +1,7 @@
 # Sumo Logic MCP Server - Tools Reference
 
 ## Overview
-Total Tools: **38**
+Total Tools: **40**
 
 ---
 
@@ -286,7 +286,7 @@ Discover available fields and suggest good dimensions for volume analysis using 
 
 ---
 
-## Content Library Tools (7)
+## Content Library Tools (9)
 
 ### 12. `get_personal_folder`
 Get user's personal folder with optional children. Fast synchronous access to personal library.
@@ -400,9 +400,84 @@ Export Admin Recommended folder (async). Uses 'children' array (unlike Global fo
 
 ---
 
+### 19. `export_installed_apps`
+Export Installed Apps folder to discover pre-built apps available in your Sumo Logic instance (async).
+
+**Parameters:**
+- `is_admin_mode` (bool, default=False) - View as admin to see all apps
+- `max_wait_seconds` (int, default=300) - Maximum seconds to wait for async job
+- `instance` (str, default='default') - Instance name
+
+**Returns:** JSON with installed apps structure containing:
+- App folders organized by category/technology
+- Each app contains dashboards, searches, monitors
+- Content IDs for accessing specific app components
+
+**Use Cases:**
+- **Discover available apps**: See what pre-built content is already installed
+- **Find relevant dashboards**: Locate dashboards for AWS, Kubernetes, Apache, etc.
+- **Log discovery integration**: After finding logs, discover if there's already an app for them
+- **Use case mapping**: Connect log sources to pre-built monitoring solutions
+
+**App Catalog References:**
+- Browse all apps: https://www.sumologic.com/app-catalog
+- Search by keyword: Use app catalog to find apps matching your technology
+- Integration docs: https://www.sumologic.com/help/docs/integrations/
+
+**Example Flow:**
+1. Use LogDiscoveryPattern to find logs (e.g., CloudTrail logs)
+2. Use export_installed_apps to see if AWS CloudTrail app is installed
+3. If installed, navigate directly to app dashboards and searches
+4. If not installed, suggest admin install from app catalog
+
+**Notes:**
+- Similar async pattern to export_global_folder and export_admin_recommended_folder
+- InstalledApps is a top-level library location like Global and Admin Recommended
+- Each app folder typically contains: Overview dashboard, detailed dashboards, saved searches
+- Apps are pre-configured with optimal queries and visualizations for their technology
+
+**API Reference:** https://api.sumologic.com/docs/#operation/getInstalledAppsFolderAsync
+
+---
+
+### 20. `list_installed_apps`
+List all installed Sumo Logic apps (lightweight alternative to export_installed_apps).
+
+**Parameters:**
+- `instance` (str, default='default') - Instance name
+
+**Returns:** JSON array of installed apps with:
+- App UUID
+- App name (e.g., "AWS CloudTrail", "Apache", "Kubernetes")
+- App manifest version
+- Installation info
+
+**Use Cases:**
+- **Quick discovery**: Faster than exporting full folder structure
+- **App availability check**: See if specific app is installed
+- **Log discovery integration**: Check for relevant apps after finding logs
+
+**Permission Note:**
+This endpoint may require admin permissions in some organizations. If it fails with permission error, use export_installed_apps instead which works with regular user permissions.
+
+**App Discovery Flow:**
+1. Phase 1: Use LogDiscoveryPattern to find logs (e.g., 'cloudtrail')
+2. Phase 2: Use list_installed_apps to see if AWS CloudTrail app exists
+3. If found: Use export_installed_apps to get full app structure
+4. If not found: Suggest installation from https://www.sumologic.com/app-catalog
+
+**App Catalog:**
+- Browse apps: https://www.sumologic.com/app-catalog
+- Search by keyword: Find apps matching your logs/technology
+- Integration guides: https://www.sumologic.com/help/docs/integrations/
+
+**API Reference:** https://api.sumologic.com/docs/#operation/listAppsV2
+
+---
+
 ## Content ID Utilities (3)
 
-### 19. `convert_content_id_hex_to_decimal`
+### 21. `convert_content_id_hex_to_decimal`
 Convert hex content ID to decimal format for web UI URLs.
 
 **Parameters:**
@@ -418,7 +493,7 @@ Convert hex content ID to decimal format for web UI URLs.
 
 ---
 
-### 20. `convert_content_id_decimal_to_hex`
+### 22. `convert_content_id_decimal_to_hex`
 Convert decimal content ID to hex format for API calls.
 
 **Parameters:**
@@ -434,7 +509,7 @@ Convert decimal content ID to hex format for API calls.
 
 ---
 
-### 21. `get_content_web_url`
+### 23. `get_content_web_url`
 Generate web UI URL for a content item.
 
 **Parameters:**
@@ -454,7 +529,7 @@ Generate web UI URL for a content item.
 
 ## Field Management Tools (3)
 
-### 22. `list_custom_fields`
+### 24. `list_custom_fields`
 List all custom fields defined in the organization.
 
 **Parameters:**
@@ -471,7 +546,7 @@ List all custom fields defined in the organization.
 
 ---
 
-### 23. `list_field_extraction_rules`
+### 25. `list_field_extraction_rules`
 List all field extraction rules (FERs) for pre-parsing logs.
 
 **Parameters:**
@@ -489,7 +564,7 @@ List all field extraction rules (FERs) for pre-parsing logs.
 
 ---
 
-### 24. `get_field_extraction_rule`
+### 26. `get_field_extraction_rule`
 Get detailed information about a specific field extraction rule.
 
 **Parameters:**
@@ -510,7 +585,7 @@ Get detailed information about a specific field extraction rule.
 
 ## Collectors & Sources Tools (2)
 
-### 25. `get_sumo_collectors`
+### 27. `get_sumo_collectors`
 Get list of Sumo Logic collectors.
 
 **Parameters:**
@@ -521,7 +596,7 @@ Get list of Sumo Logic collectors.
 
 ---
 
-### 26. `get_sumo_sources`
+### 28. `get_sumo_sources`
 Get sources for a specific Sumo Logic collector.
 
 **Parameters:**
@@ -534,7 +609,7 @@ Get sources for a specific Sumo Logic collector.
 
 ## Users & Roles Tools (2)
 
-### 27. `get_sumo_users`
+### 29. `get_sumo_users`
 Get list of Sumo Logic users.
 
 **Parameters:**
@@ -545,7 +620,7 @@ Get list of Sumo Logic users.
 
 ---
 
-### 28. `get_sumo_roles_v2`
+### 30. `get_sumo_roles_v2`
 Get list of roles using the v2 Roles API.
 
 **Parameters:**
@@ -558,7 +633,7 @@ Get list of roles using the v2 Roles API.
 
 ## Dashboards & Monitors Tools (2)
 
-### 29. `get_sumo_dashboards`
+### 31. `get_sumo_dashboards`
 Get list of Sumo Logic dashboards.
 
 **Parameters:**
@@ -569,7 +644,7 @@ Get list of Sumo Logic dashboards.
 
 ---
 
-### 30. `search_sumo_monitors`
+### 32. `search_sumo_monitors`
 Search for monitors and monitor folders.
 
 **Parameters:**
@@ -590,7 +665,7 @@ Search for monitors and monitor folders.
 
 ## System Tools (2)
 
-### 31. `get_sumo_partitions`
+### 33. `get_sumo_partitions`
 Get list of partitions.
 
 **Parameters:**
@@ -601,7 +676,7 @@ Get list of partitions.
 
 ---
 
-### 32. `list_sumo_instances`
+### 34. `list_sumo_instances`
 List all configured Sumo Logic instances.
 
 **Parameters:** None
@@ -612,7 +687,7 @@ List all configured Sumo Logic instances.
 
 ## Account Management Tools (6)
 
-### 33. `get_account_status`
+### 35. `get_account_status`
 Get account status including subscription, plan type, and usage information.
 
 **Parameters:**
@@ -629,7 +704,7 @@ Get account status including subscription, plan type, and usage information.
 
 ---
 
-### 34. `get_usage_forecast`
+### 36. `get_usage_forecast`
 Get usage forecast for specified number of days based on recent consumption patterns.
 
 **Parameters:**
@@ -647,7 +722,7 @@ Get usage forecast for specified number of days based on recent consumption patt
 
 ---
 
-### 35. `export_usage_report`
+### 37. `export_usage_report`
 Export detailed usage report for a date range (async operation). Returns download URL for CSV report.
 
 **Parameters:**
@@ -671,7 +746,7 @@ Export detailed usage report for a date range (async operation). Returns downloa
 
 ---
 
-### 36. `get_estimated_log_search_usage`
+### 38. `get_estimated_log_search_usage`
 Get estimated data volume that would be scanned for a log search query in Infrequent Data Tier and Flex.
 
 **Parameters:**
@@ -712,7 +787,7 @@ Get estimated data volume that would be scanned for a log search query in Infreq
 
 ---
 
-### 37. `analyze_data_volume`
+### 39. `analyze_data_volume`
 Analyze data volume ingestion from the Sumo Logic Data Volume Index for capacity planning and cost analysis.
 
 **Parameters:**
@@ -809,7 +884,7 @@ When `include_timeshift=True`, the tool handles edge cases properly:
 
 ---
 
-### 38. `analyze_data_volume_grouped`
+### 40. `analyze_data_volume_grouped`
 Advanced data volume analysis with cardinality reduction for large-scale environments (5000+ source categories).
 
 **Parameters:**
@@ -939,7 +1014,7 @@ Advanced data volume analysis with cardinality reduction for large-scale environ
 - Configure instances via environment variables (see `.env.example`)
 
 ### Async Export Jobs
-- Export tools (`export_content`, `export_global_folder`, `export_admin_recommended_folder`, `export_usage_report`) use async job pattern
+- Export tools (`export_content`, `export_global_folder`, `export_admin_recommended_folder`, `export_installed_apps`, `export_usage_report`) use async job pattern
 - Default timeout: 300 seconds (5 minutes)
 - Default poll interval: 2 seconds (content exports) or 5 seconds (usage reports)
 - Usage report downloads expire after 10 minutes
@@ -954,7 +1029,7 @@ Advanced data volume analysis with cardinality reduction for large-scale environ
 
 **Version:** 1.7
 **Last Updated:** 2026-03-02
-**Total Tools:** 38
+**Total Tools:** 40
 
 ---
 
