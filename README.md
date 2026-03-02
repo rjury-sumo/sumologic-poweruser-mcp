@@ -470,6 +470,13 @@ The `query_patterns.py` module provides reusable Sumo Logic query patterns that 
 
 **Key Pattern Classes:**
 
+- **`ScopePattern`** - Build optimized search scopes for partition routing and query performance
+  - `build_scope()` - Construct scopes with partition, metadata, keywords, and indexed fields
+  - `build_metadata_scope()` - Simplified API for metadata-only scopes
+  - `extract_scope_from_query()` - Extract scope from full query string
+  - `analyze_scope()` - Analyze scope and provide optimization recommendations
+  - Critical for minimizing metered scan volume in Flex/Infrequent tiers
+
 - **`TimeshiftPattern`** - Compare current data with historical baselines using `compare with timeshift`
   - Handles null values from missing historical data
   - Detects states: GONE (stopped collection), NEW (newly appeared), COLLECTING (active)
@@ -489,13 +496,26 @@ The `query_patterns.py` module provides reusable Sumo Logic query patterns that 
   - Standard tiered pricing (Continuous: 20, Frequent: 9, Infrequent: 0.4, CSE: 25 credits/GB)
   - Customizable rates for different pricing models
 
-**Usage Example:**
+**Usage Examples:**
 
 ```python
-from query_patterns import TimeshiftPattern, AggregationPatterns, CreditCalculation
+from query_patterns import ScopePattern, TimeshiftPattern, AggregationPatterns, CreditCalculation
 
-# Build a query with reusable patterns
-query_parts = ['_index=sumologic_volume']
+# Example 1: Build an optimized scope
+scope = ScopePattern.build_scope(
+    partition='prod_logs',
+    metadata={'_sourceCategory': 'prod/app'},
+    keywords=['error', '5xx'],
+    indexed_fields={'severity': 'ERROR'}
+)
+# Result: '_index=prod_logs AND _sourceCategory="prod/app" AND error AND 5xx AND severity=ERROR'
+
+# Example 2: Analyze existing scope for optimization
+analysis = ScopePattern.analyze_scope('error')
+# Returns recommendations like: 'Add _sourceCategory or _index to enable partition routing'
+
+# Example 3: Build a complete volume analysis query
+query_parts = [ScopePattern.build_metadata_scope(source_category='prod/*')]
 query_parts.append(AggregationPatterns.volume_by_dimension('sourceCategory'))
 query_parts.extend(CreditCalculation.add_credit_calculation())
 query_parts.extend(TimeshiftPattern.compare_with_timeshift('gbytes', days=7, periods=3))

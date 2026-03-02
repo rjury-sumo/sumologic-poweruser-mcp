@@ -5,6 +5,7 @@ consistent behavior, especially for handling edge cases like null values and
 division by zero.
 
 Key Patterns:
+    - ScopePattern: Build optimized search scopes for partition routing and selectivity
     - TimeshiftPattern: Compare current data with historical baselines
     - NullSafeOperations: Null-safe math operations
     - AggregationPatterns: Common aggregation and sorting patterns
@@ -17,7 +18,262 @@ Usage Example:
     >>> query_parts.append(AggregationPatterns.top_n('gbytes', limit=100))
 """
 
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Union
+import re
+
+
+class ScopePattern:
+    """Build optimized search scopes for Sumo Logic queries.
+
+    The scope is the part of the query before the first pipe (|) operator.
+    A well-crafted scope is critical for:
+    1. Partition routing - limiting metered scan to specific partitions/views
+    2. Query performance - increasing selectivity via bloom filters
+    3. Cost optimization - reducing scan volume in Flex/Infrequent tiers
+
+    Best Practices:
+    - Include partition/view specifier (_index or _view) when possible
+    - Use _sourceCategory for implicit partition routing (most common)
+    - Add keyword expressions or field=value filters for selectivity
+    - Avoid overly broad scopes like '*' or '_dataTier=all' in production
+
+    References:
+    - Keyword expressions: https://help.sumologic.com/docs/search/get-started-with-search/build-search/keyword-search-expressions/
+    - Query rewriting: https://help.sumologic.com/docs/search/optimize-search-partitions/#what-is-query-rewriting
+    """
+
+    # Built-in metadata fields that support partition routing
+    METADATA_FIELDS = ['_sourceCategory', '_collector', '_source', '_sourceName', '_sourceHost']
+
+    # Partition/view specifiers
+    PARTITION_FIELDS = ['_index', '_view']
+
+    @staticmethod
+    def build_scope(
+        partition: Optional[str] = None,
+        metadata: Optional[dict] = None,
+        keywords: Optional[List[str]] = None,
+        indexed_fields: Optional[dict] = None,
+        use_and: bool = True
+    ) -> str:
+        """Build a search scope with partition routing and selectivity filters.
+
+        Args:
+            partition: Partition or view name (e.g., 'prod_logs', 'sumologic_volume')
+                      Can be prefixed with _index= or _view=, or bare name (defaults to _index=)
+            metadata: Built-in metadata filters {field: value}
+                     e.g., {'_sourceCategory': 'prod/app', '_sourceHost': 'web-*'}
+            keywords: Keyword expressions for selectivity
+                     e.g., ['error', 'exception', '5xx']
+            indexed_fields: Indexed field filters {field: value}
+                           e.g., {'status_code': '500', 'user_id': 'abc123'}
+            use_and: Use AND between components (default: True), else OR
+
+        Returns:
+            Optimized scope string
+
+        Examples:
+            >>> ScopePattern.build_scope(partition='prod_logs', keywords=['error', '5xx'])
+            '_index=prod_logs error 5xx'
+
+            >>> ScopePattern.build_scope(
+            ...     metadata={'_sourceCategory': 'prod/app'},
+            ...     keywords=['exception'],
+            ...     indexed_fields={'severity': 'ERROR'}
+            ... )
+            '_sourceCategory="prod/app" AND exception AND severity="ERROR"'
+        """
+        components = []
+
+        # Add partition/view specifier
+        if partition:
+            if not partition.startswith('_index=') and not partition.startswith('_view='):
+                partition = f'_index={partition}'
+            components.append(partition)
+
+        # Add metadata filters
+        if metadata:
+            for field, value in metadata.items():
+                # Validate metadata field
+                if field not in ScopePattern.METADATA_FIELDS:
+                    # Allow it but it might not route to partitions efficiently
+                    pass
+
+                # Quote value if it contains spaces or special chars
+                if ' ' in str(value) or any(c in str(value) for c in ['*', '?', '-', '/']):
+                    components.append(f'{field}="{value}"')
+                else:
+                    components.append(f'{field}={value}')
+
+        # Add keyword expressions
+        if keywords:
+            components.extend(keywords)
+
+        # Add indexed field filters
+        if indexed_fields:
+            for field, value in indexed_fields.items():
+                # Quote value if needed
+                if ' ' in str(value) or any(c in str(value) for c in ['*', '?', '-', '/']):
+                    components.append(f'{field}="{value}"')
+                else:
+                    components.append(f'{field}={value}')
+
+        # Join with AND or OR
+        if not components:
+            return '*'
+
+        separator = ' AND ' if use_and else ' OR '
+        return separator.join(components)
+
+    @staticmethod
+    def build_metadata_scope(
+        source_category: Optional[str] = None,
+        collector: Optional[str] = None,
+        source: Optional[str] = None,
+        source_name: Optional[str] = None,
+        source_host: Optional[str] = None,
+        use_and: bool = True
+    ) -> str:
+        """Build a scope using built-in metadata fields (simplified API).
+
+        Args:
+            source_category: _sourceCategory value (most common, best for routing)
+            collector: _collector value
+            source: _source value
+            source_name: _sourceName value
+            source_host: _sourceHost value
+            use_and: Use AND between fields (default: True)
+
+        Returns:
+            Metadata scope string
+
+        Example:
+            >>> ScopePattern.build_metadata_scope(
+            ...     source_category='prod/app',
+            ...     source_host='web-*'
+            ... )
+            '_sourceCategory="prod/app" AND _sourceHost="web-*"'
+        """
+        metadata = {}
+        if source_category:
+            metadata['_sourceCategory'] = source_category
+        if collector:
+            metadata['_collector'] = collector
+        if source:
+            metadata['_source'] = source
+        if source_name:
+            metadata['_sourceName'] = source_name
+        if source_host:
+            metadata['_sourceHost'] = source_host
+
+        return ScopePattern.build_scope(metadata=metadata, use_and=use_and)
+
+    @staticmethod
+    def extract_scope_from_query(query: str) -> str:
+        """Extract the scope portion from a full query (before first |).
+
+        Args:
+            query: Full Sumo Logic query
+
+        Returns:
+            Scope portion (everything before first pipe)
+
+        Example:
+            >>> ScopePattern.extract_scope_from_query('error | count by _sourceHost')
+            'error'
+        """
+        # Find first pipe not inside quotes
+        in_quotes = False
+        quote_char = None
+
+        for i, char in enumerate(query):
+            if char in ['"', "'"]:
+                if not in_quotes:
+                    in_quotes = True
+                    quote_char = char
+                elif char == quote_char:
+                    in_quotes = False
+            elif char == '|' and not in_quotes:
+                return query[:i].strip()
+
+        # No pipe found, entire query is scope
+        return query.strip()
+
+    @staticmethod
+    def analyze_scope(scope: str) -> dict:
+        """Analyze a scope string and provide optimization recommendations.
+
+        Args:
+            scope: Scope string to analyze
+
+        Returns:
+            Dictionary with analysis:
+            - has_partition: bool - Has explicit _index or _view
+            - has_metadata: bool - Has built-in metadata filter
+            - metadata_fields: list - Which metadata fields are used
+            - has_keywords: bool - Has keyword expressions
+            - is_broad: bool - Scope is very broad (*, _dataTier=all, etc.)
+            - recommendations: list - Optimization suggestions
+
+        Example:
+            >>> ScopePattern.analyze_scope('error')
+            {
+                'has_partition': False,
+                'has_metadata': False,
+                'metadata_fields': [],
+                'has_keywords': True,
+                'is_broad': False,
+                'recommendations': ['Add _sourceCategory or partition to improve routing']
+            }
+        """
+        analysis = {
+            'has_partition': False,
+            'has_metadata': False,
+            'metadata_fields': [],
+            'has_keywords': False,
+            'is_broad': False,
+            'recommendations': []
+        }
+
+        scope_lower = scope.lower()
+
+        # Check for partition/view
+        if '_index=' in scope_lower or '_view=' in scope_lower:
+            analysis['has_partition'] = True
+
+        # Check for metadata fields
+        for field in ScopePattern.METADATA_FIELDS:
+            if field.lower() in scope_lower:
+                analysis['has_metadata'] = True
+                analysis['metadata_fields'].append(field)
+
+        # Check for keywords (simplified - looks for bare words not part of field expressions)
+        # This is a heuristic - actual parsing would be complex
+        tokens = re.split(r'\s+(?:AND|OR|NOT)\s+|\s+', scope)
+        for token in tokens:
+            if token and not '=' in token and not token.startswith('_') and token not in ['AND', 'OR', 'NOT', '(', ')']:
+                analysis['has_keywords'] = True
+                break
+
+        # Check if scope is too broad
+        if scope.strip() in ['*', '']:
+            analysis['is_broad'] = True
+            analysis['recommendations'].append('Scope is "*" - this scans all partitions. Add filters to reduce scan volume.')
+        elif '_datatier=all' in scope_lower:
+            analysis['is_broad'] = True
+            analysis['recommendations'].append('Using _dataTier=all scans all tiers. Consider specifying tier or using metadata filters.')
+
+        # Provide recommendations
+        if not analysis['has_partition'] and not analysis['has_metadata']:
+            analysis['recommendations'].append('Add _sourceCategory or _index to enable partition routing and reduce scan volume.')
+
+        if not analysis['has_keywords'] and not analysis['is_broad']:
+            analysis['recommendations'].append('Consider adding keyword expressions for better selectivity and performance.')
+
+        if analysis['has_metadata'] and '_sourceCategory' not in analysis['metadata_fields']:
+            analysis['recommendations'].append('Consider using _sourceCategory as it most commonly maps to partition routing.')
+
+        return analysis
 
 
 class TimeshiftPattern:
