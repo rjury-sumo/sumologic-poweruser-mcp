@@ -19,7 +19,7 @@ This Model Context Protocol (MCP) server provides secure, read-only access to Su
 
 ## Available Tools
 
-**Total: 38 MCP Tools + 1 Resource** organized into 11 categories
+**Total: 40 MCP Tools + 1 Resource** organized into 11 categories
 
 For complete tool documentation with parameters, examples, and use cases, see **[MCP Tools Reference](docs/mcp-tools-reference.md)**.
 
@@ -30,7 +30,7 @@ For complete tool documentation with parameters, examples, and use cases, see **
 | **Search & Query** | 8 | Log search, job management, metrics, search audit, scan cost analysis, metadata exploration |
 | **Query Examples** | 1 tool + 1 resource | Search 1000s of real Sumo Logic queries from published apps |
 | **Log Volume Analysis** | 2 | Raw log volume analysis using _size field, schema profiling with facets |
-| **Content Library** | 7 | Folder/content access, path operations, export with async job handling |
+| **Content Library** | 9 | Folder/content access, path operations, export with async job handling, installed apps discovery |
 | **Content ID Utilities** | 3 | Hex/decimal conversion, web URL generation |
 | **Account Management** | 6 | Account status, usage forecasting, credit analysis, data volume analysis |
 | **Collectors & Sources** | 2 | List collectors, get sources |
@@ -60,6 +60,8 @@ For complete tool documentation with parameters, examples, and use cases, see **
 **Content Library:**
 - `get_personal_folder` - Fast access to user's content library
 - `export_content` - Full content export with async job polling
+- `export_installed_apps` - Discover pre-built apps (AWS, Kubernetes, Apache, etc.) already installed
+- `list_installed_apps` - Quick list of installed apps (lightweight alternative)
 - `get_content_web_url` - Generate shareable content links
 
 **Field Management:**
@@ -496,10 +498,24 @@ The `query_patterns.py` module provides reusable Sumo Logic query patterns that 
   - Standard tiered pricing (Continuous: 20, Frequent: 9, Infrequent: 0.4, CSE: 25 credits/GB)
   - Customizable rates for different pricing models
 
+- **`LogDiscoveryPattern`** - Complete 3-phase log discovery workflow with app recommendations
+  - `build_metadata_discovery_query()` - Phase 1: Find source categories, partitions, metadata
+  - `build_usecase_query_recommendations()` - Phase 3: Query recommendations based on use case and fields
+  - `recommend_apps()` - Suggest relevant Sumo Logic apps based on discovered logs
+  - `generate_complete_workflow()` - End-to-end discovery workflow
+  - **Phase 1:** Metadata discovery (data volume index, metadata exploration, search audit)
+  - **Phase 2:** Log structure analysis (sampling, field detection, format analysis)
+  - **Phase 3:** Use-case based query building with `search_query_examples` integration
+  - **App Discovery:** Recommends pre-built apps (AWS CloudTrail, Kubernetes, Apache, etc.)
+  - Integrates with `export_installed_apps` and `list_installed_apps` tools
+  - Leverages query examples library (11,000+ real queries) for relevant patterns
+  - Provides links to app catalog and integration docs
+  - Helps users discover logs from scratch and build effective queries
+
 **Usage Examples:**
 
 ```python
-from query_patterns import ScopePattern, TimeshiftPattern, AggregationPatterns, CreditCalculation
+from query_patterns import ScopePattern, TimeshiftPattern, AggregationPatterns, CreditCalculation, LogDiscoveryPattern
 
 # Example 1: Build an optimized scope
 scope = ScopePattern.build_scope(
@@ -514,7 +530,26 @@ scope = ScopePattern.build_scope(
 analysis = ScopePattern.analyze_scope('error')
 # Returns recommendations like: 'Add _sourceCategory or _index to enable partition routing'
 
-# Example 3: Build a complete volume analysis query
+# Example 3: Phase 1 - Discover logs when you don't know the metadata
+queries = LogDiscoveryPattern.build_metadata_discovery_query('cloudtrail')
+# Returns queries to find matching source categories, partitions, and related metadata
+# Use volume_query to search data volume index (fast, no scan charge)
+# Use metadata_query_template after finding source category
+# Use search_audit_query to see what other users have searched
+
+# Example 4: Phase 3 - Get query recommendations based on use case
+recommendations = LogDiscoveryPattern.build_usecase_query_recommendations(
+    log_format='json',
+    detected_fields=['status_code', 'user_id', 'response_time'],
+    use_case='error',
+    has_query_library=True
+)
+# Returns query_library_searches (searches for search_query_examples tool)
+# Returns common_patterns (generic patterns for this use case)
+# Returns field_based_queries (queries leveraging detected fields)
+# Includes setup instructions if query library not available
+
+# Example 5: Build a complete volume analysis query
 query_parts = [ScopePattern.build_metadata_scope(source_category='prod/*')]
 query_parts.append(AggregationPatterns.volume_by_dimension('sourceCategory'))
 query_parts.extend(CreditCalculation.add_credit_calculation())

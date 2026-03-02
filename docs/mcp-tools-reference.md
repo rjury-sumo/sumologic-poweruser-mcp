@@ -955,3 +955,185 @@ Advanced data volume analysis with cardinality reduction for large-scale environ
 **Version:** 1.7
 **Last Updated:** 2026-03-02
 **Total Tools:** 38
+
+---
+
+## Query Patterns Library Reference
+
+The `query_patterns.py` module provides reusable Sumo Logic query building blocks used across multiple MCP tools.
+
+### ScopePattern
+
+Build and analyze search scopes for optimal partition routing and query performance.
+
+**Methods:**
+- `build_scope(partition, metadata, keywords, indexed_fields, use_and)` - Construct complete scope
+- `build_metadata_scope(source_category, collector, source, source_name, source_host)` - Simplified metadata scope
+- `extract_scope_from_query(query)` - Parse scope from full query
+- `analyze_scope(scope)` - Analyze and provide optimization recommendations
+
+**Example:**
+```python
+from query_patterns import ScopePattern
+
+# Build optimized scope
+scope = ScopePattern.build_scope(
+    partition='prod_logs',
+    metadata={'_sourceCategory': 'prod/app'},
+    keywords=['error', '5xx']
+)
+# Result: '_index=prod_logs AND _sourceCategory="prod/app" AND error AND 5xx'
+
+# Analyze existing scope
+analysis = ScopePattern.analyze_scope('error')
+# Returns: {'has_partition': False, 'recommendations': ['Add _sourceCategory...']}
+```
+
+### LogDiscoveryPattern
+
+Complete 3-phase log discovery workflow for users who don't know metadata, partitions, log structure, or query patterns.
+
+**Phase 1: Metadata Discovery**
+- `build_metadata_discovery_query(search_pattern, time_range, use_volume_index)` - Generate discovery queries
+- Find source categories via data volume index (fast, no scan charge)
+- Discover partitions, collectors, sources for known source category
+- Search audit for queries by other users
+
+**Phase 2: Log Structure Analysis** (template provided)
+- Sample logs with/without auto-parse to identify fields
+- Detect log format (JSON, syslog, custom)
+- Distinguish indexed fields from search-time fields
+
+**Phase 3: Use-Case Query Building**
+- `build_usecase_query_recommendations(log_format, detected_fields, use_case, has_query_library)` - Get query recommendations
+- Integrates with `search_query_examples` tool (11,000+ real queries)
+- Returns query library searches based on use case and detected fields
+- Provides common patterns for errors, performance, security use cases
+- Field-specific query suggestions (status_code, response_time, user_id, etc.)
+- Setup instructions if query library not available
+
+**Complete Workflow:**
+- `generate_complete_workflow(initial_hint, context, use_case)` - End-to-end discovery workflow
+
+**Example - Phase 1:**
+```python
+from query_patterns import LogDiscoveryPattern
+
+# Discover logs for 'cloudtrail' service
+queries = LogDiscoveryPattern.build_metadata_discovery_query('cloudtrail')
+# Returns: volume_query, metadata_query_template, search_audit_query
+```
+
+**Example - Phase 3:**
+```python
+# Get query recommendations for error use case
+recommendations = LogDiscoveryPattern.build_usecase_query_recommendations(
+    log_format='json',
+    detected_fields=['status_code', 'user_id', 'response_time'],
+    use_case='error',
+    has_query_library=True
+)
+
+# Returns:
+# - query_library_searches: [
+#     {'tool': 'search_query_examples', 'parameters': {'query': 'error'}, ...},
+#     {'tool': 'search_query_examples', 'parameters': {'keywords': 'status_code'}, ...}
+#   ]
+# - common_patterns: Generic error patterns
+# - field_based_queries: Queries using status_code, response_time
+# - setup_instructions: How to enable query library (if not available)
+```
+
+**Use Cases:**
+- Developer knows service name but not _sourceCategory
+- User doesn't know which partition/view logs are in
+- Need to understand log structure and available fields
+- Want to find relevant query examples for specific use case
+- Building queries from scratch without prior Sumo experience
+
+**Query Library Integration:**
+- Phase 3 leverages `search_query_examples` tool for relevant patterns
+- Extract `sumologic_query_examples.json.gz` to enable 11,000+ examples
+- Automatic fallback with setup instructions if library unavailable
+
+### TimeshiftPattern
+
+Compare current data with historical baselines using `compare with timeshift` operator.
+
+**Features:**
+- Null-safe math for missing historical data
+- Division-by-zero guards
+- State detection: GONE (stopped), NEW (new source), COLLECTING (active)
+
+**Example:**
+```python
+from query_patterns import TimeshiftPattern
+
+# Add timeshift comparison
+operators = TimeshiftPattern.compare_with_timeshift('gbytes', days=7, periods=3)
+# Generates: compare operator, null guards, state detection, percentage calc
+```
+
+### NullSafeOperations
+
+Null-safe mathematical operations for edge cases.
+
+**Methods:**
+- `safe_divide(numerator, denominator, result_field)` - Division with null/zero guards
+- `coalesce(field, default_value)` - Convert nulls to defaults
+- `percentage_change(current, baseline, result_field)` - Calculate % change safely
+
+### AggregationPatterns
+
+Common aggregation and sorting patterns.
+
+**Methods:**
+- `volume_by_dimension(dimension, include_tier)` - Standard volume aggregation
+- `top_n(sort_field, limit, direction)` - Top N results
+- `timeslice_aggregation(interval, fields, group_by)` - Time-series aggregations
+
+### CreditCalculation
+
+Sumo Logic credit rate calculations for cost analysis.
+
+**Standard Rates (credits/GB):**
+- Continuous: 20
+- Frequent: 9
+- Infrequent: 0.4
+- CSE: 25
+
+**Methods:**
+- `add_credit_calculation(data_field, tier_field, credit_field, rates)` - Calculate credits
+
+**Example:**
+```python
+from query_patterns import CreditCalculation
+
+operators = CreditCalculation.add_credit_calculation()
+# Generates tier-based credit calculation operators
+```
+
+### Integration Example
+
+Combine multiple patterns for complex queries:
+
+```python
+from query_patterns import ScopePattern, AggregationPatterns, CreditCalculation, TimeshiftPattern
+
+# Build complete volume analysis query
+query_parts = []
+query_parts.append(ScopePattern.build_metadata_scope(source_category='prod/*'))
+query_parts.append(AggregationPatterns.volume_by_dimension('sourceCategory'))
+query_parts.extend(CreditCalculation.add_credit_calculation())
+query_parts.extend(TimeshiftPattern.compare_with_timeshift('gbytes', days=7, periods=3))
+query_parts.append(AggregationPatterns.top_n('gbytes', limit=100))
+
+query = '\n'.join(query_parts)
+```
+
+**Benefits:**
+- Centralized, tested query logic
+- Consistent null handling and edge case management
+- Easy to maintain and extend
+- Self-documenting with clear APIs
+

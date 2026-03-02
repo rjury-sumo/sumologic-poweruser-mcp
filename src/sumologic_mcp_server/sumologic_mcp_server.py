@@ -507,6 +507,23 @@ class SumoLogicClient:
         """Get Admin Recommended folder export job result."""
         return await self._request("GET", f"/content/folders/adminRecommended/{job_id}/result", api_version="v2")
 
+    async def begin_installed_apps_export(self, is_admin_mode: bool = False) -> Dict[str, Any]:
+        """Begin async Installed Apps folder export."""
+        params = {"isAdminMode": str(is_admin_mode).lower()} if is_admin_mode else {}
+        return await self._request("GET", "/content/folders/installedApps", api_version="v2", params=params)
+
+    async def get_installed_apps_export_status(self, job_id: str) -> Dict[str, Any]:
+        """Get Installed Apps folder export job status."""
+        return await self._request("GET", f"/content/folders/installedApps/{job_id}/status", api_version="v2")
+
+    async def get_installed_apps_export_result(self, job_id: str) -> Dict[str, Any]:
+        """Get Installed Apps folder export job result."""
+        return await self._request("GET", f"/content/folders/installedApps/{job_id}/result", api_version="v2")
+
+    async def list_apps(self) -> Dict[str, Any]:
+        """List all installed apps (requires admin permissions in most orgs)."""
+        return await self._request("GET", "/apps", api_version="v2")
+
     # Account Management API methods
 
     async def get_account_status(self) -> Dict[str, Any]:
@@ -1137,6 +1154,149 @@ async def export_admin_recommended_folder(
 
     except Exception as e:
         return handle_tool_error(e, "export_admin_recommended_folder")
+
+
+@mcp.tool()
+async def export_installed_apps(
+    is_admin_mode: bool = False,
+    max_wait_seconds: int = 300,
+    instance: str = Field(default='default', description="Sumo Logic instance name")
+) -> str:
+    """
+    Export Installed Apps folder to discover pre-built apps available in your Sumo Logic instance.
+
+    This tool lists all installed Sumo Logic apps (e.g., AWS CloudTrail, Apache, Kubernetes, etc.)
+    that admins have already set up. Each app folder contains pre-built dashboards, searches,
+    and monitors for specific use cases.
+
+    Args:
+        is_admin_mode: View as admin to see all apps (default: False, requires admin permissions)
+        max_wait_seconds: Maximum seconds to wait for async job (default: 300)
+        instance: Sumo Logic instance name (default: 'default')
+
+    Returns:
+        JSON with installed apps structure containing:
+        - App folders organized by category/technology
+        - Each app contains dashboards, searches, monitors
+        - Content IDs for accessing specific app components
+
+    Use Cases:
+        - **Discover available apps**: See what pre-built content is already installed
+        - **Find relevant dashboards**: Locate dashboards for AWS, Kubernetes, Apache, etc.
+        - **Log discovery**: After finding logs, discover if there's already an app for them
+        - **Use case mapping**: Connect log sources to pre-built monitoring solutions
+
+    App Catalog References:
+        - Browse all apps: https://www.sumologic.com/app-catalog
+        - Search by keyword: Use app catalog to find apps matching your technology
+        - Integration docs: https://www.sumologic.com/help/docs/integrations/
+
+    Example Flow:
+        1. Use LogDiscoveryPattern to find logs (e.g., CloudTrail logs)
+        2. Use export_installed_apps to see if AWS CloudTrail app is installed
+        3. If installed, navigate directly to app dashboards and searches
+        4. If not installed, suggest admin install from app catalog
+
+    Notes:
+        - Similar async pattern to export_global_folder and export_admin_recommended_folder
+        - InstalledApps is a top-level library location like Global and Admin Recommended
+        - Each app folder typically contains: Overview dashboard, detailed dashboards, saved searches
+        - Apps are pre-configured with optimal queries and visualizations for their technology
+
+    API Reference:
+        - https://api.sumologic.com/docs/#operation/getInstalledAppsFolderAsync
+    """
+    try:
+        from .async_export_helper import poll_folder_export_job
+
+        _ensure_config_initialized()
+        config = get_config()
+        limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
+        await limiter.acquire("export_installed_apps")
+
+        instance = validate_instance_name(instance)
+        client = await get_sumo_client(instance)
+
+        # Start export job
+        job_response = await client.begin_installed_apps_export(is_admin_mode)
+        job_id = job_response['id']
+
+        # Poll for completion
+        result = await poll_folder_export_job(
+            job_id=job_id,
+            folder_type="Installed Apps folder",
+            get_status_func=lambda jid: client.get_installed_apps_export_status(jid),
+            get_result_func=lambda jid: client.get_installed_apps_export_result(jid),
+            max_wait_seconds=max_wait_seconds
+        )
+
+        return json.dumps(result, indent=2)
+
+    except Exception as e:
+        return handle_tool_error(e, "export_installed_apps")
+
+
+@mcp.tool()
+async def list_installed_apps(
+    instance: str = Field(default='default', description="Sumo Logic instance name")
+) -> str:
+    """
+    List all installed Sumo Logic apps (lightweight alternative to export_installed_apps).
+
+    This uses the listAppsV2 endpoint which returns a simplified list of installed apps
+    without the full folder structure. Faster than export_installed_apps but may require
+    admin permissions in some organizations.
+
+    Args:
+        instance: Sumo Logic instance name (default: 'default')
+
+    Returns:
+        JSON array of installed apps with:
+        - App UUID
+        - App name (e.g., "AWS CloudTrail", "Apache", "Kubernetes")
+        - App manifest version
+        - Installation info
+
+    Use Cases:
+        - **Quick discovery**: Faster than exporting full folder structure
+        - **App availability check**: See if specific app is installed
+        - **Log discovery integration**: Check for relevant apps after finding logs
+
+    Permission Note:
+        This endpoint may require admin permissions in some organizations.
+        If it fails with permission error, use export_installed_apps instead
+        which works with regular user permissions.
+
+    App Discovery Flow:
+        1. Phase 1: Use LogDiscoveryPattern to find logs (e.g., 'cloudtrail')
+        2. Phase 2: Use list_installed_apps to see if AWS CloudTrail app exists
+        3. If found: Use export_installed_apps to get full app structure
+        4. If not found: Suggest installation from https://www.sumologic.com/app-catalog
+
+    App Catalog:
+        - Browse apps: https://www.sumologic.com/app-catalog
+        - Search by keyword: Find apps matching your logs/technology
+        - Integration guides: https://www.sumologic.com/help/docs/integrations/
+
+    API Reference:
+        - https://api.sumologic.com/docs/#operation/listAppsV2
+    """
+    try:
+        _ensure_config_initialized()
+        config = get_config()
+        limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
+        await limiter.acquire("list_installed_apps")
+
+        instance = validate_instance_name(instance)
+        client = await get_sumo_client(instance)
+
+        # List apps
+        result = await client.list_apps()
+
+        return json.dumps(result, indent=2)
+
+    except Exception as e:
+        return handle_tool_error(e, "list_installed_apps")
 
 
 @mcp.tool()
