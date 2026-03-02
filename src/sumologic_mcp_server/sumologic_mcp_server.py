@@ -2353,47 +2353,158 @@ async def convert_content_id_decimal_to_hex(
 @mcp.tool()
 async def get_content_web_url(
     content_id: str = Field(description="Content ID (hex or decimal)"),
+    content_type: Optional[str] = Field(default=None, description="Optional: Content type (Dashboard, Search, Folder, etc.) to optimize URL generation"),
     instance: str = Field(default='default', description="Sumo Logic instance name")
 ) -> str:
     """
     Generate web UI URL for a content item.
 
     Accepts either hex or decimal content ID and generates the appropriate
-    web UI URL for the specified instance.
+    web UI URL for the specified instance, with proper handling for different
+    content types (dashboards use different URL format than library content).
 
-    Returns a URL like: https://instance.sumologic.com/library/6181891
+    For library content (folders, searches, etc.):
+        https://service.au.sumologic.com/library/6181891
+    For dashboards:
+        https://service.au.sumologic.com/dashboard/<dashboard_id>
+
+    If you have a custom subdomain configured, URLs will use that subdomain instead of 'service'.
     """
     try:
-        from .content_id_utils import hex_to_decimal, is_valid_hex_id, normalize_to_hex
+        from .content_id_utils import hex_to_decimal, normalize_to_hex
+        from .url_builder import build_library_url, build_dashboard_url
 
         _ensure_config_initialized()
         config = get_config()
+        limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
+        await limiter.acquire("get_content_web_url")
+
         instance = validate_instance_name(instance)
 
-        # Normalize to hex, then convert to decimal for URL
+        # Normalize to hex, then convert to decimal for library URLs
         hex_id = normalize_to_hex(content_id)
         decimal_id = hex_to_decimal(hex_id)
 
-        # Get instance endpoint
+        # Get instance configuration
         instance_config = config.get_instance(instance)
-        base_url = instance_config.endpoint.rstrip('/')
+        subdomain = instance_config.subdomain
 
-        # Remove /api suffix if present
-        if base_url.endswith('/api'):
-            base_url = base_url[:-4]
+        # Determine if this is a dashboard and get the dashboard ID if needed
+        is_dashboard = False
+        dashboard_id = None
 
-        # Construct library URL
-        url = f"{base_url}/library/{decimal_id}"
+        if content_type and content_type.lower() == 'dashboard':
+            is_dashboard = True
+        else:
+            # Try to fetch content details to determine type
+            try:
+                client = await get_sumo_client(instance)
+                path_result = await client.get_content_path(hex_id)
+
+                # Check if contentType indicates this is a dashboard
+                if path_result.get('contentType') == 'Dashboard':
+                    is_dashboard = True
+            except Exception as e:
+                # If we can't fetch content details, assume it's library content
+                logger.debug(f"Could not fetch content type for {hex_id}: {e}")
+
+        # Generate the appropriate URL
+        if is_dashboard:
+            # For dashboards, we need the dashboard's unique ID, not the content ID
+            # We'll need to get this from the dashboard list or export
+            try:
+                client = await get_sumo_client(instance)
+                # Try to get dashboard details - dashboards have an 'id' field that's different from content ID
+                # We'll use export to get the full dashboard details
+                from .async_export_helper import poll_export_job
+                export_result = await poll_export_job(
+                    client,
+                    hex_id,
+                    is_admin_mode=False,
+                    max_wait_seconds=30
+                )
+
+                # Extract dashboard ID from export result
+                dashboard_id = export_result.get('id')
+                if dashboard_id:
+                    url = build_dashboard_url(instance_config.endpoint, dashboard_id, subdomain)
+                else:
+                    # Fallback to library URL if we can't get dashboard ID
+                    url = build_library_url(instance_config.endpoint, decimal_id, subdomain)
+                    logger.warning(f"Could not get dashboard ID for {hex_id}, using library URL")
+            except Exception as e:
+                # Fallback to library URL
+                logger.warning(f"Error getting dashboard ID: {e}, using library URL")
+                url = build_library_url(instance_config.endpoint, decimal_id, subdomain)
+        else:
+            # Use library URL for all other content types
+            url = build_library_url(instance_config.endpoint, decimal_id, subdomain)
 
         return json.dumps({
             "url": url,
             "hex_id": hex_id,
             "decimal_id": decimal_id,
+            "content_type": "Dashboard" if is_dashboard else "Library Content",
             "instance": instance
         }, indent=2)
 
     except Exception as e:
         return handle_tool_error(e, "get_content_web_url")
+
+
+@mcp.tool()
+async def build_search_web_url(
+    query: str = Field(description="Sumo Logic search query to open in the web UI"),
+    start_time: Optional[str] = Field(default=None, description="Start time (e.g., '-1h', '-24h', '2024-01-01T00:00:00', ISO format)"),
+    end_time: Optional[str] = Field(default=None, description="End time (e.g., '-1s', 'now', '2024-01-01T23:59:59', ISO format)"),
+    instance: str = Field(default='default', description="Sumo Logic instance name")
+) -> str:
+    """
+    Build a web UI URL to open a log search query.
+
+    Creates a URL that opens the Sumo Logic search page with the specified query
+    and time range pre-filled. Useful for sharing searches or opening them from
+    other tools.
+
+    Example usage:
+    - Open a query for the last hour: query='_sourceCategory=prod/app | count', start_time='-1h'
+    - Open with absolute time: start_time='2024-01-01T00:00:00', end_time='2024-01-01T23:59:59'
+    - Open with relative time: start_time='-24h', end_time='now'
+
+    If you have a custom subdomain configured, URLs will use that subdomain.
+
+    Returns a URL like: https://service.au.sumologic.com/log-search/create?query=...&startTime=-1h&endTime=-1s
+    """
+    try:
+        from .url_builder import build_search_url
+
+        _ensure_config_initialized()
+        config = get_config()
+        instance = validate_instance_name(instance)
+
+        # Get instance configuration
+        instance_config = config.get_instance(instance)
+        subdomain = instance_config.subdomain
+
+        # Build the search URL
+        url = build_search_url(
+            instance_config.endpoint,
+            query,
+            start_time=start_time or '-1h',
+            end_time=end_time or '-1s',
+            subdomain=subdomain
+        )
+
+        return json.dumps({
+            "url": url,
+            "query": query,
+            "start_time": start_time or '-1h',
+            "end_time": end_time or '-1s',
+            "instance": instance
+        }, indent=2)
+
+    except Exception as e:
+        return handle_tool_error(e, "build_search_web_url")
 
 
 # Account Management Tools

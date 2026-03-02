@@ -3,7 +3,6 @@
 import os
 import re
 from typing import Dict, Optional
-from dataclasses import dataclass
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -13,6 +12,7 @@ class SumoInstanceConfig(BaseModel):
     access_id: str = Field(..., min_length=1, description="Sumo Logic Access ID")
     access_key: str = Field(..., min_length=1, description="Sumo Logic Access Key")
     endpoint: str = Field(..., description="Sumo Logic API endpoint")
+    subdomain: Optional[str] = Field(default=None, description="Optional subdomain for custom Sumo Logic URL")
 
     @field_validator('endpoint')
     @classmethod
@@ -85,10 +85,12 @@ class Config:
 
         if default_id and default_key:
             try:
+                default_subdomain = os.getenv('SUMO_SUBDOMAIN')
                 self.instances['default'] = SumoInstanceConfig(
                     access_id=default_id,
                     access_key=default_key,
-                    endpoint=default_endpoint
+                    endpoint=default_endpoint,
+                    subdomain=default_subdomain
                 )
             except ValueError as e:
                 raise ValueError(f"Default instance configuration invalid: {e}")
@@ -108,13 +110,15 @@ class Config:
                 access_id = os.getenv(f'SUMO_{match.group(1)}_ACCESS_ID')
                 access_key = os.getenv(f'SUMO_{match.group(1)}_ACCESS_KEY')
                 endpoint = os.getenv(f'SUMO_{match.group(1)}_ENDPOINT', 'https://api.sumologic.com')
+                subdomain = os.getenv(f'SUMO_{match.group(1)}_SUBDOMAIN')
 
                 if access_id and access_key:
                     try:
                         self.instances[instance_name] = SumoInstanceConfig(
                             access_id=access_id,
                             access_key=access_key,
-                            endpoint=endpoint
+                            endpoint=endpoint,
+                            subdomain=subdomain
                         )
                     except ValueError as e:
                         raise ValueError(f"Instance '{instance_name}' configuration invalid: {e}")

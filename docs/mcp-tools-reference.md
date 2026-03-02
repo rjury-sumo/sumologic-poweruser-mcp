@@ -1,7 +1,7 @@
 # Sumo Logic MCP Server - Tools Reference
 
 ## Overview
-Total Tools: **40**
+Total Tools: **41**
 
 ---
 
@@ -286,7 +286,7 @@ Discover available fields and suggest good dimensions for volume analysis using 
 
 ---
 
-## Content Library Tools (9)
+## Content Library Tools (10)
 
 ### 12. `get_personal_folder`
 Get user's personal folder with optional children. Fast synchronous access to personal library.
@@ -510,26 +510,62 @@ Convert decimal content ID to hex format for API calls.
 ---
 
 ### 23. `get_content_web_url`
-Generate web UI URL for a content item.
+Generate web UI URL for a content item with proper handling for different content types.
 
 **Parameters:**
 - `content_id` (str) - Content ID (hex or decimal)
+- `content_type` (str, optional) - Content type (Dashboard, Search, Folder, etc.) to optimize URL generation
 - `instance` (str, default='default') - Instance name
 
-**Returns:** URL, hex ID, decimal ID, instance
+**Returns:** URL, hex ID, decimal ID, content type, instance
 
-**Example:** `https://instance.sumologic.com/library/6181891`
+**URL Formats:**
+- Library content (folders, searches, etc.): `https://service.au.sumologic.com/library/6181891`
+- Dashboards: `https://service.au.sumologic.com/dashboard/<dashboard_id>`
+- Custom subdomain: `https://mycompany.au.sumologic.com/library/6181891`
 
 **Use Cases:**
-- Share content links
+- Share content links with correct URL format
 - Open content in browser
-- Generate shareable URLs
+- Generate shareable URLs for folders, searches, dashboards
+- Automatically handles dashboard vs library content URLs
+
+**Notes:**
+- If subdomain is configured in `.env` (e.g., `SUMO_SUBDOMAIN=mycompany`), URLs will use custom subdomain
+- Tool automatically detects if content is a dashboard and uses appropriate URL format
+- For dashboards, fetches the dashboard ID needed for proper URL generation
+
+---
+
+### 24. `build_search_web_url`
+Build a web UI URL to open a log search query with pre-filled query and time range.
+
+**Parameters:**
+- `query` (str) - Sumo Logic search query to open
+- `start_time` (str, optional, default='-1h') - Start time (e.g., '-1h', '-24h', '2024-01-01T00:00:00', ISO format)
+- `end_time` (str, optional, default='-1s') - End time (e.g., '-1s', 'now', '2024-01-01T23:59:59', ISO format)
+- `instance` (str, default='default') - Instance name
+
+**Returns:** URL, query, start_time, end_time, instance
+
+**Example:** `https://service.au.sumologic.com/log-search/create?query=...&startTime=-1h&endTime=-1s`
+
+**Use Cases:**
+- Share search queries with team members
+- Open searches from other tools (Slack, email, documentation)
+- Create bookmarks for frequently-used searches
+- Generate URLs for saved search queries
+
+**Time Range Examples:**
+- Last hour: `start_time='-1h', end_time='-1s'`
+- Last 24 hours: `start_time='-24h', end_time='now'`
+- Specific date range: `start_time='2024-01-01T00:00:00', end_time='2024-01-01T23:59:59'`
 
 ---
 
 ## Field Management Tools (3)
 
-### 24. `list_custom_fields`
+### 25. `list_custom_fields`
 List all custom fields defined in the organization.
 
 **Parameters:**
@@ -546,7 +582,7 @@ List all custom fields defined in the organization.
 
 ---
 
-### 25. `list_field_extraction_rules`
+### 26. `list_field_extraction_rules`
 List all field extraction rules (FERs) for pre-parsing logs.
 
 **Parameters:**
@@ -564,7 +600,7 @@ List all field extraction rules (FERs) for pre-parsing logs.
 
 ---
 
-### 26. `get_field_extraction_rule`
+### 27. `get_field_extraction_rule`
 Get detailed information about a specific field extraction rule.
 
 **Parameters:**
@@ -585,7 +621,7 @@ Get detailed information about a specific field extraction rule.
 
 ## Collectors & Sources Tools (2)
 
-### 27. `get_sumo_collectors`
+### 28. `get_sumo_collectors`
 Get list of Sumo Logic collectors.
 
 **Parameters:**
@@ -596,7 +632,7 @@ Get list of Sumo Logic collectors.
 
 ---
 
-### 28. `get_sumo_sources`
+### 29. `get_sumo_sources`
 Get sources for a specific Sumo Logic collector.
 
 **Parameters:**
@@ -609,7 +645,7 @@ Get sources for a specific Sumo Logic collector.
 
 ## Users & Roles Tools (2)
 
-### 29. `get_sumo_users`
+### 30. `get_sumo_users`
 Get list of Sumo Logic users.
 
 **Parameters:**
@@ -620,7 +656,7 @@ Get list of Sumo Logic users.
 
 ---
 
-### 30. `get_sumo_roles_v2`
+### 31. `get_sumo_roles_v2`
 Get list of roles using the v2 Roles API.
 
 **Parameters:**
@@ -633,7 +669,7 @@ Get list of roles using the v2 Roles API.
 
 ## Dashboards & Monitors Tools (2)
 
-### 31. `get_sumo_dashboards`
+### 32. `get_sumo_dashboards`
 Get list of Sumo Logic dashboards.
 
 **Parameters:**
@@ -644,7 +680,7 @@ Get list of Sumo Logic dashboards.
 
 ---
 
-### 32. `search_sumo_monitors`
+### 33. `search_sumo_monitors`
 Search for monitors and monitor folders.
 
 **Parameters:**
@@ -665,7 +701,7 @@ Search for monitors and monitor folders.
 
 ## System Tools (2)
 
-### 33. `get_sumo_partitions`
+### 34. `get_sumo_partitions`
 Get list of partitions.
 
 **Parameters:**
@@ -676,7 +712,7 @@ Get list of partitions.
 
 ---
 
-### 34. `list_sumo_instances`
+### 35. `list_sumo_instances`
 List all configured Sumo Logic instances.
 
 **Parameters:** None
@@ -687,7 +723,7 @@ List all configured Sumo Logic instances.
 
 ## Account Management Tools (6)
 
-### 35. `get_account_status`
+### 36. `get_account_status`
 Get account status including subscription, plan type, and usage information.
 
 **Parameters:**
@@ -704,7 +740,7 @@ Get account status including subscription, plan type, and usage information.
 
 ---
 
-### 36. `get_usage_forecast`
+### 37. `get_usage_forecast`
 Get usage forecast for specified number of days based on recent consumption patterns.
 
 **Parameters:**
@@ -722,7 +758,7 @@ Get usage forecast for specified number of days based on recent consumption patt
 
 ---
 
-### 37. `export_usage_report`
+### 38. `export_usage_report`
 Export detailed usage report for a date range (async operation). Returns download URL for CSV report.
 
 **Parameters:**
@@ -746,7 +782,7 @@ Export detailed usage report for a date range (async operation). Returns downloa
 
 ---
 
-### 38. `get_estimated_log_search_usage`
+### 39. `get_estimated_log_search_usage`
 Get estimated data volume that would be scanned for a log search query in Infrequent Data Tier and Flex.
 
 **Parameters:**
@@ -787,7 +823,7 @@ Get estimated data volume that would be scanned for a log search query in Infreq
 
 ---
 
-### 39. `analyze_data_volume`
+### 40. `analyze_data_volume`
 Analyze data volume ingestion from the Sumo Logic Data Volume Index for capacity planning and cost analysis.
 
 **Parameters:**
@@ -884,7 +920,7 @@ When `include_timeshift=True`, the tool handles edge cases properly:
 
 ---
 
-### 40. `analyze_data_volume_grouped`
+### 41. `analyze_data_volume_grouped`
 Advanced data volume analysis with cardinality reduction for large-scale environments (5000+ source categories).
 
 **Parameters:**
