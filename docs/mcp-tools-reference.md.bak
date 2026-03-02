@@ -207,7 +207,7 @@ Analyze search scan costs with detailed tier/metering breakdown for Infrequent a
 
 ## Query Examples Tools (1)
 
-### 9. `search_query_examples`
+### 17. `search_query_examples`
 Search through 11,000+ real Sumo Logic queries from 280+ published apps using intelligent scoring and relevance ranking.
 
 **Parameters:**
@@ -244,7 +244,7 @@ Search through 11,000+ real Sumo Logic queries from 280+ published apps using in
 
 ## Log Volume Analysis Tools (2)
 
-### 10. `analyze_log_volume`
+### 14. `analyze_log_volume`
 Analyze raw log volume using the _size field to understand ingestion drivers and optimize Infrequent tier usage.
 
 **Parameters:**
@@ -267,7 +267,7 @@ Analyze raw log volume using the _size field to understand ingestion drivers and
 
 ---
 
-### 11. `profile_log_schema`
+### 15. `profile_log_schema`
 Discover available fields and suggest good dimensions for volume analysis using the facets operator.
 
 **Parameters:**
@@ -288,7 +288,7 @@ Discover available fields and suggest good dimensions for volume analysis using 
 
 ## Content Library Tools (7)
 
-### 12. `get_personal_folder`
+### 16. `get_personal_folder`
 Get user's personal folder with optional children. Fast synchronous access to personal library.
 
 **Parameters:**
@@ -303,7 +303,7 @@ Get user's personal folder with optional children. Fast synchronous access to pe
 
 ---
 
-### 13. `get_folder_by_id`
+### 17. `get_folder_by_id`
 Get a specific folder by ID with optional children. Navigate folder hierarchy.
 
 **Parameters:**
@@ -384,7 +384,7 @@ Export Global folder contents (async). **IMPORTANT:** Uses 'data' array instead 
 
 ---
 
-### 18. `export_admin_recommended_folder`
+### 14. `export_admin_recommended_folder`
 Export Admin Recommended folder (async). Uses 'children' array (unlike Global folder).
 
 **Parameters:**
@@ -402,7 +402,7 @@ Export Admin Recommended folder (async). Uses 'children' array (unlike Global fo
 
 ## Content ID Utilities (3)
 
-### 19. `convert_content_id_hex_to_decimal`
+### 15. `convert_content_id_hex_to_decimal`
 Convert hex content ID to decimal format for web UI URLs.
 
 **Parameters:**
@@ -418,7 +418,7 @@ Convert hex content ID to decimal format for web UI URLs.
 
 ---
 
-### 20. `convert_content_id_decimal_to_hex`
+### 16. `convert_content_id_decimal_to_hex`
 Convert decimal content ID to hex format for API calls.
 
 **Parameters:**
@@ -434,7 +434,7 @@ Convert decimal content ID to hex format for API calls.
 
 ---
 
-### 21. `get_content_web_url`
+### 17. `get_content_web_url`
 Generate web UI URL for a content item.
 
 **Parameters:**
@@ -452,65 +452,9 @@ Generate web UI URL for a content item.
 
 ---
 
-## Field Management Tools (3)
-
-### 22. `list_custom_fields`
-List all custom fields defined in the organization.
-
-**Parameters:**
-- `instance` (str, default='default') - Instance name
-
-**Returns:** Array of custom field objects with:
-- Field name and key
-- Data type
-- Field ID
-
-**Use Cases:**
-- Discover available custom fields for query building
-- Audit custom field usage
-
----
-
-### 23. `list_field_extraction_rules`
-List all field extraction rules (FERs) for pre-parsing logs.
-
-**Parameters:**
-- `limit` (int, default=100) - Maximum results
-- `instance` (str, default='default') - Instance name
-
-**Returns:** Array of FER objects with:
-- Rule name and scope
-- Parse expression
-- Enabled status
-
-**Use Cases:**
-- Audit FER configuration
-- Discover which fields are extracted at ingest time
-
----
-
-### 24. `get_field_extraction_rule`
-Get detailed information about a specific field extraction rule.
-
-**Parameters:**
-- `rule_id` (str) - FER ID
-- `instance` (str, default='default') - Instance name
-
-**Returns:** Complete FER details including:
-- Parse expression
-- Scope filter
-- Field list
-- Enabled status
-
-**Use Cases:**
-- Inspect FER configuration
-- Debug field extraction issues
-
----
-
 ## Collectors & Sources Tools (2)
 
-### 25. `get_sumo_collectors`
+### 18. `get_sumo_collectors`
 Get list of Sumo Logic collectors.
 
 **Parameters:**
@@ -521,7 +465,7 @@ Get list of Sumo Logic collectors.
 
 ---
 
-### 26. `get_sumo_sources`
+### 19. `get_sumo_sources`
 Get sources for a specific Sumo Logic collector.
 
 **Parameters:**
@@ -534,7 +478,7 @@ Get sources for a specific Sumo Logic collector.
 
 ## Users & Roles Tools (2)
 
-### 27. `get_sumo_users`
+### 20. `get_sumo_users`
 Get list of Sumo Logic users.
 
 **Parameters:**
@@ -545,7 +489,7 @@ Get list of Sumo Logic users.
 
 ---
 
-### 28. `get_sumo_roles_v2`
+### 21. `get_sumo_roles_v2`
 Get list of roles using the v2 Roles API.
 
 **Parameters:**
@@ -558,7 +502,7 @@ Get list of roles using the v2 Roles API.
 
 ## Dashboards & Monitors Tools (2)
 
-### 29. `get_sumo_dashboards`
+### 22. `get_sumo_dashboards`
 Get list of Sumo Logic dashboards.
 
 **Parameters:**
@@ -569,7 +513,7 @@ Get list of Sumo Logic dashboards.
 
 ---
 
-### 30. `search_sumo_monitors`
+### 23. `search_sumo_monitors`
 Search for monitors and monitor folders.
 
 **Parameters:**
@@ -590,7 +534,7 @@ Search for monitors and monitor folders.
 
 ## System Tools (2)
 
-### 31. `get_sumo_partitions`
+### 24. `get_sumo_partitions`
 Get list of partitions.
 
 **Parameters:**
@@ -601,7 +545,7 @@ Get list of partitions.
 
 ---
 
-### 32. `list_sumo_instances`
+### 25. `list_sumo_instances`
 List all configured Sumo Logic instances.
 
 **Parameters:** None
@@ -610,9 +554,9 @@ List all configured Sumo Logic instances.
 
 ---
 
-## Account Management Tools (6)
+## Account Management Tools (3)
 
-### 33. `get_account_status`
+### 26. `get_account_status`
 Get account status including subscription, plan type, and usage information.
 
 **Parameters:**
@@ -629,7 +573,7 @@ Get account status including subscription, plan type, and usage information.
 
 ---
 
-### 34. `get_usage_forecast`
+### 27. `get_usage_forecast`
 Get usage forecast for specified number of days based on recent consumption patterns.
 
 **Parameters:**
@@ -647,7 +591,7 @@ Get usage forecast for specified number of days based on recent consumption patt
 
 ---
 
-### 35. `export_usage_report`
+### 28. `export_usage_report`
 Export detailed usage report for a date range (async operation). Returns download URL for CSV report.
 
 **Parameters:**
@@ -671,7 +615,7 @@ Export detailed usage report for a date range (async operation). Returns downloa
 
 ---
 
-### 36. `get_estimated_log_search_usage`
+### 29. `get_estimated_log_search_usage`
 Get estimated data volume that would be scanned for a log search query in Infrequent Data Tier and Flex.
 
 **Parameters:**
@@ -712,7 +656,68 @@ Get estimated data volume that would be scanned for a log search query in Infreq
 
 ---
 
-### 37. `analyze_data_volume`
+### 30. `explore_log_metadata`
+Explore log metadata values for a given scope to discover partitions, source categories, and other metadata dimensions.
+
+**Parameters:**
+- `scope` (str, default='*') - Log search scope
+- `from_time` (str, default='-15m') - Start time (ISO8601, epoch ms, or relative)
+- `to_time` (str, default='now') - End time
+- `time_zone` (str, default='UTC') - Timezone
+- `metadata_fields` (str, default='_view,_sourceCategory') - Comma-separated metadata fields to aggregate
+- `sort_by` (str, default='_sourceCategory') - Field to sort results by
+- `max_results` (int, default=1000) - Maximum results to return
+- `instance` (str, default='default') - Instance name
+
+**Common Metadata Fields:**
+- `_view` / `_index` - Partition name
+- `_sourceCategory` - Source category assigned to logs
+- `_collector` - Collector name
+- `_source` - Source name
+- `_sourceHost` - Source host
+- `_sourceName` - Source name (alternative)
+
+**Scope Examples:**
+- `"*"` - All logs (use with caution, short time range recommended)
+- `"_sourceCategory=*cloudtrail*"` - Any CloudTrail source categories
+- `"sqlexception"` - Keyword search
+- `"_dataTier=infrequent _sourceCategory=*k8s*"` - K8s logs in infrequent tier
+- `"_index=sumologic_default"` - All logs in default partition
+
+**Metadata Field Examples:**
+- `"_view,_sourceCategory"` - Basic partition and category mapping (fast)
+- `"_view,_sourceCategory,_collector,_source"` - Include collector/source info
+- `"_view,_sourceCategory,_collector,_source,_sourceName"` - Comprehensive mapping (slower)
+
+**Returns:** JSON with:
+- `summary`: Unique combinations count, total messages, truncation flag
+- `metadata`: Array of metadata combinations with message counts
+- `time_range`: Query time range info
+- `scope`: Query scope used
+
+**Use Cases:**
+- Discover which partitions/views contain specific logs
+- Map source categories to partitions for query optimization
+- Understand collector and source structure
+- Build efficient queries by learning metadata relationships
+- Essential for Flex/Infrequent tier accounts to scope queries before incurring scan charges
+
+**Notes:**
+- Keep time range short (<60m) for large instances or many metadata dimensions
+- More metadata fields = higher cardinality = longer query time
+- Infrequent tier searches incur scan charges - scope well
+- Empty partition names displayed as "sumologic_default"
+- Results can be filtered/analyzed client-side
+- Uses Sumo Logic search job API with automatic polling
+
+**Time Format Examples:**
+- Relative: "-15m", "-1h", "-24h", "-7d"
+- ISO: "2024-01-01T00:00:00Z"
+- Epoch ms: "1704067200000"
+
+---
+
+### 31. `analyze_data_volume`
 Analyze data volume ingestion from the Sumo Logic Data Volume Index for capacity planning and cost analysis.
 
 **Parameters:**
@@ -796,7 +801,7 @@ Analyze data volume ingestion from the Sumo Logic Data Volume Index for capacity
 
 ---
 
-### 38. `analyze_data_volume_grouped`
+### 32. `analyze_data_volume_grouped`
 Advanced data volume analysis with cardinality reduction for large-scale environments (5000+ source categories).
 
 **Parameters:**
@@ -900,17 +905,14 @@ Advanced data volume analysis with cardinality reduction for large-scale environ
 
 | Category | Count | Tools |
 |----------|-------|-------|
-| **Search & Query** | 9 | Search logs, job management, query metrics, search audit, scan cost analysis, metadata exploration |
-| **Query Examples** | 1 | Search 11,000+ queries from published apps |
-| **Log Volume Analysis** | 2 | Raw log volume analysis with _size field, schema profiling with facets |
-| **Content Library** | 7 | Folder access, path operations, content export with async jobs |
+| **Search & Query** | 7 | Search logs, create jobs, get status/results, query metrics, search audit, explore metadata |
+| **Content Library** | 7 | Personal/folder access, path operations, content export |
 | **Content ID Utilities** | 3 | Hex/decimal conversion, web URL generation |
-| **Field Management** | 3 | Custom fields, field extraction rules |
+| **Account Management** | 6 | Account status, usage forecast, usage report export, estimated log search usage, data volume analysis, grouped data volume analysis |
 | **Collectors & Sources** | 2 | List collectors, get sources |
 | **Users & Roles** | 2 | List users, list roles |
 | **Dashboards & Monitors** | 2 | List dashboards, search monitors |
 | **System** | 2 | List partitions, list instances |
-| **Account Management** | 6 | Account status, usage forecast, usage report, estimated usage, data volume analysis |
 
 ---
 
@@ -939,6 +941,6 @@ Advanced data volume analysis with cardinality reduction for large-scale environ
 
 ---
 
-**Version:** 1.7
-**Last Updated:** 2026-03-02
-**Total Tools:** 38
+**Version:** 1.6
+**Last Updated:** 2026-02-27
+**Total Tools:** 31
