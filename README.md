@@ -8,6 +8,66 @@ This Model Context Protocol (MCP) server provides secure, read-only access to Su
 >
 > **📦 Package Manager:** This project uses [uv](https://github.com/astral-sh/uv) exclusively. See [UV_MIGRATION.md](UV_MIGRATION.md) if migrating from pip/venv.
 
+## Project Status & Scope
+
+### ⚠️ Experimental & Unsupported
+
+This is an **experimental demonstration project** showcasing MCP capabilities with Sumo Logic APIs.
+
+- ❗ **Not officially supported** by Sumo Logic
+- ⚠️ **Use at your own risk** - no warranties or liability
+- 🤝 **Community-driven** - forks and enhancement suggestions welcome
+- 📝 **Open for contributions** - see [Contributing](#contributing) section
+
+### 🔒 Read-Only by Design
+
+This MCP server is **intentionally read-only** to minimize risk and showcase safe search/analytics workflows:
+
+- ✅ **Safe for exploration** - No create, update, or delete operations
+- 🎯 **Focused scope** - Search, query, and analytics only
+- 🚫 **Out of scope** - Write operations dramatically increase risk and complexity
+- 🛡️ **Risk mitigation** - Read-only access prevents accidental modifications
+
+**Why read-only?** Adding write capabilities (create/modify/delete) would:
+- Introduce significant operational risk to production environments
+- Require extensive permission management and validation
+- Dramatically increase code complexity and attack surface
+- Shift focus from core search/analytics capabilities
+
+### 🎯 Key Use Cases
+
+This MCP server enables **AI-assisted Sumo Logic workflows** for power users and administrators, replacing traditional UI interactions with natural language queries:
+
+**1. Search & Query Assistance**
+   - Natural language to Sumo Logic query translation
+   - Query optimization and troubleshooting
+   - Access to 11,000+ real query examples from published apps
+
+**2. Environment Discovery**
+   - Discover available log sources, partitions, and metadata
+   - Identify installed apps and available dashboards
+   - Profile log schemas and field structures
+
+**3. Advanced Analytics for Administrators**
+   - **Log Volume Analysis**: Track ingested data volumes and trends over time
+   - **Cost Optimization**: Analyze search scan costs for Flex/Infrequent tier optimization
+   - **Search Audit Analysis**: Identify high-scan queries and poorly performing searches
+   - **Partition Design**: Analyze data distribution to optimize data tiering strategies
+   - **User Behavior**: Track search patterns and query performance by user
+   - **Capacity Planning**: Forecast usage and credit consumption
+
+**4. Data Tier Optimization (Flex Customers)**
+   - Analyze which data should move to Infrequent tier
+   - Calculate potential cost savings from data tiering
+   - Design partition strategies based on actual query patterns
+   - Monitor search scan costs to validate tier decisions
+
+These capabilities are particularly valuable for:
+- **Administrators** managing large Sumo Logic deployments
+- **Power users** building complex queries and dashboards
+- **Cost managers** optimizing data tier allocation
+- **DevOps teams** investigating production issues via AI assistance
+
 ## Features
 
 - ✅ **Read-only operations** - No write/update/delete capabilities
