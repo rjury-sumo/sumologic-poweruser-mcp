@@ -16,6 +16,8 @@
   - Support for all Sumo Logic regions (au, ca, de, eu, fed, in, jp, kr, us2)
 - **Configuration**: Added optional `subdomain` field to instance configuration
 - **Tests**: Comprehensive URL builder tests (16 tests covering all functions and edge cases)
+- **Documentation Verification Script**: `scripts/verify_docs.py` to catch documentation drift automatically
+- **Enhanced Docstrings**: Improved documentation for 5 high-traffic tools with comprehensive examples and use cases
 
 ### Changed
 - Updated `get_content_web_url` tool to handle dashboard URLs differently from library content

@@ -867,7 +867,48 @@ async def get_sumo_sources(
     collector_id: int = Field(description="Collector ID to get sources for"),
     instance: str = Field(default='default', description="Sumo Logic instance name")
 ) -> str:
-    """Get sources for a specific Sumo Logic collector."""
+    """
+    Get sources for a specific Sumo Logic collector.
+
+    Returns configuration details for all sources attached to a collector,
+    including source type, category, host name, and collection settings.
+
+    Args:
+        collector_id: Numeric collector ID (get from get_sumo_collectors)
+
+    Returns:
+        JSON array of source objects containing:
+        - id: Source ID
+        - name: Source name
+        - category: Source category (used in queries)
+        - sourceType: Type (e.g., LocalFile, Syslog, HTTP)
+        - alive: Collection status (true/false)
+        - description: Source description
+
+    Use Cases:
+        - **Troubleshoot collection**: Check source configuration and status
+        - **Source inventory**: List all sources for a collector
+        - **Category discovery**: Find source categories for query building
+        - **Monitoring**: Verify sources are alive and collecting
+        - **Configuration audit**: Review source settings
+
+    Example Output:
+        [{
+          "id": 123456,
+          "name": "apache_access_logs",
+          "category": "prod/apache/access",
+          "sourceType": "LocalFile",
+          "alive": true
+        }]
+
+    Workflow:
+        1. Use get_sumo_collectors to list collectors
+        2. Use this tool to get sources for a specific collector
+        3. Check 'alive' status to verify collection is working
+        4. Use 'category' in queries: _sourceCategory=prod/apache/access
+
+    API Reference: https://api.sumologic.com/docs/#operation/getSources
+    """
     try:
         _ensure_config_initialized()
         config = get_config()
@@ -889,7 +930,44 @@ async def get_sumo_users(
     limit: int = Field(default=100, description="Maximum number of results"),
     instance: str = Field(default='default', description="Sumo Logic instance name")
 ) -> str:
-    """Get list of Sumo Logic users."""
+    """
+    Get list of Sumo Logic users in the organization.
+
+    Returns user information including email, first/last name, roles, and status.
+    Useful for user management, audit reporting, and access reviews.
+
+    Returns:
+        JSON array of user objects containing:
+        - id: Unique user identifier
+        - firstName/lastName: User's name
+        - email: User's email address
+        - roleIds: Array of assigned role IDs
+        - isActive: Account status (true/false)
+        - createdAt/modifiedAt: Timestamps
+
+    Use Cases:
+        - **User audit**: List all users for security reviews
+        - **Access management**: Identify users and their roles
+        - **License management**: Count active vs inactive users
+        - **Onboarding/offboarding**: Verify user accounts
+        - **Compliance reporting**: Generate user access reports
+
+    Example Output:
+        [{
+          "id": "00000000001A2B3C",
+          "firstName": "John",
+          "lastName": "Doe",
+          "email": "john.doe@example.com",
+          "roleIds": ["00000000001A2B3D"],
+          "isActive": true
+        }]
+
+    Related Tools:
+        - get_sumo_roles_v2: Get role definitions
+        - Use together to map users to their permissions
+
+    API Reference: https://api.sumologic.com/docs/#operation/listUsers
+    """
     try:
         _ensure_config_initialized()
         config = get_config()
@@ -1304,7 +1382,42 @@ async def get_sumo_dashboards(
     limit: int = Field(default=100, description="Maximum number of results"),
     instance: str = Field(default='default', description="Sumo Logic instance name")
 ) -> str:
-    """Get list of Sumo Logic dashboards."""
+    """
+    Get list of Sumo Logic dashboards visible to the user.
+
+    Returns dashboard metadata including ID, name, description, and folder location.
+    Use this to discover available dashboards before viewing or exporting them.
+
+    Returns:
+        JSON array of dashboard objects containing:
+        - id: Unique dashboard identifier (for get_content_web_url)
+        - title: Dashboard name
+        - description: Dashboard description
+        - folderId: Parent folder ID
+        - createdAt/modifiedAt: Timestamps
+
+    Use Cases:
+        - **Dashboard discovery**: Find dashboards by name or description
+        - **URL generation**: Get dashboard IDs for get_content_web_url tool
+        - **Content inventory**: List all dashboards in organization
+        - **Dashboard search**: Find dashboards matching criteria before opening
+        - **Integration**: Identify dashboards to link in external tools
+
+    Example Output:
+        [{
+          "id": "00000000001A2B3C",
+          "title": "AWS CloudTrail Overview",
+          "description": "AWS CloudTrail monitoring dashboard",
+          "folderId": "00000000001A2B3D"
+        }]
+
+    Next Steps:
+        - Use get_content_web_url to generate shareable dashboard links
+        - Use export_content to get full dashboard definition
+        - Use get_content_path_by_id to find dashboard location
+
+    API Reference: https://api.sumologic.com/docs/#operation/listDashboards
+    """
     try:
         _ensure_config_initialized()
         config = get_config()
@@ -1394,13 +1507,46 @@ async def search_sumo_monitors(
     instance: str = Field(default='default', description="Sumo Logic instance name")
 ) -> str:
     """
-    Search for monitors and monitor folders.
+    Search for monitors and monitor folders using flexible query syntax.
 
-    Query examples:
-    - 'Test' - Search for monitors containing 'Test'
-    - 'createdBy:000000000000968B' - Search by creator ID
-    - 'monitorStatus:Normal' - Search by status
-    - 'name:*error*' - Search monitors with 'error' in name
+    Monitors are alerting rules that trigger notifications when log or metric conditions are met.
+    Use this tool to discover existing monitors, check their status, and find alerting configs.
+
+    Query Syntax:
+        - Simple text: 'Test' - Matches monitors containing 'Test' in name/description
+        - Field search: 'name:*error*' - Wildcard search in name field
+        - Status filter: 'monitorStatus:Normal' - Find monitors by status
+        - Creator filter: 'createdBy:000000000000968B' - Find monitors by creator
+
+    Returns:
+        JSON array of monitor objects containing:
+        - id: Monitor ID
+        - name: Monitor name
+        - monitorType: Type (Logs, Metrics, SLO)
+        - status: Current status (Normal, Critical, Warning, etc.)
+        - isDisabled: Whether monitor is disabled
+        - triggers: Alert conditions
+
+    Use Cases:
+        - **Alert inventory**: List all monitors in organization
+        - **Troubleshoot alerts**: Find monitors that may be firing
+        - **Monitor discovery**: Search for monitors by name or keyword
+        - **Status check**: Find all Critical or Warning monitors
+        - **Audit review**: Find monitors created by specific users
+
+    Query Examples:
+        - Find error monitors: query="name:*error*"
+        - Find critical monitors: query="monitorStatus:Critical"
+        - Find all log monitors: query="monitorType:Logs"
+        - Find by creator: query="createdBy:USER_ID"
+
+    Monitor Status Values:
+        - Normal: No alerts firing
+        - Critical: Critical threshold breached
+        - Warning: Warning threshold breached
+        - Missing Data: No data received
+
+    API Reference: https://api.sumologic.com/docs/#operation/monitorsSearch
     """
     try:
         _ensure_config_initialized()
@@ -1424,7 +1570,48 @@ async def get_sumo_partitions(
     limit: int = Field(default=100, description="Maximum number of results"),
     instance: str = Field(default='default', description="Sumo Logic instance name")
 ) -> str:
-    """Get list of partitions."""
+    """
+    Get list of Sumo Logic partitions.
+
+    Partitions are data subsets used to improve query performance by pre-filtering logs
+    at index time. Understanding partitions helps optimize query performance and costs.
+
+    Returns:
+        JSON array of partition objects containing:
+        - name: Partition name (used in queries with _index)
+        - routingExpression: Filter expression for partition
+        - retentionPeriod: Days data is retained
+        - isActive: Whether partition is active
+        - dataForwardingId: Data forwarding configuration (if any)
+        - totalBytes: Total data size in partition
+
+    Use Cases:
+        - **Query optimization**: Use _index=partition_name to speed up queries
+        - **Data management**: See how data is organized and retained
+        - **Cost analysis**: Understand data distribution across partitions
+        - **Partition discovery**: Find available partitions for queries
+        - **Retention review**: Check retention policies per partition
+
+    Query Performance Tip:
+        When querying specific data, use partition index for faster results:
+        _index=cloudtrail _sourceCategory=aws/cloudtrail | ...
+
+    Example Output:
+        [{
+          "name": "cloudtrail",
+          "routingExpression": "_sourceCategory=aws/cloudtrail",
+          "retentionPeriod": 30,
+          "isActive": true,
+          "totalBytes": 1073741824
+        }]
+
+    Related Concepts:
+        - Partitions pre-filter data at index time (fast)
+        - Views pre-filter data at query time (slower but more flexible)
+        - Use partitions when you frequently query specific data subsets
+
+    API Reference: https://api.sumologic.com/docs/#operation/listPartitions
+    """
     try:
         _ensure_config_initialized()
         config = get_config()
