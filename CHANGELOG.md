@@ -1,6 +1,40 @@
 # Changelog
 
-## [Unreleased] - 2026-02-25
+## [Unreleased] - 2026-03-04
+
+### Added
+- **Development Guidelines**: Comprehensive development documentation for consistent AI-assisted development
+  - `CLAUDE.md`: Guidelines for Claude/AI-assisted development with patterns, workflows, and checklists
+  - `.PATTERNS.md`: Architecture patterns and coding standards with detailed examples
+  - `docs/QUICK_REFERENCE.md`: Quick lookup reference for common development tasks
+  - `docs/development/.CHECKLIST_TEMPLATE.md`: Template checklist for new features
+- **URL Generation Improvements**: Enhanced web URL generation with proper regional and subdomain support
+  - New `url_builder.py` module for centralized URL generation
+  - Support for custom subdomains in `.env` configuration (`SUMO_SUBDOMAIN`, `SUMO_<INSTANCE>_SUBDOMAIN`)
+  - Added `build_search_web_url` tool to generate shareable search URLs with pre-filled queries
+  - Enhanced `get_content_web_url` to auto-detect dashboards and generate correct URLs
+  - Support for all Sumo Logic regions (au, ca, de, eu, fed, in, jp, kr, us2)
+- **Configuration**: Added optional `subdomain` field to instance configuration
+- **Tests**: Comprehensive URL builder tests (16 tests covering all functions and edge cases)
+
+### Changed
+- Updated `get_content_web_url` tool to handle dashboard URLs differently from library content
+  - Dashboards now use `/dashboard/{id}` format instead of `/library/{id}`
+  - Auto-detects content type and fetches dashboard unique ID when needed
+- Updated `.env.example` with subdomain configuration examples
+- Enhanced `.gitignore` to prevent temporary development files from being committed
+- Updated README.md with links to new development documentation
+- Updated `docs/mcp-tools-reference.md`:
+  - Total tools: 40 → 41
+  - Enhanced documentation for `get_content_web_url` with URL formats and subdomain examples
+  - Added documentation for `build_search_web_url` tool
+  - Renumbered tools 25-41 to maintain sequential order
+
+### Fixed
+- Web URL generation now correctly maps API endpoints to UI endpoints for all regions
+- Dashboard URLs now use proper dashboard ID instead of content ID
+
+## [Previous] - 2026-02-25
 
 ### Fixed - CRITICAL Search Job Bug
 - **BREAKING FIX**: `search_logs()` now correctly detects query type and calls appropriate endpoint

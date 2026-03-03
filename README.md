@@ -390,6 +390,15 @@ See [SECURITY.md](SECURITY.md) for detailed security information.
 
 ## Development
 
+### For Contributors and AI Assistants
+
+**📖 Essential Reading for Development:**
+- **[CLAUDE.md](CLAUDE.md)** - Development guidelines for Claude/AI-assisted development
+- **[.PATTERNS.md](.PATTERNS.md)** - Architecture patterns and coding standards
+- **[docs/QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md)** - Quick lookup for common tasks
+
+**⚠️ Critical Rule:** Always update `docs/mcp-tools-reference.md` when adding/modifying tools!
+
 ### Install Development Dependencies
 
 ```bash
@@ -400,7 +409,14 @@ uv sync --all-extras
 ### Run Tests
 
 ```bash
+# Run all tests
 uv run pytest
+
+# Run with verbose output
+uv run pytest -v
+
+# Run specific test file
+uv run pytest tests/test_module.py -v
 ```
 
 ### Run with Coverage
@@ -408,6 +424,15 @@ uv run pytest
 ```bash
 uv run pytest --cov=src --cov-report=html
 ```
+
+### Development Workflow
+
+1. Review [CLAUDE.md](CLAUDE.md) for guidelines and patterns
+2. Copy [docs/development/.CHECKLIST_TEMPLATE.md](docs/development/.CHECKLIST_TEMPLATE.md) for your feature
+3. Implement following patterns from [.PATTERNS.md](.PATTERNS.md)
+4. **Update `docs/mcp-tools-reference.md`** (mandatory for new/modified tools)
+5. Write tests and verify they pass
+6. Update CHANGELOG.md
 
 ### Linting and Formatting
 

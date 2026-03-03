@@ -156,6 +156,28 @@ tests/integration/*.py
 tests/debug/*.py
 tests/utilities/*.py
 
+# Temporary development files - should not be committed
+/*_temp.md
+/*_working.md
+/*_notes.md
+/*_dev.md
+/temp_*.md
+/working_*.md
+/notes_*.md
+/dev_*.md
+/TODO.md
+/WORKING.md
+/NOTES.md
+/TEMP.md
+
+# But allow permanent documentation
+!CLAUDE.md
+!.PATTERNS.md
+!CHANGELOG.md
+!README.md
+!QUICKSTART.md
+!SECURITY.md
+
 # Spyder project settings
 .spyderproject
 .spyproject
