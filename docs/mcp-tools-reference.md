@@ -369,34 +369,45 @@ Export full content structure (dashboards, searches, etc.) with async job handli
 ---
 
 ### 17. `export_global_folder`
-Export Global folder contents (async). **IMPORTANT:** Uses 'data' array instead of 'children'.
+Export Global folder contents (async) with optional truncation. **IMPORTANT:** Uses 'data' array instead of 'children'.
 
 **Parameters:**
 - `is_admin_mode` (bool, default=False) - Use admin mode
 - `max_wait_seconds` (int, default=300) - Max polling time
+- `max_items` (int, optional) - Maximum items to return (truncates large folders)
 - `instance` (str, default='default') - Instance name
 
-**Returns:** Global folder with 'data' array containing children
+**Returns:** Global folder with 'data' array containing children, optional `_metadata` if truncated
+
+**Truncation Examples:**
+- `max_items=50` - Limit to first 50 items (helps with >1MB responses)
+- Useful for very large Global folders with 100+ items
 
 **Use Cases:**
 - List global/shared content
 - Discover organization-wide content
+- Preview large folders without full export (use max_items)
 
 ---
 
 ### 18. `export_admin_recommended_folder`
-Export Admin Recommended folder (async). Uses 'children' array (unlike Global folder).
+Export Admin Recommended folder (async) with optional truncation. Uses 'children' array (unlike Global folder).
 
 **Parameters:**
 - `is_admin_mode` (bool, default=False) - Use admin mode
 - `max_wait_seconds` (int, default=300) - Max polling time
+- `max_items` (int, optional) - Maximum items to return (truncates large folders)
 - `instance` (str, default='default') - Instance name
 
-**Returns:** Admin Recommended folder with 'children' array
+**Returns:** Admin Recommended folder with 'children' array, optional `_metadata` if truncated
+
+**Truncation Examples:**
+- `max_items=50` - Limit to first 50 items for large folders
 
 **Use Cases:**
 - Access admin-curated content
 - Discover best practices content
+- Sample large Admin Recommended folders (use max_items)
 
 ---
 
@@ -441,9 +452,11 @@ Export Installed Apps folder to discover pre-built apps available in your Sumo L
 ---
 
 ### 20. `list_installed_apps`
-List all installed Sumo Logic apps (lightweight alternative to export_installed_apps).
+List all installed Sumo Logic apps with optional filtering (lightweight alternative to export_installed_apps).
 
 **Parameters:**
+- `filter_name` (str, optional) - Filter apps by name (substring match, case-insensitive)
+- `search_term` (str, optional) - Search app names
 - `instance` (str, default='default') - Instance name
 
 **Returns:** JSON array of installed apps with:
@@ -451,11 +464,17 @@ List all installed Sumo Logic apps (lightweight alternative to export_installed_
 - App name (e.g., "AWS CloudTrail", "Apache", "Kubernetes")
 - App manifest version
 - Installation info
+- `_metadata` (if filters applied)
+
+**Filtering Examples:**
+- `filter_name="AWS"` - Find all AWS-related apps
+- `search_term="kubernetes"` - Search for Kubernetes apps
 
 **Use Cases:**
 - **Quick discovery**: Faster than exporting full folder structure
-- **App availability check**: See if specific app is installed
+- **App availability check**: See if specific app is installed (use filter for fast search)
 - **Log discovery integration**: Check for relevant apps after finding logs
+- **Large app catalogs**: Filter when many apps installed (reduces response size)
 
 **Permission Note:**
 This endpoint may require admin permissions in some organizations. If it fails with permission error, use export_installed_apps instead which works with regular user permissions.
@@ -622,13 +641,26 @@ Get detailed information about a specific field extraction rule.
 ## Collectors & Sources Tools (2)
 
 ### 28. `get_sumo_collectors`
-Get list of Sumo Logic collectors.
+Get list of Sumo Logic collectors with optional client-side filtering.
 
 **Parameters:**
 - `limit` (int, default=100) - Maximum results
+- `filter_name` (str, optional) - Filter collectors by name (substring match, case-insensitive)
+- `filter_alive` (bool, optional) - Filter by alive status (true=active, false=inactive)
+- `search_term` (str, optional) - Search across name, description, hostName fields
 - `instance` (str, default='default') - Instance name
 
-**Returns:** Array of collector objects
+**Returns:** Array of collector objects with optional `_metadata` if filtered
+
+**Filtering Examples:**
+- `filter_name="prod"` - Find collectors with "prod" in name
+- `filter_alive=True` - Only show active collectors
+- `search_term="aws"` - Search across name, description, hostname
+
+**Use Cases:**
+- Large orgs with 100s of collectors - filter to reduce response size
+- Finding specific collector types before operations
+- Filtering by status before maintenance tasks
 
 ---
 
@@ -670,13 +702,52 @@ Get list of roles using the v2 Roles API.
 ## Dashboards & Monitors Tools (2)
 
 ### 32. `get_sumo_dashboards`
-Get list of Sumo Logic dashboards.
+Get list of Sumo Logic dashboards with pagination, mode filtering, and client-side filtering.
 
 **Parameters:**
-- `limit` (int, default=100) - Maximum results
+- `limit` (int, default=100) - Maximum results per page (1-100)
+- `mode` (str, default='allViewableByUser') - Filter mode:
+  - `'allViewableByUser'`: All dashboards user can view (default)
+  - `'createdByUser'`: Only dashboards created by current user
+- `token` (str, optional) - Pagination token from previous response's `next` field
+- `filter_name` (str, optional) - Filter dashboards by title (substring match, case-insensitive)
+- `filter_description` (str, optional) - Filter dashboards by description (substring match)
+- `search_term` (str, optional) - Search across title and description fields
 - `instance` (str, default='default') - Instance name
 
-**Returns:** Array of dashboard objects
+**Returns:**
+- `dashboards`: Array of dashboard objects
+- `next`: Pagination token (if more results available)
+- `_metadata`: Filtering statistics (if client-side filters applied)
+
+**Pagination Workflow:**
+1. Call without `token` to get first page
+2. Check if `next` field exists in response
+3. Pass `next` value as `token` parameter for next page
+4. Repeat until `next` is absent (reached end)
+
+**Mode Examples:**
+- `mode='allViewableByUser'` - All dashboards you can view (default)
+- `mode='createdByUser'` - Only your dashboards
+
+**Filtering Examples:**
+- `filter_name="AWS"` - Find dashboards with "AWS" in title
+- `search_term="security"` - Find "security" in title or description
+- `mode='createdByUser', filter_name='test'` - Combine mode + client filter
+
+**Performance:**
+- Token-based pagination recommended for >100 dashboards
+- Client-side filtering reduces response size (3.2MB → smaller)
+- Mode filtering happens server-side (fast)
+- Client-side filters applied after API response
+
+**Use Cases:**
+- Dashboard discovery in large organizations
+- Finding your own dashboards (use mode='createdByUser')
+- Paginating through 100+ dashboards
+- Finding dashboards by topic before viewing
+
+**API Reference:** https://api.sumologic.com/docs/#operation/listDashboards
 
 ---
 

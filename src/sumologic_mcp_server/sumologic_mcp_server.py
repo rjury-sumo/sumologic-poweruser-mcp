@@ -47,6 +47,20 @@ from .validation import (
     MonitorSearchValidation,
 )
 
+
+def _resolve_field_value(value: Any) -> Any:
+    """
+    Resolve Pydantic Field values to actual values.
+
+    When tools are called directly from Python (not via MCP), Field() objects
+    may be passed instead of actual values. This helper extracts the real value.
+    """
+    from pydantic.fields import FieldInfo
+
+    if isinstance(value, FieldInfo):
+        return value.default if hasattr(value, 'default') else None
+    return value
+
 # Logging will be configured on first access
 logger = logging.getLogger(__name__)
 audit_logger = logging.getLogger('audit')
@@ -396,9 +410,34 @@ class SumoLogicClient:
         params = {"limit": limit, "offset": offset}
         return await self._request("GET", "/folders/global", api_version="v2", params=params)
 
-    async def get_dashboards(self, limit: int = 100, offset: int = 0) -> Dict[str, Any]:
-        """Get list of dashboards."""
-        params = {"limit": limit, "offset": offset}
+    async def get_dashboards(
+        self,
+        limit: int = 100,
+        offset: int = 0,
+        mode: str = "allViewableByUser",
+        token: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Get list of dashboards.
+
+        Args:
+            limit: Maximum number of results (1-100)
+            offset: Pagination offset (deprecated - use token instead)
+            mode: Filter mode - 'allViewableByUser' or 'createdByUser'
+            token: Pagination token from previous response's 'next' field
+
+        Returns:
+            Response with 'dashboards' array and optional 'next' token
+        """
+        params = {"limit": limit, "mode": mode}
+
+        # Use token-based pagination if provided (preferred)
+        if token:
+            params["token"] = token
+        else:
+            # Fall back to offset-based pagination for backward compatibility
+            params["offset"] = offset
+
         return await self._request("GET", "/dashboards", api_version="v2", params=params)
 
     async def query_metrics(self, query: str, from_time: str, to_time: str) -> Dict[str, Any]:
@@ -843,10 +882,28 @@ async def get_sumo_search_job_results(
 @mcp.tool()
 async def get_sumo_collectors(
     limit: int = Field(default=100, description="Maximum number of results"),
+    filter_name: Optional[str] = Field(default=None, description="Filter collectors by name (substring match, case-insensitive)"),
+    filter_alive: Optional[bool] = Field(default=None, description="Filter by alive status (true=active, false=inactive)"),
+    search_term: Optional[str] = Field(default=None, description="Search across name, description, hostName fields"),
     instance: str = Field(default='default', description="Sumo Logic instance name")
 ) -> str:
-    """Get list of Sumo Logic collectors."""
+    """
+    Get list of Sumo Logic collectors with optional client-side filtering.
+
+    Client-side filtering helps when API returns large result sets (>1MB).
+    Use filter_name, filter_alive, or search_term to reduce results.
+
+    Filtering Examples:
+        - filter_name="prod" - Find collectors with "prod" in name
+        - filter_alive=True - Only show active collectors
+        - search_term="aws" - Search across name, description, hostname
+
+    Returns:
+        JSON with collectors array and optional _metadata if filtered
+    """
     try:
+        from .response_filter import filter_response
+
         _ensure_config_initialized()
         config = get_config()
         limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
@@ -857,6 +914,38 @@ async def get_sumo_collectors(
 
         client = await get_sumo_client(instance)
         collectors = await client.get_collectors(limit=limit)
+
+        # Resolve Field values when called directly from Python
+        filter_name = _resolve_field_value(filter_name)
+        filter_alive = _resolve_field_value(filter_alive)
+        search_term = _resolve_field_value(search_term)
+
+        # Apply client-side filtering if requested
+        has_filter_name = filter_name is not None and filter_name != ""
+        has_filter_alive = filter_alive is not None
+        has_search_term = search_term is not None and search_term != ""
+
+        if has_filter_name or has_filter_alive or has_search_term:
+            if has_filter_name:
+                collectors = filter_response(
+                    collectors,
+                    field='name',
+                    value=filter_name,
+                    case_sensitive=False
+                )
+            elif has_filter_alive:
+                collectors = filter_response(
+                    collectors,
+                    custom_filter=lambda c: c.get('alive', False) == filter_alive
+                )
+            elif has_search_term:
+                collectors = filter_response(
+                    collectors,
+                    search_term=search_term,
+                    search_fields=['name', 'description', 'hostName'],
+                    case_sensitive=False
+                )
+
         return json.dumps(collectors, indent=2)
     except Exception as e:
         return handle_tool_error(e, "get_sumo_collectors")
@@ -1152,18 +1241,27 @@ async def export_content(
 async def export_global_folder(
     is_admin_mode: bool = False,
     max_wait_seconds: int = 300,
+    max_items: Optional[int] = Field(default=None, description="Maximum number of items to return (truncates large folders)"),
     instance: str = Field(default='default', description="Sumo Logic instance name")
 ) -> str:
     """
-    Export Global folder contents (async).
+    Export Global folder contents (async) with optional truncation for large folders.
 
     IMPORTANT: Global folder uses 'data' array instead of 'children' for its contents.
     This is different from other folders and Admin Recommended.
 
     Set is_admin_mode=true to see more content (requires admin permissions).
+    Use max_items to truncate large folder exports (helps with >1MB responses).
+
+    Args:
+        is_admin_mode: Export with admin permissions
+        max_wait_seconds: Maximum time to wait for export job
+        max_items: Limit number of items returned (e.g., 50 for large folders)
+        instance: Sumo Logic instance name
     """
     try:
         from .async_export_helper import poll_folder_export_job
+        from .response_filter import truncate_response
 
         _ensure_config_initialized()
         config = get_config()
@@ -1171,6 +1269,7 @@ async def export_global_folder(
         await limiter.acquire("export_global_folder")
 
         instance = validate_instance_name(instance)
+        max_items = _resolve_field_value(max_items)
         client = await get_sumo_client(instance)
 
         # Start export job
@@ -1186,6 +1285,12 @@ async def export_global_folder(
             max_wait_seconds=max_wait_seconds
         )
 
+        # Truncate if requested
+        if max_items is not None and max_items > 0:
+            result, was_truncated = truncate_response(result, max_items=max_items)
+            if was_truncated:
+                logger.info(f"Truncated Global folder export to {max_items} items")
+
         return json.dumps(result, indent=2)
 
     except Exception as e:
@@ -1196,16 +1301,25 @@ async def export_global_folder(
 async def export_admin_recommended_folder(
     is_admin_mode: bool = False,
     max_wait_seconds: int = 300,
+    max_items: Optional[int] = Field(default=None, description="Maximum number of items to return (truncates large folders)"),
     instance: str = Field(default='default', description="Sumo Logic instance name")
 ) -> str:
     """
-    Export Admin Recommended folder (async).
+    Export Admin Recommended folder (async) with optional truncation for large folders.
 
     Returns admin-curated content. Unlike Global folder, this uses 'children' array.
     Set is_admin_mode=true to see more content (requires admin permissions).
+    Use max_items to truncate large folder exports (helps with >1MB responses).
+
+    Args:
+        is_admin_mode: Export with admin permissions
+        max_wait_seconds: Maximum time to wait for export job
+        max_items: Limit number of items returned (e.g., 50 for large folders)
+        instance: Sumo Logic instance name
     """
     try:
         from .async_export_helper import poll_folder_export_job
+        from .response_filter import truncate_response
 
         _ensure_config_initialized()
         config = get_config()
@@ -1213,6 +1327,7 @@ async def export_admin_recommended_folder(
         await limiter.acquire("export_admin_recommended_folder")
 
         instance = validate_instance_name(instance)
+        max_items = _resolve_field_value(max_items)
         client = await get_sumo_client(instance)
 
         # Start export job
@@ -1227,6 +1342,12 @@ async def export_admin_recommended_folder(
             get_result_func=lambda jid: client.get_admin_recommended_export_result(jid),
             max_wait_seconds=max_wait_seconds
         )
+
+        # Truncate if requested
+        if max_items is not None and max_items > 0:
+            result, was_truncated = truncate_response(result, max_items=max_items)
+            if was_truncated:
+                logger.info(f"Truncated Admin Recommended folder export to {max_items} items")
 
         return json.dumps(result, indent=2)
 
@@ -1316,16 +1437,22 @@ async def export_installed_apps(
 
 @mcp.tool()
 async def list_installed_apps(
+    filter_name: Optional[str] = Field(default=None, description="Filter apps by name (substring match, case-insensitive)"),
+    search_term: Optional[str] = Field(default=None, description="Search app names"),
     instance: str = Field(default='default', description="Sumo Logic instance name")
 ) -> str:
     """
-    List all installed Sumo Logic apps (lightweight alternative to export_installed_apps).
+    List all installed Sumo Logic apps with optional filtering (lightweight alternative to export_installed_apps).
 
     This uses the listAppsV2 endpoint which returns a simplified list of installed apps
     without the full folder structure. Faster than export_installed_apps but may require
     admin permissions in some organizations.
 
+    Client-side filtering helps when many apps are installed.
+
     Args:
+        filter_name: Filter apps by name (e.g., "AWS", "Kubernetes")
+        search_term: Search app names
         instance: Sumo Logic instance name (default: 'default')
 
     Returns:
@@ -1334,6 +1461,11 @@ async def list_installed_apps(
         - App name (e.g., "AWS CloudTrail", "Apache", "Kubernetes")
         - App manifest version
         - Installation info
+        - _metadata: Filtering statistics (if filters applied)
+
+    Filtering Examples:
+        - filter_name="AWS" - Find all AWS-related apps
+        - search_term="kubernetes" - Search for Kubernetes apps
 
     Use Cases:
         - **Quick discovery**: Faster than exporting full folder structure
@@ -1360,6 +1492,8 @@ async def list_installed_apps(
         - https://api.sumologic.com/docs/#operation/listAppsV2
     """
     try:
+        from .response_filter import filter_response
+
         _ensure_config_initialized()
         config = get_config()
         limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
@@ -1371,6 +1505,30 @@ async def list_installed_apps(
         # List apps
         result = await client.list_apps()
 
+        # Resolve Field values when called directly from Python
+        filter_name = _resolve_field_value(filter_name)
+        search_term = _resolve_field_value(search_term)
+
+        # Apply client-side filtering if requested
+        has_filter_name = filter_name is not None and filter_name != ""
+        has_search_term = search_term is not None and search_term != ""
+
+        if has_filter_name or has_search_term:
+            if has_filter_name:
+                result = filter_response(
+                    result,
+                    field='appName',
+                    value=filter_name,
+                    case_sensitive=False
+                )
+            elif has_search_term:
+                result = filter_response(
+                    result,
+                    search_term=search_term,
+                    search_fields=['appName'],
+                    case_sensitive=False
+                )
+
         return json.dumps(result, indent=2)
 
     except Exception as e:
@@ -1379,14 +1537,32 @@ async def list_installed_apps(
 
 @mcp.tool()
 async def get_sumo_dashboards(
-    limit: int = Field(default=100, description="Maximum number of results"),
+    limit: int = Field(default=100, description="Maximum number of results (1-100)"),
+    mode: str = Field(default="allViewableByUser", description="Filter mode: 'allViewableByUser' or 'createdByUser'"),
+    token: Optional[str] = Field(default=None, description="Pagination token from previous response's 'next' field"),
+    filter_name: Optional[str] = Field(default=None, description="Filter dashboards by title (substring match, case-insensitive)"),
+    filter_description: Optional[str] = Field(default=None, description="Filter dashboards by description (substring match)"),
+    search_term: Optional[str] = Field(default=None, description="Search across title and description fields"),
     instance: str = Field(default='default', description="Sumo Logic instance name")
 ) -> str:
     """
-    Get list of Sumo Logic dashboards visible to the user.
+    Get list of Sumo Logic dashboards with pagination and filtering.
 
     Returns dashboard metadata including ID, name, description, and folder location.
     Use this to discover available dashboards before viewing or exporting them.
+
+    Pagination:
+        - Use 'token' for cursor-based pagination (recommended)
+        - Check response's 'next' field for pagination token
+        - Pass token to get next page of results
+        - When 'next' is absent, you've reached the end
+
+    Mode Parameter:
+        - 'allViewableByUser' (default): All dashboards user can view
+        - 'createdByUser': Only dashboards created by the current user
+
+    Client-side filtering helps when API returns large result sets (>1MB).
+    Use filter_name, filter_description, or search_term to reduce results.
 
     Returns:
         JSON array of dashboard objects containing:
@@ -1395,6 +1571,7 @@ async def get_sumo_dashboards(
         - description: Dashboard description
         - folderId: Parent folder ID
         - createdAt/modifiedAt: Timestamps
+        - _metadata: Filtering statistics (if filters applied)
 
     Use Cases:
         - **Dashboard discovery**: Find dashboards by name or description
@@ -1411,6 +1588,11 @@ async def get_sumo_dashboards(
           "folderId": "00000000001A2B3D"
         }]
 
+    Filtering Examples:
+        - filter_name="APITest" - Find dashboards with "APITest" in title
+        - search_term="security" - Find "security" in title or description
+        - Both filters can be combined for more specific results
+
     Next Steps:
         - Use get_content_web_url to generate shareable dashboard links
         - Use export_content to get full dashboard definition
@@ -1419,6 +1601,8 @@ async def get_sumo_dashboards(
     API Reference: https://api.sumologic.com/docs/#operation/listDashboards
     """
     try:
+        from .response_filter import filter_response
+
         _ensure_config_initialized()
         config = get_config()
         limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
@@ -1427,8 +1611,54 @@ async def get_sumo_dashboards(
         limit, _ = validate_pagination(limit, 0)
         instance = validate_instance_name(instance)
 
+        # Resolve Field values when called directly from Python
+        mode = _resolve_field_value(mode)
+        token = _resolve_field_value(token)
+        filter_name = _resolve_field_value(filter_name)
+        filter_description = _resolve_field_value(filter_description)
+        search_term = _resolve_field_value(search_term)
+
+        # Validate mode parameter
+        if mode not in ["allViewableByUser", "createdByUser"]:
+            raise ValidationError(
+                f"Invalid mode '{mode}'. Must be 'allViewableByUser' or 'createdByUser'"
+            )
+
         client = await get_sumo_client(instance)
-        dashboards = await client.get_dashboards(limit=limit)
+        dashboards = await client.get_dashboards(
+            limit=limit,
+            mode=mode,
+            token=token
+        )
+
+        # Check for None explicitly to handle both MCP calls and direct Python calls
+        has_filter_name = filter_name is not None and filter_name != ""
+        has_filter_desc = filter_description is not None and filter_description != ""
+        has_search_term = search_term is not None and search_term != ""
+
+        if has_filter_name or has_filter_desc or has_search_term:
+            if has_filter_name:
+                dashboards = filter_response(
+                    dashboards,
+                    field='title',
+                    value=filter_name,
+                    case_sensitive=False
+                )
+            elif has_filter_desc:
+                dashboards = filter_response(
+                    dashboards,
+                    field='description',
+                    value=filter_description,
+                    case_sensitive=False
+                )
+            elif has_search_term:
+                dashboards = filter_response(
+                    dashboards,
+                    search_term=search_term,
+                    search_fields=['title', 'description'],
+                    case_sensitive=False
+                )
+
         return json.dumps(dashboards, indent=2)
     except Exception as e:
         return handle_tool_error(e, "get_sumo_dashboards")
