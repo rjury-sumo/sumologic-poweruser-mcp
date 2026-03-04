@@ -56,7 +56,7 @@ This MCP server enables **AI-assisted Sumo Logic workflows** for power users and
    - **User Behavior**: Track search patterns and query performance by user
    - **Capacity Planning**: Forecast usage and credit consumption
 
-**4. Data Tier Optimization (Flex Customers)**
+**4. Data Tier Optimization (Infrequent / Flex Customers)**
    - Analyze which data should move to Infrequent tier
    - Calculate potential cost savings from data tiering
    - Design partition strategies based on actual query patterns
@@ -190,6 +190,8 @@ cp .env.example .env
 SUMO_ACCESS_ID=your_access_id_here
 SUMO_ACCESS_KEY=your_access_key_here
 SUMO_ENDPOINT=https://api.sumologic.com
+# optional subdomain if using UI web url tools
+# SUMO_SUBDOMAIN=mycompany
 
 # Optional: Additional instances
 SUMO_PROD_ACCESS_ID=your_prod_id
