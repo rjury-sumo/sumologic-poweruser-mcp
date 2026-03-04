@@ -66,6 +66,25 @@ SUMO_STAGING_ENDPOINT=https://api.eu.sumologic.com
 **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
 **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
 
+**Option A: Using wrapper script (Recommended - keeps credentials in .env)**
+
+```json
+{
+  "mcpServers": {
+    "sumologic": {
+      "command": "python3",
+      "args": [
+        "/absolute/path/to/sumologic-python-mcp/scripts/run_with_env.py"
+      ]
+    }
+  }
+}
+```
+
+> **Note for macOS users**: Using `python3` with `run_with_env.py` is more reliable than the shell script on macOS due to permission restrictions.
+
+**Option B: Direct credentials (less secure)**
+
 ```json
 {
   "mcpServers": {
@@ -77,7 +96,11 @@ SUMO_STAGING_ENDPOINT=https://api.eu.sumologic.com
         "run",
         "sumologic-mcp-server"
       ],
-      "env": {}
+      "env": {
+        "SUMO_ACCESS_ID": "your_access_id",
+        "SUMO_ACCESS_KEY": "your_access_key",
+        "SUMO_ENDPOINT": "https://api.sumologic.com"
+      }
     }
   }
 }

@@ -2095,7 +2095,7 @@ async def run_search_audit_query(
         - Searches using threatip: scope_filters=["query=*threatip*"]
         - Large scheduled searches: scope_filters=["query_type=Scheduled"],
                                    where_filters=["data_scanned_bytes > 1099511627776"]
-        - Expensive searches: query_regex='.*\| count.*' (searches with count operator)
+        - Expensive searches: query_regex=r'.*\| count.*' (searches with count operator)
 
     Reference: https://www.sumologic.com/help/docs/manage/security/audit-indexes/search-audit-index/
 

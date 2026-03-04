@@ -1,0 +1,28 @@
+services:
+  sumologic-mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: sumologic-mcp-server:latest
+    container_name: sumologic-mcp-server
+    env_file:
+      - .env
+    environment:
+      # Override any environment variables here if needed
+      # SUMO_ACCESS_ID: ${SUMO_ACCESS_ID}
+      # SUMO_ACCESS_KEY: ${SUMO_ACCESS_KEY}
+      # SUMO_API_ENDPOINT: ${SUMO_API_ENDPOINT}
+      - PYTHONUNBUFFERED=1
+    stdin_open: true  # Keep stdin open for MCP stdio communication
+    tty: true         # Allocate a pseudo-TTY
+    restart: unless-stopped
+    # Uncomment volumes below if needed:
+    # volumes:
+    #   - ./.env:/app/.env:ro
+    #   - ./logs:/app/logs
+    networks:
+      - sumologic-mcp-network
+
+networks:
+  sumologic-mcp-network:
+    driver: bridge

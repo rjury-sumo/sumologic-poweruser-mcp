@@ -145,11 +145,58 @@ All tools support an `instance` parameter to target specific Sumo Logic deployme
 
 ### Prerequisites
 
-- Python 3.10 or higher
+- Python 3.10 or higher (for local installation) OR Docker (for containerized deployment)
 - Sumo Logic access ID and access key
-- [uv](https://github.com/astral-sh/uv) - Fast Python package installer
+- [uv](https://github.com/astral-sh/uv) - Fast Python package installer (for local installation only)
 
-### Install uv
+### Option 1: Docker Installation (Recommended for Portability)
+
+**Prerequisites:**
+- Docker installed ([Get Docker](https://docs.docker.com/get-docker/))
+- Docker Compose (included with Docker Desktop)
+
+**Quick Start:**
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/sumologic-python-mcp.git
+cd sumologic-python-mcp
+
+# Create .env file with your credentials
+cp .env.example .env
+# Edit .env with your actual credentials
+
+# Build and run with Docker Compose
+docker compose up -d
+
+# View logs
+docker compose logs -f
+
+# Stop the server
+docker compose down
+```
+
+**Or build manually:**
+
+```bash
+# Build the Docker image
+docker build -t sumologic-mcp-server .
+
+# Run the container
+docker run -it --rm \
+  --env-file .env \
+  sumologic-mcp-server
+```
+
+**Benefits:**
+- ✅ No need to install Python or uv
+- ✅ Consistent environment across all platforms
+- ✅ Easy deployment and portability
+- ✅ Isolated from system Python installations
+
+### Option 2: Local Installation with uv
+
+**Install uv:**
 
 If you don't have uv installed:
 
@@ -164,7 +211,7 @@ powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 pip install uv
 ```
 
-### Installation
+**Install the MCP server:**
 
 ```bash
 # Clone the repository
@@ -207,23 +254,54 @@ SUMO_STAGING_ENDPOINT=https://api.eu.sumologic.com
 
 3. **Configure MCP Client**
 
-Choose your MCP client configuration below:
+Choose your MCP client configuration below. You can use either the Docker container or the local uv installation.
 
-### Option A: Claude Desktop
+### Option A: Claude Desktop (with Docker)
 
 Add to your Claude Desktop configuration file:
 
 **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
 **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
 
-**Using wrapper script (Recommended - keeps credentials in .env)**
+```json
+{
+  "mcpServers": {
+    "sumologic": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "--env-file",
+        "/absolute/path/to/sumologic-python-mcp/.env",
+        "sumologic-mcp-server"
+      ]
+    }
+  }
+}
+```
+
+Replace `/absolute/path/to/sumologic-python-mcp` with your actual project path.
+
+**Note:** Make sure you've built the Docker image first with `docker build -t sumologic-mcp-server .`
+
+### Option B: Claude Desktop (with uv)
+
+Add to your Claude Desktop configuration file:
+
+**macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+**Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+
+**Option A: Using wrapper script (Recommended - keeps credentials in .env)**
 
 ```json
 {
   "mcpServers": {
     "sumologic": {
-      "command": "/absolute/path/to/sumologic-python-mcp/scripts/run-with-env.sh",
-      "args": []
+      "command": "python3",
+      "args": [
+        "/absolute/path/to/sumologic-python-mcp/scripts/run_with_env.py"
+      ]
     }
   }
 }
@@ -231,7 +309,9 @@ Add to your Claude Desktop configuration file:
 
 Replace `/absolute/path/to/sumologic-python-mcp` with your actual project path. The wrapper script will load credentials from your `.env` file.
 
-**Alternative: Specify credentials directly in config**
+> **Note for macOS users**: Using `python3` with `run_with_env.py` is more reliable than the shell script on macOS due to permission restrictions.
+
+**Option B: Specify credentials directly in config**
 
 ```json
 {
@@ -249,73 +329,62 @@ Replace `/absolute/path/to/sumologic-python-mcp` with your actual project path. 
 }
 ```
 
-**⚠️ Security Note:** The wrapper script method is more secure as credentials stay in `.env` instead of the config file.
+**⚠️ Security Note:** Option A (wrapper script) is more secure as credentials stay in `.env` instead of the config file.
 
 **Restart Claude Desktop**
 
 The MCP server will start automatically when Claude Desktop launches.
 
-### Option B: Claude Code (VSCode Extension)
+### Option C: Claude Code (VSCode Extension)
 
 > **📖 Quick Start:** See [QUICKSTART-CLAUDE-CODE.md](QUICKSTART-CLAUDE-CODE.md) for detailed setup instructions.
 
-Claude Code uses a dedicated MCP configuration file (`~/.claude.json`), not VSCode settings.
+**IMPORTANT:** Claude Code uses the Claude CLI for MCP server configuration. The CLI approach is more reliable than `.vscode/mcp.json` files.
 
-**Quick Setup:**
+**Note:** The MCP server code does NOT automatically load `.env` files. You must explicitly pass environment variables using the `env` parameter.
 
-1. **Open MCP Configuration**
-   - Press `Cmd+Shift+P` (macOS) or `Ctrl+Shift+P` (Windows/Linux)
-   - Type: `MCP: Open User Configuration`
-   - Press Enter (creates/opens `~/.claude.json`)
+**Method 1: Using Claude CLI with Explicit Credentials (Working Method)**
 
-2. **Add Configuration** (using wrapper script - recommended):
-
-```json
-{
-  "mcpServers": {
-    "sumologic": {
-      "command": "/absolute/path/to/sumologic-python-mcp/scripts/run-with-env.sh",
-      "args": []
-    }
-  }
-}
+```bash
+# Replace /path/to/sumologic-python-mcp with your actual path (use pwd)
+# Update credentials with your actual values
+node ~/.vscode/extensions/anthropic.claude-code-*/resources/claude-code/cli.js mcp add-json sumologic \
+  '{"command":"uv","args":["run","--directory","/path/to/sumologic-python-mcp","sumologic-mcp-server"],"env":{"SUMO_ACCESS_ID":"your_access_id","SUMO_ACCESS_KEY":"your_access_key","SUMO_ENDPOINT":"https://api.au.sumologic.com","SUMO_SUBDOMAIN":"your_subdomain"}}' \
+  -s user
 ```
 
-3. **Save and Reload**
-   - Save the file (Cmd+S / Ctrl+S)
-   - Command Palette → `Developer: Reload Window`
-   - Or fully restart VSCode if the server doesn't load
+**Method 2: Using Shell Wrapper to Load .env (Alternative)**
 
-**Alternative: Direct credentials** (less secure, but simpler):
+To keep credentials in your `.env` file, use the wrapper script:
 
-```json
-{
-  "mcpServers": {
-    "sumologic": {
-      "command": "uv",
-      "args": [
-        "--directory",
-        "/absolute/path/to/sumologic-python-mcp",
-        "run",
-        "sumologic-mcp-server"
-      ],
-      "env": {
-        "SUMO_ACCESS_ID": "your_access_id",
-        "SUMO_ACCESS_KEY": "your_access_key",
-        "SUMO_ENDPOINT": "https://api.sumologic.com"
-      }
-    }
-  }
-}
+```bash
+node ~/.vscode/extensions/anthropic.claude-code-*/resources/claude-code/cli.js mcp add-json sumologic \
+  '{"command":"python3","args":["/path/to/sumologic-python-mcp/scripts/run_with_env.py"]}' \
+  -s user
 ```
 
-Replace `/absolute/path/to/sumologic-python-mcp` with your actual project path (use `pwd` command in the project directory to find it).
+**Verify Configuration:**
+```bash
+node ~/.vscode/extensions/anthropic.claude-code-*/resources/claude-code/cli.js mcp list
+```
 
-**Verify:** Open a Claude Code chat and type `/mcp` to see connected servers - "sumologic" should appear in the list.
+You should see: `sumologic: uv run ... - ✓ Connected`
 
-### Option C: Cline Extension
+**Restart VSCode:** Quit completely (Cmd+Q / Ctrl+Q) and reopen.
 
-For Cline users, see the [QUICKSTART.md](QUICKSTART.md) for detailed configuration.
+**Troubleshooting:**
+- Check logs: View → Output → "Claude VSCode" dropdown
+- List servers: `node ~/.vscode/.../cli.js mcp list`
+- Remove server: `node ~/.vscode/.../cli.js mcp remove sumologic`
+
+**Claude Code MCP References:**
+- [Connect Claude Code to tools via MCP - Official Docs](https://docs.claude.com/en/docs/claude-code/mcp)
+- [Configuring MCP Tools in Claude Code - The Better Way](https://scottspence.com/posts/configuring-mcp-tools-in-claude-code-the-better-way)
+- [How to Extend Claude Code with MCP Guide](https://dev.to/anthropic/how-to-extend-claude-code-with-mcp-secure-project-file-control-guide)
+
+### Option D: Cline Extension
+
+For Cline users, Docker or uv configurations work similarly. See the [QUICKSTART.md](QUICKSTART.md) for detailed configuration.
 
 ## Configuration Options
 

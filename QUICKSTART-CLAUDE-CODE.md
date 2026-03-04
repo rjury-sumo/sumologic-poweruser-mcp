@@ -107,107 +107,94 @@ Press `Ctrl+C` to stop the test server.
 
 ## Step 6: Configure Claude Code in VSCode
 
-Claude Code uses a dedicated MCP configuration file, not VSCode settings.
+**IMPORTANT:** Claude Code uses the Claude CLI for MCP server configuration, not `.vscode/mcp.json` files. The CLI approach is more reliable and avoids common configuration issues.
 
-### Method A: Using Environment File (Recommended - More Secure)
+**Note about .env files:** The MCP server code does NOT automatically load `.env` files. You must explicitly pass environment variables using the `env` parameter in the configuration.
 
-1. **Open MCP Configuration**
-   - Press `Cmd+Shift+P` (macOS) or `Ctrl+Shift+P` (Windows/Linux)
-   - Type: `MCP: Open User Configuration`
-   - Press Enter
+### Method A: Using Claude CLI with Explicit Credentials (Working Method)
 
-   This creates/opens `~/.claude.json`
+Replace `/path/to/sumologic-python-mcp` with your actual path and update the credentials:
 
-2. **Add Configuration**
-
-   Replace `/absolute/path/to/sumologic-python-mcp` with your actual path:
-
-   ```json
-   {
-     "mcpServers": {
-       "sumologic": {
-         "command": "/absolute/path/to/sumologic-python-mcp/scripts/run-with-env.sh",
-         "args": []
-       }
-     }
-   }
-   ```
-
-   **Finding Your Absolute Path:**
-   ```bash
-   # Run this in your project directory
-   pwd
-   # Copy the output and use it in the config above
-   ```
-
-### Method B: Direct Configuration (Credentials in Config File)
-
-Alternatively, specify credentials directly in `~/.claude.json`:
-
-```json
-{
-  "mcpServers": {
-    "sumologic": {
-      "command": "uv",
-      "args": [
-        "--directory",
-        "/absolute/path/to/sumologic-python-mcp",
-        "run",
-        "sumologic-mcp-server"
-      ],
-      "env": {
-        "SUMO_ACCESS_ID": "your_access_id",
-        "SUMO_ACCESS_KEY": "your_access_key",
-        "SUMO_ENDPOINT": "https://api.sumologic.com"
-      }
-    }
-  }
-}
+```bash
+node ~/.vscode/extensions/anthropic.claude-code-*/resources/claude-code/cli.js mcp add-json sumologic \
+  '{"command":"uv","args":["run","--directory","/path/to/sumologic-python-mcp","sumologic-mcp-server"],"env":{"SUMO_ACCESS_ID":"your_access_id","SUMO_ACCESS_KEY":"your_access_key","SUMO_ENDPOINT":"https://api.au.sumologic.com","SUMO_SUBDOMAIN":"your_subdomain"}}' \
+  -s user
 ```
 
-### Method C: Project-Level Configuration
-
-For project-specific MCP servers, create `.mcp.json` in your project root:
-
-```json
-{
-  "mcpServers": {
-    "sumologic": {
-      "command": "/absolute/path/to/sumologic-python-mcp/scripts/run-with-env.sh",
-      "args": []
-    }
-  }
-}
+**Finding Your Path:**
+```bash
+# Run this in your project directory
+pwd
+# Example output: /Users/yourname/Documents/sumologic-python-mcp
 ```
+
+**Verify Configuration:**
+```bash
+node ~/.vscode/extensions/anthropic.claude-code-*/resources/claude-code/cli.js mcp list
+```
+
+You should see output like:
+```
+sumologic: uv run ... - ✓ Connected
+```
+
+**Restart VSCode Completely:**
+- Quit VSCode fully (Cmd+Q / Ctrl+Q)
+- Reopen VSCode
+
+> **Note:** A simple window reload is **not enough**. You must fully quit and restart VSCode.
+
+### Method B: Using Shell Wrapper to Load .env (Alternative)
+
+If you want to keep credentials in your `.env` file, use the wrapper script:
+
+```bash
+node ~/.vscode/extensions/anthropic.claude-code-*/resources/claude-code/cli.js mcp add-json sumologic \
+  '{"command":"python3","args":["/path/to/sumologic-python-mcp/scripts/run_with_env.py"]}' \
+  -s user
+```
+
+This Python wrapper loads the `.env` file before starting the server.
 
 **⚠️ Security Note:**
-- Method A (wrapper script) is most secure - credentials stay in `.env` (git-ignored)
-- Avoid committing `.mcp.json` files with credentials to version control
-- User config (`~/.claude.json`) is safer than project config for credentials
+- Method A stores credentials in the MCP configuration
+- Method B keeps credentials in `.env` file (more secure)
+- Never commit files containing credentials
 
-## Step 7: Activate the MCP Server
+### Troubleshooting CLI Configuration
 
-1. **Save the configuration file** (Cmd+S / Ctrl+S)
+**Remove Existing Configuration:**
+```bash
+node ~/.vscode/extensions/anthropic.claude-code-*/resources/claude-code/cli.js mcp remove sumologic
+```
 
-2. **Reload VSCode Window**
-   - Open Command Palette: `Cmd+Shift+P` (macOS) or `Ctrl+Shift+P` (Windows/Linux)
-   - Type: `Developer: Reload Window`
-   - Press Enter
+**List All MCP Servers:**
+```bash
+node ~/.vscode/extensions/anthropic.claude-code-*/resources/claude-code/cli.js mcp list
+```
 
-   **Note:** A simple window reload is sometimes not enough. If MCP servers don't load, fully restart VSCode (quit and reopen).
+**Check Logs:**
+1. Open VSCode Output panel (View → Output)
+2. Select "Claude VSCode" from dropdown
+3. Look for server startup messages and errors
 
-3. **Verify Server Status**
+## Step 7: Verify MCP Server
 
-   **Method 1: Check with Claude Code**
-   - Open a Claude Code chat
-   - Type: `/mcp`
-   - This shows connected MCP servers and their status
-   - Look for **"sumologic"** in the list
+After restarting VSCode, verify the server is working:
 
-   **Method 2: Check Status Bar**
-   - Look at the **bottom-right status bar** in VSCode
-   - You should see an MCP indicator (if available)
-   - Click it to view MCP server status
+1. **Check Server Status**
+
+   Open a Claude Code chat and type:
+   ```
+   /mcp
+   ```
+
+   You should see **"sumologic"** listed as a connected MCP server.
+
+2. **Alternative: Check Output Panel**
+   - View → Output
+   - Select **"Claude Code"** from dropdown
+   - Look for sumologic server startup messages
 
 ## Step 8: Test with Claude
 
@@ -244,10 +231,10 @@ What Sumo Logic instances are configured?
 
 **Common Causes:**
 - ✅ Verify `uv` is installed: `uv --version`
-- ✅ Check absolute path is correct in `~/.claude.json` or `.mcp.json`
+- ✅ Check absolute path is correct in CLI command
 - ✅ Ensure `.env` file exists and has correct credentials
-- ✅ Verify wrapper script is executable: `ls -la scripts/run-with-env.sh`
-- ✅ Try fully restarting VSCode (not just reload window)
+- ✅ Verify server was added with CLI: `node ~/.vscode/extensions/anthropic.claude-code-*/resources/claude-code/cli.js mcp list`
+- ✅ Try fully restarting VSCode (quit and reopen, not just reload window)
 
 ### Issue: "Command not found: uv"
 
@@ -268,7 +255,7 @@ which uv
 # Output: /Users/yourname/.local/bin/uv
 ```
 
-Update `~/.claude.json`:
+Update `.vscode/mcp.json`:
 ```json
 {
   "mcpServers": {
@@ -277,10 +264,9 @@ Update `~/.claude.json`:
       "args": [
         "--directory",
         "/absolute/path/to/sumologic-python-mcp",
-          "run",
-          "sumologic-mcp-server"
-        ]
-      }
+        "run",
+        "sumologic-mcp-server"
+      ]
     }
   }
 }
@@ -459,6 +445,11 @@ SUMO_SUBDOMAIN=mycompany          # For generating web UI URLs
 - 🐛 Issues: [GitHub Issues](https://github.com/yourusername/sumologic-python-mcp/issues)
 - 🔒 Security: [SECURITY.md](SECURITY.md)
 - 💬 Ask Claude: "How do I use the Sumo Logic MCP server?"
+
+**Claude Code MCP References:**
+- [Connect Claude Code to tools via MCP - Official Docs](https://docs.claude.com/en/docs/claude-code/mcp)
+- [Configuring MCP Tools in Claude Code - The Better Way](https://scottspence.com/posts/configuring-mcp-tools-in-claude-code-the-better-way)
+- [How to Extend Claude Code with MCP Guide](https://dev.to/anthropic/how-to-extend-claude-code-with-mcp-secure-project-file-control-guide)
 
 **Support:**
 - Review logs in VSCode Output → "Claude Code"
