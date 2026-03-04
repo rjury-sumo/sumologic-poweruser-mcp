@@ -641,10 +641,11 @@ Get detailed information about a specific field extraction rule.
 ## Collectors & Sources Tools (2)
 
 ### 28. `get_sumo_collectors`
-Get list of Sumo Logic collectors with optional client-side filtering.
+Get list of Sumo Logic collectors with pagination and optional client-side filtering.
 
 **Parameters:**
-- `limit` (int, default=100) - Maximum results
+- `limit` (int, default=100) - Maximum results per page
+- `offset` (int, default=0) - Pagination offset for retrieving results beyond the limit
 - `filter_name` (str, optional) - Filter collectors by name (substring match, case-insensitive)
 - `filter_alive` (bool, optional) - Filter by alive status (true=active, false=inactive)
 - `search_term` (str, optional) - Search across name, description, hostName fields
@@ -652,13 +653,19 @@ Get list of Sumo Logic collectors with optional client-side filtering.
 
 **Returns:** Array of collector objects with optional `_metadata` if filtered
 
+**Pagination Examples:**
+- First 100 collectors: `limit=100, offset=0`
+- Next 100 collectors: `limit=100, offset=100`
+- Collectors 200-299: `limit=100, offset=200`
+
 **Filtering Examples:**
 - `filter_name="prod"` - Find collectors with "prod" in name
 - `filter_alive=True` - Only show active collectors
 - `search_term="aws"` - Search across name, description, hostname
 
 **Use Cases:**
-- Large orgs with 100s of collectors - filter to reduce response size
+- Large orgs with 100s of collectors - use pagination to retrieve all
+- Filter to reduce response size for >1MB results
 - Finding specific collector types before operations
 - Filtering by status before maintenance tasks
 

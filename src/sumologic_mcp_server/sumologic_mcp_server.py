@@ -882,16 +882,23 @@ async def get_sumo_search_job_results(
 @mcp.tool()
 async def get_sumo_collectors(
     limit: int = Field(default=100, description="Maximum number of results"),
+    offset: int = Field(default=0, description="Pagination offset for retrieving results beyond the limit"),
     filter_name: Optional[str] = Field(default=None, description="Filter collectors by name (substring match, case-insensitive)"),
     filter_alive: Optional[bool] = Field(default=None, description="Filter by alive status (true=active, false=inactive)"),
     search_term: Optional[str] = Field(default=None, description="Search across name, description, hostName fields"),
     instance: str = Field(default='default', description="Sumo Logic instance name")
 ) -> str:
     """
-    Get list of Sumo Logic collectors with optional client-side filtering.
+    Get list of Sumo Logic collectors with pagination and optional client-side filtering.
 
+    For environments with many collectors, use limit and offset to paginate through results.
     Client-side filtering helps when API returns large result sets (>1MB).
     Use filter_name, filter_alive, or search_term to reduce results.
+
+    Pagination Examples:
+        - First 100: limit=100, offset=0
+        - Next 100: limit=100, offset=100
+        - Collectors 200-299: limit=100, offset=200
 
     Filtering Examples:
         - filter_name="prod" - Find collectors with "prod" in name
@@ -909,11 +916,11 @@ async def get_sumo_collectors(
         limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
         await limiter.acquire("get_sumo_collectors")
 
-        limit, _ = validate_pagination(limit, 0)
+        limit, offset = validate_pagination(limit, offset)
         instance = validate_instance_name(instance)
 
         client = await get_sumo_client(instance)
-        collectors = await client.get_collectors(limit=limit)
+        collectors = await client.get_collectors(limit=limit, offset=offset)
 
         # Resolve Field values when called directly from Python
         filter_name = _resolve_field_value(filter_name)
