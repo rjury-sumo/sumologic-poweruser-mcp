@@ -205,14 +205,18 @@ SUMO_STAGING_ENDPOINT=https://api.eu.sumologic.com
 
 **⚠️ Security Note:** Never commit your `.env` file to version control!
 
-3. **Configure Claude Desktop**
+3. **Configure MCP Client**
+
+Choose your MCP client configuration below:
+
+### Option A: Claude Desktop
 
 Add to your Claude Desktop configuration file:
 
 **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
 **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
 
-**Option A: Using wrapper script (Recommended - keeps credentials in .env)**
+**Using wrapper script (Recommended - keeps credentials in .env)**
 
 ```json
 {
@@ -227,7 +231,7 @@ Add to your Claude Desktop configuration file:
 
 Replace `/absolute/path/to/sumologic-python-mcp` with your actual project path. The wrapper script will load credentials from your `.env` file.
 
-**Option B: Specify credentials directly in config**
+**Alternative: Specify credentials directly in config**
 
 ```json
 {
@@ -245,11 +249,73 @@ Replace `/absolute/path/to/sumologic-python-mcp` with your actual project path. 
 }
 ```
 
-**⚠️ Security Note:** Option A is more secure as credentials stay in `.env` instead of the config file.
+**⚠️ Security Note:** The wrapper script method is more secure as credentials stay in `.env` instead of the config file.
 
-4. **Restart Claude Desktop**
+**Restart Claude Desktop**
 
 The MCP server will start automatically when Claude Desktop launches.
+
+### Option B: Claude Code (VSCode Extension)
+
+> **📖 Quick Start:** See [QUICKSTART-CLAUDE-CODE.md](QUICKSTART-CLAUDE-CODE.md) for detailed setup instructions.
+
+Claude Code uses a dedicated MCP configuration file (`~/.claude.json`), not VSCode settings.
+
+**Quick Setup:**
+
+1. **Open MCP Configuration**
+   - Press `Cmd+Shift+P` (macOS) or `Ctrl+Shift+P` (Windows/Linux)
+   - Type: `MCP: Open User Configuration`
+   - Press Enter (creates/opens `~/.claude.json`)
+
+2. **Add Configuration** (using wrapper script - recommended):
+
+```json
+{
+  "mcpServers": {
+    "sumologic": {
+      "command": "/absolute/path/to/sumologic-python-mcp/scripts/run-with-env.sh",
+      "args": []
+    }
+  }
+}
+```
+
+3. **Save and Reload**
+   - Save the file (Cmd+S / Ctrl+S)
+   - Command Palette → `Developer: Reload Window`
+   - Or fully restart VSCode if the server doesn't load
+
+**Alternative: Direct credentials** (less secure, but simpler):
+
+```json
+{
+  "mcpServers": {
+    "sumologic": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "/absolute/path/to/sumologic-python-mcp",
+        "run",
+        "sumologic-mcp-server"
+      ],
+      "env": {
+        "SUMO_ACCESS_ID": "your_access_id",
+        "SUMO_ACCESS_KEY": "your_access_key",
+        "SUMO_ENDPOINT": "https://api.sumologic.com"
+      }
+    }
+  }
+}
+```
+
+Replace `/absolute/path/to/sumologic-python-mcp` with your actual project path (use `pwd` command in the project directory to find it).
+
+**Verify:** Open a Claude Code chat and type `/mcp` to see connected servers - "sumologic" should appear in the list.
+
+### Option C: Cline Extension
+
+For Cline users, see the [QUICKSTART.md](QUICKSTART.md) for detailed configuration.
 
 ## Configuration Options
 

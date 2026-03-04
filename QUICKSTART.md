@@ -2,6 +2,10 @@
 
 Get up and running in 5 minutes with uv!
 
+> **📖 Using Claude Code (VSCode)?** See [QUICKSTART-CLAUDE-CODE.md](QUICKSTART-CLAUDE-CODE.md) for VSCode-specific setup instructions.
+
+This guide covers Claude Desktop and Cline extension setup.
+
 ## 1. Install uv (if needed)
 
 ```bash
@@ -163,9 +167,10 @@ uv run mypy src/
 
 ## Next Steps
 
-- Read [README.md](README.md) for full documentation
-- Check [SECURITY.md](SECURITY.md) for security best practices
-- Review [IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md) for technical details
+- 📖 **[View All Tools](docs/mcp-tools-reference.md)** - Complete tool documentation
+- 📚 **[README.md](README.md)** - Full project documentation
+- 🔒 **[SECURITY.md](SECURITY.md)** - Security best practices
+- 💻 **[QUICKSTART-CLAUDE-CODE.md](QUICKSTART-CLAUDE-CODE.md)** - VSCode/Claude Code setup
 
 ## Getting Help
 
