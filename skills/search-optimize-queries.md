@@ -172,7 +172,62 @@ _index=prod_logs "\"errorCode\":\"AccessDenied\""
 - **JSON logs:** Use `"\"key\":\"value\""` for known key-value pairs
 - **Multiple keywords:** Combine for maximum selectivity: `error exception sqlexception`
 
-#### Rule 3: Scope Selectivity Analysis
+#### Rule 3: Prefer Field Extraction Rules (FERs) Over Where Filters
+
+**Field Extraction Rules (FERs)** are admin-defined parsing rules that extract fields at index time. Using FER-extracted fields dramatically improves performance compared to post-pipe filtering.
+
+**Performance Hierarchy (Best to Worst):**
+
+**Best: FER Field + Keyword in Scope**
+```
+_index=prod_logs status_code=5* error
+| count by status_code, error_type
+```
+- FER extracts `status_code` at index time
+- Indexed field filter + keyword in scope = maximum bloom filter efficiency
+- No parsing overhead at query time
+
+**Good: Keyword in Scope + Where Filter**
+```
+_index=prod_logs error
+| json "status_code" as status_code
+| where status_code >= 500
+| count by status_code
+```
+- Keyword reduces initial scan via bloom filter
+- Parse/filter at query time (overhead)
+- Better than where-only, but not as fast as FER
+
+**Poor: Where Filter Only (No Keyword)**
+```
+_index=prod_logs
+| json "status_code" as status_code
+| where status_code >= 500
+| count by status_code
+```
+- Scans entire partition
+- Parse all messages
+- Filter after parsing
+- Slowest, most expensive option
+
+**When to Use Each:**
+
+- **FER + keyword**: Production queries, dashboards, scheduled searches, repeated queries
+- **Keyword + where**: Ad-hoc exploration, one-time investigations
+- **Where only**: Last resort when neither FER nor keyword is possible (avoid in production)
+
+**Creating a FER** (Admin Only):
+```
+Scope: _sourceCategory=prod/app
+Parse Expression: json "status_code", "error_type", "user_id"
+```
+After FER is created, these fields are indexed and available without parsing.
+
+**How to Check for FERs:**
+
+Use the `list_field_extraction_rules` MCP tool to see available FERs for your data.
+
+#### Rule 4: Scope Selectivity Analysis
 Use `ScopePattern.analyze_scope()` pattern from query_patterns.py:
 
 ```python
@@ -190,9 +245,93 @@ analysis = ScopePattern.analyze_scope(scope)
 3. Keywords (high-selectivity terms)
 4. Indexed field filters (field="value")
 
-### Phase 2: Filter Optimization (After the Pipe)
+### Phase 2: Parse Optimization
 
-#### Rule 4: Filter Early, Filter Often
+#### Rule 5: Choose the Right Parse Operator
+
+Parsing efficiency varies dramatically by operator choice. Use the fastest operator that meets your needs.
+
+**Performance Ranking (Fastest to Slowest):**
+
+1. **FER (Field Extraction Rule)** - Fastest, fields pre-extracted at index time
+2. **parse anchor** - Fast, uses literal anchor strings
+3. **json/csv/xml** - Moderate, structured format parsers
+4. **keyvalue** - Moderate, for key=value formatted logs
+5. **parse regex** - Slow, expensive pattern matching
+
+**Use parse anchor for structured logs:**
+
+**Good (parse anchor):**
+```
+_index=apache_logs
+| parse "GET * HTTP" as url
+| parse "\" * * \"" as status_code, bytes_sent
+```
+- Uses literal strings as anchors
+- Fast, efficient
+- Works well for structured formats
+
+**Avoid (parse regex without FER):**
+```
+_index=apache_logs
+| parse regex "GET (?<url>.*) HTTP.*\" (?<status>\d+) (?<bytes>\d+)"
+```
+- Much slower than parse anchor
+- Only use when structure is complex/variable
+
+**Parse Regex Best Practices:**
+
+When you must use `parse regex`:
+
+**Bad (greedy, non-specific):**
+```
+| parse regex "user: (?<user>.*) action"
+```
+- `.*` is greedy, matches too much
+- Non-specific pattern
+
+**Good (specific, constrained):**
+```
+| parse regex "user: (?<user>[a-zA-Z0-9_]+) action"
+```
+- Specific character class
+- Constrained matching
+- Much faster
+
+**Better (use in FER):**
+```
+Admin creates FER with regex
+Scope: _sourceCategory=prod/app
+Parse: parse regex "user: (?<user>[a-zA-Z0-9_]+) action"
+```
+- One-time parse at index time
+- All queries benefit
+- No query-time parsing overhead
+
+**Extract Parse Keywords to Scope:**
+
+When using parse statements, extract literal strings to scope for bloom filter acceleration.
+
+**Inefficient:**
+```
+_index=prod_logs
+| parse "completed * action" as actionName
+| count by actionName
+```
+
+**Efficient:**
+```
+_index=prod_logs completed action
+| parse "completed * action" as actionName
+| count by actionName
+```
+- Keywords "completed" and "action" filter via bloom filter
+- Only events containing both strings are parsed
+- Dramatic performance improvement for optional fields
+
+### Phase 3: Filter Optimization (After the Pipe)
+
+#### Rule 6: Filter Early, Filter Often
 **Bad:**
 ```
 _index=prod_logs
@@ -214,7 +353,7 @@ _index=prod_logs status=500
 - Where filter before aggregation reduces rows
 - Only aggregate needed fields
 
-#### Rule 5: Avoid Expensive Operations in Scope
+#### Rule 7: Avoid Expensive Operations in Scope
 **Bad:**
 ```
 _index=prod_logs
@@ -234,9 +373,9 @@ _index=prod_logs "john@company.com"
 - Keyword in scope reduces scan
 - Use simple parse when possible (faster than regex)
 
-### Phase 3: Aggregation Optimization
+### Phase 4: Aggregation Optimization
 
-#### Rule 6: Limit Cardinality in Group By
+#### Rule 8: Limit Cardinality in Group By
 **Bad:**
 ```
 | count by requestId, timestamp, sessionId, traceId
@@ -263,7 +402,7 @@ MCP: profile_log_schema
 
 Returns fields with good cardinality for aggregation.
 
-#### Rule 7: Use Timeslice for Time-Series
+#### Rule 9: Use Timeslice for Time-Series
 **Bad:**
 ```
 | count by _messagetime
@@ -277,7 +416,51 @@ Every unique timestamp = high cardinality
 ```
 Bucket into intervals = lower cardinality
 
-#### Rule 8: Limit Result Set Size
+#### Rule 10: Aggregate Before Lookup Operations
+
+**Lookup operations** can be expensive when processing large result sets. Always aggregate data before performing lookups to minimize the volume of data being enriched.
+
+**Inefficient:**
+```
+_index=firewall_logs
+| json "src_ip" as src_ip
+| lookup threat_intel on src_ip
+| where threat_level = "high"
+| count by src_ip, threat_type
+```
+- Looks up every event (potentially millions)
+- Enriches data before filtering
+- Wastes lookups on events that will be filtered out
+
+**Efficient:**
+```
+_index=firewall_logs
+| json "src_ip" as src_ip
+| count by src_ip
+| lookup threat_intel on src_ip
+| where threat_level = "high"
+| count by src_ip, threat_type
+```
+- Aggregates to unique IPs first (potentially thousands)
+- Only lookups unique values
+- Filters after enrichment on smaller dataset
+- Can be 100x-1000x faster
+
+**Why This Works:**
+- Reduces lookup API calls from N events to N unique values
+- Minimizes data transfer for lookup results
+- Filters on smaller enriched dataset
+
+**Pattern:**
+```
+scope
+| extract fields
+| aggregate/deduplicate  <-- Do this BEFORE lookup
+| lookup enrichment
+| filter/aggregate on enriched fields
+```
+
+#### Rule 11: Limit Result Set Size
 **Bad:**
 ```
 | count by field1, field2, field3
@@ -291,9 +474,9 @@ May return 100K rows
 ```
 Limits memory and output
 
-### Phase 4: Time Range Optimization
+### Phase 5: Time Range Optimization
 
-#### Rule 9: Use Shortest Time Range Possible
+#### Rule 12: Use Shortest Time Range Possible
 **Bad:**
 ```
 -30d for real-time monitoring dashboard
@@ -318,7 +501,7 @@ MCP: get_estimated_log_search_usage
 
 If scan > 100 GB, reconsider time range or scope.
 
-#### Rule 10: Use Receipt Time for Real-Time Data
+#### Rule 13: Use Receipt Time for Real-Time Data
 **Bad:**
 ```
 by_receipt_time: false (default)
@@ -331,7 +514,7 @@ by_receipt_time: true
 ```
 Searches by time data was received, not log timestamp
 
-### Phase 5: Advanced Patterns
+### Phase 6: Advanced Patterns
 
 #### Pattern 1: Subquery for Pre-Filtering
 **Scenario:** Need to find errors for users who had >100 requests
@@ -556,18 +739,49 @@ Joins are expensive
 
 **Fix:** Use lookup tables, or denormalize data at ingest time if possible
 
+## Quick Reference: Optimization Rules Summary
+
+**Scope Optimization (Phase 1):**
+1. Always include partition (_index or _view)
+2. Add keyword expressions for bloom filters (including JSON literals)
+3. Prefer FER fields over where filters (FER + keyword > keyword + where > where only)
+4. Analyze scope selectivity
+
+**Parse Optimization (Phase 2):**
+5. Choose right parse operator (FER > parse anchor > json/csv > parse regex)
+6. Extract parse keywords to scope for bloom filtering
+
+**Filter Optimization (Phase 3):**
+7. Avoid expensive operations in scope (use keywords instead)
+
+**Aggregation Optimization (Phase 4):**
+8. Limit cardinality in group by (<10K unique values)
+9. Use timeslice for time-series (not _messagetime)
+10. Aggregate before lookup operations (dedupe first, then enrich)
+11. Limit result set size (use top/limit)
+
+**Time Range Optimization (Phase 5):**
+12. Use shortest time range possible
+13. Use receipt time for real-time data
+
 ## Optimization Checklist
 
 Before committing a query to production:
 
 - [ ] Scope includes partition (_index or _view)
-- [ ] Scope includes high-selectivity keywords
+- [ ] Scope includes high-selectivity keywords (or JSON literals for known fields)
+- [ ] Using FER fields instead of where filters when possible
+- [ ] Checked for available FERs with `list_field_extraction_rules`
+- [ ] Parse keywords extracted to scope (e.g., "completed action" for parse "completed * action")
+- [ ] Using parse anchor or json/csv instead of parse regex when possible
+- [ ] Parse regex patterns are specific (not .* or .+)
 - [ ] Time range is as short as possible for use case
 - [ ] Where filters before aggregation
+- [ ] Aggregation before lookup operations
 - [ ] Group by fields have medium cardinality (<10K values)
 - [ ] Result set is limited (top/limit)
 - [ ] Tested on representative time range
-- [ ] Estimated scan cost is acceptable
+- [ ] Estimated scan cost is acceptable (use `get_estimated_log_search_usage`)
 - [ ] Query completes in <30 seconds
 
 For dashboards specifically:
@@ -649,21 +863,38 @@ operators = get_operator_category_info()
 - [Search Cost Analysis](./cost-analyze-search-costs.md) - Measure optimization impact
 
 ## MCP Tools Used
-- `explore_log_metadata` - Find partitions
-- `profile_log_schema` - Check field cardinality
-- `get_estimated_log_search_usage` - Estimate scan before running
-- `analyze_search_scan_cost` - Measure actual costs
-- `search_query_examples` - Find optimized examples
+- `explore_log_metadata` - Find partitions and source categories for scope
+- `profile_log_schema` - Check field cardinality for aggregation planning
+- `get_estimated_log_search_usage` - Estimate scan volume before running query
+- `analyze_search_scan_cost` - Measure actual costs and identify expensive queries
+- `search_query_examples` - Find optimized query patterns and examples
+- `list_field_extraction_rules` - Discover available FERs for your data
+- `get_field_extraction_rule` - Get details of specific FER configuration
+- `list_custom_fields` - See custom fields defined in your organization
 
 ## API References
 - [Query Language Reference](https://help.sumologic.com/docs/search/)
+- [Best Practices for Searches](https://www.sumologic.com/help/docs/search/get-started-with-search/build-search/best-practices-search/)
 - [Optimize Search Performance](https://help.sumologic.com/docs/search/optimize-search-performance/)
 - [Optimize with Partitions](https://help.sumologic.com/docs/search/optimize-search-partitions/)
+- [Field Extraction Rules](https://help.sumologic.com/docs/manage/field-extractions/)
 - [Search Operators](https://help.sumologic.com/docs/search/search-query-language/group-aggregate-operators/)
 
 ---
 
-**Version:** 1.0.0
+**Version:** 2.0.0
+**Last Updated:** 2026-03-06
 **Domain:** Search & Performance
 **Complexity:** Intermediate to Advanced
 **Estimated Impact:** 10x-100x improvement in speed and cost
+
+**Changelog v2.0:**
+- Added Rule 3: Prefer FERs over where filters (performance hierarchy)
+- Added Rule 5: Parse operator selection (FER > parse anchor > parse regex)
+- Added Rule 10: Aggregate before lookup operations
+- Enhanced Rule 2: JSON literal expressions and push-down optimization
+- Added parse keyword extraction technique
+- Added parse regex best practices (avoid .*, be specific)
+- Renumbered all rules for logical flow (13 rules total)
+- Added FER-related MCP tools to reference
+- Enhanced checklist with FER and parse optimization items
