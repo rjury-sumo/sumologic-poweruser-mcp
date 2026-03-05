@@ -471,6 +471,13 @@ class SumoLogicClient:
         params = {"limit": limit, "offset": offset}
         return await self._request("GET", "/partitions", api_version="v1", params=params)
 
+    async def list_scheduled_views(self, limit: int = 100, token: Optional[str] = None) -> Dict[str, Any]:
+        """Get list of scheduled views with pagination."""
+        params = {"limit": limit}
+        if token:
+            params["token"] = token
+        return await self._request("GET", "/scheduledViews", api_version="v1", params=params)
+
     # Field Management API methods
 
     async def list_custom_fields(self) -> Dict[str, Any]:
@@ -1863,6 +1870,144 @@ async def get_sumo_partitions(
         return json.dumps(partitions, indent=2)
     except Exception as e:
         return handle_tool_error(e, "get_sumo_partitions")
+
+
+@mcp.tool()
+async def list_scheduled_views(
+    limit: int = Field(default=100, description="Maximum number of results (1-1000)"),
+    token: str = Field(default=None, description="Pagination token from previous response's 'next' field"),
+    instance: str = Field(default='default', description="Sumo Logic instance name")
+) -> str:
+    """
+    Get list of scheduled views with pagination.
+
+    Scheduled views are pre-aggregated data sets created by admins and power users to
+    accelerate reporting queries. Views run every 1 minute, pre-computing stats and
+    caching complex parsing/filtering/lookup operations.
+
+    Returns:
+        JSON with scheduled views array and optional pagination token:
+        - id: View ID
+        - indexName: View name (used in queries with _view=name)
+        - query: View query definition
+        - startTime: View start time
+        - retentionPeriod: Retention in days
+        - dataForwardingId: Data forwarding config (if any)
+        - parsing: Parsing mode
+        - reduceOnlyFields: Output schema fields
+        - indexedFields: Indexed fields for filtering
+        - next: Pagination token for next page (if more results available)
+
+    Use Cases:
+        - **Query acceleration**: Find views that pre-aggregate data for your use case
+        - **Schema discovery**: See output fields available in each view
+        - **Performance optimization**: Replace raw log queries with view queries
+        - **View inventory**: List all available scheduled views
+        - **Cost optimization**: Views provide 0 scan cost (tiered) or reduced scan (flex)
+
+    Query Performance:
+        Views are queried using _view=view_name or _view=pattern* for versioned views.
+        Views have 1m timeslice and defined schema - much faster than raw logs for
+        aggregate queries over long time ranges (days to weeks).
+
+    Pagination:
+        - Check response's 'next' field for pagination token
+        - Pass token to get next page of results
+        - When 'next' is absent, you've reached the end
+
+    Example Output:
+        {
+          "data": [{
+            "id": "000000000ABC1234",
+            "indexName": "apache_status_code_1m_v1",
+            "query": "_sourceCategory=apache | parse ... | count by status_code, host | timeslice 1m",
+            "startTime": "2024-01-01T00:00:00Z",
+            "retentionPeriod": 30,
+            "reduceOnlyFields": ["status_code", "host", "_count"]
+          }],
+          "next": "token_for_next_page"
+        }
+
+    View Query Notes:
+        - Views use _view=name scope (not keywords)
+        - Filter with field=value expressions in scope
+        - Views have fixed schema - check reduceOnlyFields
+        - Versioned views common: apache_status_code_1m_v1, v2, etc.
+        - Query patterns: _view=apache_status_code_1m_*
+
+    CRITICAL Aggregate Column Naming:
+        ⚠️ COMMON MISTAKE: Don't use | count in queries against aggregate views!
+        - This counts view rows, NOT original events
+        - Check reduceOnlyFields for actual aggregate column names
+        - Common names: _count, _sum, _avg, _max, _min
+        - May be aliased in view definition: requests, total_bytes, avg_latency, etc.
+        - Always use sum(), avg(), max(), or min() on the pre-aggregated columns
+
+        Example WRONG: _view=apache_status | count by status_code
+        Example RIGHT: _view=apache_status | sum(_count) as requests by status_code
+
+    Common View Patterns:
+
+        1. **Reporting Acceleration (Simple Aggregation)**
+           View definition:
+           ```
+           _sourceCategory=Labs/Apache/Access
+           | parse "HTTP/1.1\" * " as status_code
+           | timeslice 1m
+           | count by status_code, _timeslice
+           ```
+           Query pattern:
+           ```
+           _view=apache_status
+           | sum(_count) as requests by status_code, _timeslice
+           | timeslice 1h  # Re-aggregate 1m to 1h
+           | transpose row _timeslice column status_code
+           ```
+
+        2. **Caching Heavy Operations (Threat Intelligence, Lookups)**
+           View definition (saves threatip + geoip lookups):
+           ```
+           _sourceCategory=logs/firewall
+           | json "httpRequest.clientIp" as src_ip
+           | where ispublicip(src_ip)
+           | threatip src_ip | where !(isempty(malicious_confidence))
+           | timeslice 1m
+           | count by _timeslice, src_ip, action, malicious_confidence, actor
+           | lookup asn, organization from asn://default on ip=src_ip
+           | geoip src_ip
+           ```
+           Query pattern (fast threat search over weeks):
+           ```
+           _view=threat_matches_1m
+           | sum(_count) by src_ip, country_code, malicious_confidence
+           | sort by _sum desc
+           ```
+           Benefits: Pre-computed threatip/geoip lookups, stores results before they change
+
+    Cost Optimization:
+        - Tiered: 0 scan cost for aggregate views, continuous tier cost for raw view ingestion
+        - Flex: Scan charges apply but much lower than raw logs due to aggregation
+        - Best for: Dashboard panels, scheduled reports, long time range queries
+
+    API Reference: https://api.sumologic.com/docs/#tag/scheduledViewManagement
+    Help Reference: https://www.sumologic.com/help/docs/manage/scheduled-views/
+    """
+    try:
+        _ensure_config_initialized()
+        config = get_config()
+        limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
+        await limiter.acquire("list_scheduled_views")
+
+        # Validate pagination
+        if limit < 1 or limit > 1000:
+            raise ValidationError("limit must be between 1 and 1000")
+        instance = validate_instance_name(instance)
+
+        client = await get_sumo_client(instance)
+        result = await client.list_scheduled_views(limit=limit, token=token)
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        return handle_tool_error(e, "list_scheduled_views")
 
 
 @mcp.tool()

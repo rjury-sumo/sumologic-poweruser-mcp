@@ -1,7 +1,7 @@
 # Sumo Logic MCP Server - Tools Reference
 
 ## Overview
-Total Tools: **44**
+Total Tools: **45**
 
 ---
 
@@ -953,7 +953,81 @@ Get list of partitions.
 
 ---
 
-### 38. `list_sumo_instances`
+### 38. `list_scheduled_views`
+Get list of scheduled views with pagination.
+
+**Parameters:**
+- `limit` (int, default=100) - Maximum number of results (1-1000)
+- `token` (str, optional) - Pagination token from previous response's 'next' field
+- `instance` (str, default='default') - Instance name
+
+**Returns:** JSON with scheduled views array containing:
+- `id` - View ID
+- `indexName` - View name (used in queries with `_view=name`)
+- `query` - View query definition
+- `startTime` - View start time
+- `retentionPeriod` - Retention in days
+- `dataForwardingId` - Data forwarding config (if any)
+- `parsing` - Parsing mode
+- `reduceOnlyFields` - Output schema fields
+- `indexedFields` - Indexed fields for filtering
+- `next` - Pagination token for next page (if more results)
+
+**Use Cases:**
+- **Query acceleration**: Find views that pre-aggregate data for your use case
+- **Schema discovery**: See output fields available in each view
+- **Performance optimization**: Replace raw log queries with view queries (much faster for long time ranges)
+- **View inventory**: List all available scheduled views in organization
+- **Cost optimization**: Views provide 0 scan cost (tiered) or reduced scan (flex) compared to raw logs
+
+**Query Performance:**
+Scheduled views run every 1 minute, pre-computing aggregates with 1m timeslice. They're ideal for:
+- Dashboard panels querying days to weeks of data
+- Scheduled reports requiring aggregate data
+- Queries that would otherwise scan TBs of raw logs
+
+**View Query Syntax:**
+- `_view=view_name` - Query specific view
+- `_view=pattern*` - Query versioned views (e.g., `_view=apache_status_code_1m_*`)
+- Filter with `field=value` expressions (no keywords)
+- Schema is fixed - check `reduceOnlyFields` for available fields
+
+**Versioning Pattern:**
+Views are often versioned since queries can't be edited:
+- `apache_status_code_1m_v1` (original)
+- `apache_status_code_1m_v2` (updated version)
+- Use wildcard: `_view=apache_status_code_1m_*` to query all versions
+
+**Advanced Patterns:**
+- **Scheduled views**: Auto-created, 1m timeslice, aggregate data
+- **Ad-hoc views**: Custom timeslice (1h, 1d), created via scheduled search "save to index" or save operator
+- **Layered views**: Scheduled view (1m) → hourly aggregation (1h) for multi-tier reporting
+
+**Cost Notes:**
+- **Tiered customers**: 0 scan cost for aggregate views, continuous tier cost for view ingestion
+- **Flex customers**: Scan charges apply but much lower than raw logs due to pre-aggregation
+
+**Example Output:**
+```json
+{
+  "data": [{
+    "id": "000000000ABC1234",
+    "indexName": "apache_status_code_1m_v1",
+    "query": "_sourceCategory=apache | parse ... | count by status_code, host | timeslice 1m",
+    "startTime": "2024-01-01T00:00:00Z",
+    "retentionPeriod": 30,
+    "reduceOnlyFields": ["status_code", "host", "_count"]
+  }],
+  "next": "pagination_token"
+}
+```
+
+**API Reference:** https://api.sumologic.com/docs/#tag/scheduledViewManagement
+**Help Reference:** https://www.sumologic.com/help/docs/manage/scheduled-views/
+
+---
+
+### 39. `list_sumo_instances`
 List all configured Sumo Logic instances.
 
 **Parameters:** None
@@ -964,7 +1038,7 @@ List all configured Sumo Logic instances.
 
 ## Account Management Tools (6)
 
-### 39. `get_account_status`
+### 40. `get_account_status`
 Get account status including subscription, plan type, and usage information.
 
 **Parameters:**
@@ -981,7 +1055,7 @@ Get account status including subscription, plan type, and usage information.
 
 ---
 
-### 40. `get_usage_forecast`
+### 41. `get_usage_forecast`
 Get usage forecast for specified number of days based on recent consumption patterns.
 
 **Parameters:**
@@ -999,7 +1073,7 @@ Get usage forecast for specified number of days based on recent consumption patt
 
 ---
 
-### 41. `export_usage_report`
+### 42. `export_usage_report`
 Export detailed usage report for a date range (async operation). Returns download URL for CSV report.
 
 **Parameters:**
@@ -1023,7 +1097,7 @@ Export detailed usage report for a date range (async operation). Returns downloa
 
 ---
 
-### 42. `get_estimated_log_search_usage`
+### 43. `get_estimated_log_search_usage`
 Get estimated data volume that would be scanned for a log search query in Infrequent Data Tier and Flex.
 
 **Parameters:**
@@ -1064,7 +1138,7 @@ Get estimated data volume that would be scanned for a log search query in Infreq
 
 ---
 
-### 43. `analyze_data_volume`
+### 44. `analyze_data_volume`
 Analyze data volume ingestion from the Sumo Logic Data Volume Index for capacity planning and cost analysis.
 
 **Parameters:**
@@ -1161,7 +1235,7 @@ When `include_timeshift=True`, the tool handles edge cases properly:
 
 ---
 
-### 44. `analyze_data_volume_grouped`
+### 45. `analyze_data_volume_grouped`
 Advanced data volume analysis with cardinality reduction for large-scale environments (5000+ source categories).
 
 **Parameters:**

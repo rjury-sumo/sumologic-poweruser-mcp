@@ -19,7 +19,7 @@ Skills are organized by domain:
 
 ### Search & Query (`search-*.md`, `ui-*.md`)
 - **Writing queries**: Complete 5-phase construction guide
-- **Query optimization**: Performance and cost optimization
+- **Query optimization**: Performance and cost optimization with views
 - **UI navigation**: Interactive investigation techniques
 - Metrics querying
 - Search cost analysis
@@ -28,6 +28,7 @@ Skills are organized by domain:
 - Finding logs without knowing metadata
 - Schema profiling
 - Partition discovery
+- Scheduled view inventory
 - Field exploration
 
 ### Cost Analysis (`cost-*.md`)
@@ -107,10 +108,12 @@ Links to official documentation
 | Skill | Category | Description | MCP Tools |
 |-------|----------|-------------|-----------|
 | [Log Discovery](./discovery-logs-without-metadata.md) | Discovery | Find logs when you don't know metadata | Yes |
+| [Scheduled Views Discovery](./discovery-scheduled-views.md) | Discovery | Find and understand scheduled views | Yes |
 | [Search Cost Analysis](./cost-analyze-search-costs.md) | Cost | Analyze Flex/Infrequent tier search costs | Yes |
 | [Data Volume Analysis](./cost-analyze-data-volume.md) | Cost | Track ingestion and identify cost drivers | Yes |
 | **[Writing Queries](./search-write-queries.md)** | **Search** | **Complete query construction guide (5 phases)** | **Yes** |
 | [Query Optimization](./search-optimize-queries.md) | Search | Build efficient, cost-effective queries | Yes |
+| [Optimize with Views](./search-optimize-with-views.md) | Search | Transform slow queries using scheduled views | Yes |
 | **[UI Navigation](./ui-navigate-and-search.md)** | **Search** | **Interactive UI features for investigation** | **No** |
 | [Audit User Activity](./audit-user-activity.md) | Audit | Track authentication and user actions | Yes |
 | [Monitor System Health](./audit-system-health.md) | Audit | Monitor collectors and alerts | Yes |
@@ -152,11 +155,27 @@ See [CLAUDE.md](../CLAUDE.md) for developer guidelines on keeping skills synchro
 - Anti-patterns to avoid
 - Uses MCP tools for analysis
 
+**[Optimize with Views](./search-optimize-with-views.md)** - Transform slow queries to use scheduled views
+- Replace raw log queries with pre-aggregated view queries
+- Achieve 10x-100x performance improvements
+- Dramatically reduce scan costs (especially Flex/Infrequent)
+- Patterns for direct replacement, re-aggregation, dimension collapsing
+
 **Combined Workflow:**
 1. Use **UI Navigation** to explore and build queries interactively
 2. Apply **Writing Queries** patterns for proper structure
 3. Optimize with **Query Optimization** techniques
-4. Execute via MCP tools for automation
+4. If slow/expensive: Use **Optimize with Views** to find scheduled view alternatives
+5. Execute via MCP tools for automation
+
+### Discovery Skills
+
+**[Scheduled Views Discovery](./discovery-scheduled-views.md)** - Find and understand scheduled views
+- Inventory all available views in organization
+- Understand view schemas and field availability
+- Match views to use cases
+- Query patterns for versioned views
+- Cost optimization opportunities
 
 ---
 
