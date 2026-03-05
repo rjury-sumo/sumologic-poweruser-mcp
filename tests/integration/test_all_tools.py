@@ -19,7 +19,7 @@ from sumologic_mcp_server.sumologic_mcp_server import (
 )
 
 
-async def test_tool(name, coro):
+async def run_tool_test(name, coro):
     """Test a single tool and report result."""
     try:
         result = await coro
@@ -43,7 +43,7 @@ async def main():
     print("Running tests with rate limiting (400ms delay between API calls)...\n")
 
     # Test 1: list_sumo_instances (no API call)
-    results.append(await test_tool(
+    results.append(await run_tool_test(
         "list_sumo_instances",
         list_sumo_instances()
     ))
@@ -51,7 +51,7 @@ async def main():
     await asyncio.sleep(delay)
 
     # Test 2: search_sumo_logs
-    results.append(await test_tool(
+    results.append(await run_tool_test(
         "search_sumo_logs",
         search_sumo_logs(query="error", hours_back=1, instance="default")
     ))
@@ -73,7 +73,7 @@ async def main():
         await asyncio.sleep(delay)
 
         # Test 4: get_sumo_search_job_status
-        results.append(await test_tool(
+        results.append(await run_tool_test(
             "get_sumo_search_job_status",
             get_sumo_search_job_status(job_id=job_id, instance="default")
         ))
@@ -81,7 +81,7 @@ async def main():
         await asyncio.sleep(5)  # Wait for job to complete
 
         # Test 5: get_sumo_search_job_results
-        results.append(await test_tool(
+        results.append(await run_tool_test(
             "get_sumo_search_job_results",
             get_sumo_search_job_results(job_id=job_id, result_type="auto", limit=10, instance="default")
         ))
@@ -94,7 +94,7 @@ async def main():
     await asyncio.sleep(delay)
 
     # Test 6: get_sumo_collectors
-    results.append(await test_tool(
+    results.append(await run_tool_test(
         "get_sumo_collectors",
         get_sumo_collectors(limit=10, instance="default")
     ))
@@ -109,7 +109,7 @@ async def main():
     if "collectors" in collectors_dict and len(collectors_dict["collectors"]) > 0:
         collector_id = collectors_dict["collectors"][0]["id"]
         # Test 7: get_sumo_sources
-        results.append(await test_tool(
+        results.append(await run_tool_test(
             "get_sumo_sources",
             get_sumo_sources(collector_id=collector_id, instance="default")
         ))
@@ -120,7 +120,7 @@ async def main():
     await asyncio.sleep(delay)
 
     # Test 8: get_sumo_users
-    results.append(await test_tool(
+    results.append(await run_tool_test(
         "get_sumo_users",
         get_sumo_users(limit=10, instance="default")
     ))
@@ -128,7 +128,7 @@ async def main():
     await asyncio.sleep(delay)
 
     # Test 9: get_sumo_folders
-    results.append(await test_tool(
+    results.append(await run_tool_test(
         "get_sumo_folders",
         get_sumo_folders(limit=10, instance="default")
     ))
@@ -136,7 +136,7 @@ async def main():
     await asyncio.sleep(delay)
 
     # Test 10: get_sumo_dashboards
-    results.append(await test_tool(
+    results.append(await run_tool_test(
         "get_sumo_dashboards",
         get_sumo_dashboards(limit=10, instance="default")
     ))
@@ -144,7 +144,7 @@ async def main():
     await asyncio.sleep(delay)
 
     # Test 11: query_sumo_metrics
-    results.append(await test_tool(
+    results.append(await run_tool_test(
         "query_sumo_metrics",
         query_sumo_metrics(query="metric=CPU_User", hours_back=1, instance="default")
     ))
@@ -152,7 +152,7 @@ async def main():
     await asyncio.sleep(delay)
 
     # Test 12: get_sumo_content_v2
-    results.append(await test_tool(
+    results.append(await run_tool_test(
         "get_sumo_content_v2",
         get_sumo_content_v2(content_type="Dashboard", limit=10, instance="default")
     ))
@@ -160,7 +160,7 @@ async def main():
     await asyncio.sleep(delay)
 
     # Test 13: get_sumo_roles_v2
-    results.append(await test_tool(
+    results.append(await run_tool_test(
         "get_sumo_roles_v2",
         get_sumo_roles_v2(limit=10, instance="default")
     ))
@@ -168,7 +168,7 @@ async def main():
     await asyncio.sleep(delay)
 
     # Test 14: search_sumo_monitors
-    results.append(await test_tool(
+    results.append(await run_tool_test(
         "search_sumo_monitors",
         search_sumo_monitors(query="*", limit=10, offset=0, instance="default")
     ))
@@ -176,7 +176,7 @@ async def main():
     await asyncio.sleep(delay)
 
     # Test 15: get_sumo_partitions
-    results.append(await test_tool(
+    results.append(await run_tool_test(
         "get_sumo_partitions",
         get_sumo_partitions(limit=10, instance="default")
     ))

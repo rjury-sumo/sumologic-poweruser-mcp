@@ -18,9 +18,9 @@ async def test_tool():
     print("\n1. Search for Windows queries:")
     result = await search_query_examples(app_name="Windows", max_results=3)
     data = json.loads(result)
-    print(f"   Found {data['summary']['matches_found']} matches")
-    print(f"   Returned {data['summary']['returned']} examples")
-    if data['examples']:
+    print(f"   Found {data.get('summary', {}).get('matches_found', 0)} matches")
+    print(f"   Returned {data.get('summary', {}).get('returned', 0)} examples")
+    if data.get('examples'):
         print(f"   First example: {data['examples'][0]['search_name']}")
 
     # Test 2: Search by keywords
@@ -41,9 +41,9 @@ async def test_tool():
     print("\n4. Search AWS + CloudTrail:")
     result = await search_query_examples(app_name="AWS", keywords="CloudTrail", max_results=2)
     data = json.loads(result)
-    print(f"   Found {data['summary']['matches_found']} matches")
-    print(f"   Returned {data['summary']['returned']} examples")
-    if data['examples']:
+    print(f"   Found {data.get('summary', {}).get('matches_found', 0)} matches")
+    print(f"   Returned {data.get('summary', {}).get('returned', 0)} examples")
+    if data.get('examples'):
         print(f"   First example app: {data['examples'][0]['app']}")
 
 

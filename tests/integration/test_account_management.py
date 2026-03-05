@@ -9,7 +9,7 @@ from sumologic_mcp_server.sumologic_mcp_server import (
 )
 
 
-async def test_tool(name, coro):
+async def run_tool_test(name, coro):
     """Test a single tool and report result."""
     try:
         result = await coro
@@ -45,7 +45,7 @@ async def main():
 
     # Test 1: get_account_status
     print("Test 1: get_account_status")
-    results.append(await test_tool(
+    results.append(await run_tool_test(
         "get_account_status",
         get_account_status(instance="default")
     ))
@@ -54,7 +54,7 @@ async def main():
 
     # Test 2: get_usage_forecast (7 days)
     print("\\nTest 2: get_usage_forecast (7 days)")
-    results.append(await test_tool(
+    results.append(await run_tool_test(
         "get_usage_forecast",
         get_usage_forecast(number_of_days=7, instance="default")
     ))
@@ -63,7 +63,7 @@ async def main():
 
     # Test 3: get_usage_forecast (30 days)
     print("\\nTest 3: get_usage_forecast (30 days)")
-    results.append(await test_tool(
+    results.append(await run_tool_test(
         "get_usage_forecast",
         get_usage_forecast(number_of_days=30, instance="default")
     ))
@@ -76,7 +76,7 @@ async def main():
     end_date = datetime.now().date()
     start_date = end_date - timedelta(days=7)
 
-    results.append(await test_tool(
+    results.append(await run_tool_test(
         "export_usage_report",
         export_usage_report(
             start_date=start_date.strftime("%Y-%m-%d"),

@@ -16,7 +16,7 @@ from sumologic_mcp_server.sumologic_mcp_server import (
 )
 
 
-async def test_tool(name, coro):
+async def run_tool_test(name, coro):
     """Test a single tool and report result."""
     print(f"\nTesting {name}...")
     try:
@@ -45,7 +45,7 @@ async def main():
     print("="*60)
 
     # Test 1: ID Conversion - Hex to Decimal
-    results.append(await test_tool(
+    results.append(await run_tool_test(
         "convert_content_id_hex_to_decimal",
         convert_content_id_hex_to_decimal(hex_id="00000000005E5403")
     ))
@@ -53,7 +53,7 @@ async def main():
     await asyncio.sleep(0.5)
 
     # Test 2: ID Conversion - Decimal to Hex
-    results.append(await test_tool(
+    results.append(await run_tool_test(
         "convert_content_id_decimal_to_hex",
         convert_content_id_decimal_to_hex(decimal_id="6181891")
     ))
@@ -61,7 +61,7 @@ async def main():
     await asyncio.sleep(0.5)
 
     # Test 3: Get Web URL
-    results.append(await test_tool(
+    results.append(await run_tool_test(
         "get_content_web_url",
         get_content_web_url(content_id="00000000005E5403", instance="default")
     ))
@@ -69,7 +69,7 @@ async def main():
     await asyncio.sleep(0.5)
 
     # Test 4: Get Personal Folder (with children)
-    results.append(await test_tool(
+    results.append(await run_tool_test(
         "get_personal_folder (with children)",
         get_personal_folder(include_children=True, instance="default")
     ))
@@ -77,7 +77,7 @@ async def main():
     await asyncio.sleep(0.5)
 
     # Test 5: Get Personal Folder (without children)
-    results.append(await test_tool(
+    results.append(await run_tool_test(
         "get_personal_folder (no children)",
         get_personal_folder(include_children=False, instance="default")
     ))
@@ -94,7 +94,7 @@ async def main():
         await asyncio.sleep(0.5)
 
         # Test 6: Get Folder by ID
-        results.append(await test_tool(
+        results.append(await run_tool_test(
             f"get_folder_by_id ({folder_id})",
             get_folder_by_id(folder_id=folder_id, include_children=True, instance="default")
         ))
@@ -102,7 +102,7 @@ async def main():
         await asyncio.sleep(0.5)
 
         # Test 7: Get Content Path by ID
-        results.append(await test_tool(
+        results.append(await run_tool_test(
             f"get_content_path_by_id ({folder_id})",
             get_content_path_by_id(content_id=folder_id, instance="default")
         ))
@@ -123,7 +123,7 @@ async def main():
                     await asyncio.sleep(0.5)
 
                     # Test 8: Get Content by Path
-                    results.append(await test_tool(
+                    results.append(await run_tool_test(
                         f"get_content_by_path ({content_path})",
                         get_content_by_path(content_path=content_path, instance="default")
                     ))
