@@ -532,6 +532,129 @@ async def export_async_resource(
         return handle_tool_error(e, "export_async_resource")
 ```
 
+## Skills Library Maintenance
+
+The `skills/` directory contains portable skill definitions for use with Claude Code and other LLM systems. These skills capture **how to accomplish tasks** using the MCP tools and Sumo Logic knowledge.
+
+### When to Update Skills
+
+**Update existing skills when:**
+- Adding new MCP tools that enhance existing capabilities
+- Discovering optimization patterns or best practices
+- Finding common pitfalls users encounter
+- Tools change parameters or behavior
+
+**Create new skills when:**
+- Adding entirely new capability areas (e.g., new audit index)
+- Implementing complex multi-step workflows
+- Discovering reusable patterns not covered by existing skills
+
+### Skill Maintenance Workflow
+
+When adding or modifying tools:
+
+1. **Review Related Skills**
+   - Check `skills/README.md` index for related skills
+   - Determine if existing skills need updates
+
+2. **Update Existing Skills**
+   - Add new tool references to "MCP Tools Used" section
+   - Update examples if tool provides better approach
+   - Add new patterns to "Query Patterns" section
+   - Update "Common Pitfalls" if tool prevents mistakes
+
+3. **Create New Skill (if needed)**
+   - Follow template in `skills/README.md`
+   - Include: Intent, Prerequisites, Context, Approach, Patterns, Examples, Pitfalls
+   - Cross-reference related skills
+   - Add to skills index in `skills/README.md`
+
+4. **Validate Skill Quality**
+   - Skill is actionable (not just reference)
+   - Includes real examples with MCP tool calls
+   - Explains "why" not just "what"
+   - Has clear success criteria
+
+### Skills Organization
+
+Skills are domain-organized:
+- `discovery-*.md` - Finding logs and understanding structure
+- `cost-*.md` - Cost analysis and optimization
+- `search-*.md` - Query building and optimization
+- `audit-*.md` - Audit indexes and compliance
+- `content-*.md` - Content library management
+- `admin-*.md` - Administration and configuration
+
+### Skill Template
+
+```markdown
+# Skill: [Name]
+
+## Intent
+What this skill accomplishes (1-2 sentences)
+
+## Prerequisites
+- Knowledge/access requirements
+
+## Context
+**Use this skill when:** ...
+**Don't use this when:** ...
+
+## Approach
+Step-by-step methodology with MCP tool calls
+
+## Query Patterns
+Reusable query building blocks
+
+## Examples
+Real-world scenarios with solutions
+
+## Common Pitfalls
+Mistakes to avoid
+
+## Related Skills
+Cross-references
+
+## MCP Tools Used
+List of tools with brief purpose
+
+## API References
+Links to official docs
+```
+
+### Example: Adding Tool to Existing Skill
+
+When adding `new_search_tool` that helps with query optimization:
+
+1. Update `skills/search-optimize-queries.md`:
+   ```markdown
+   ### New Optimization Pattern
+
+   **MCP Tool:** `new_search_tool`
+   ```json
+   {
+     "parameter": "value"
+   }
+   ```
+
+   **Use Case:** When you need to...
+   ```
+
+2. Add to "MCP Tools Used" section:
+   ```markdown
+   - `new_search_tool` - Brief description of what it does
+   ```
+
+3. Update examples if tool provides better approach
+
+### Example: Creating New Skill
+
+When adding comprehensive field extraction capabilities:
+
+1. Create `skills/admin-field-extraction.md` following template
+2. Add entry to `skills/README.md` index table
+3. Cross-reference from related skills (e.g., query optimization)
+
 ## Session Checklist
 
 At the end of each Claude session:
@@ -539,6 +662,7 @@ At the end of each Claude session:
 - [ ] All new tools documented in `docs/mcp-tools-reference.md`
 - [ ] Tool count updated in `docs/mcp-tools-reference.md` header
 - [ ] Tool count updated in `README.md` if changed significantly
+- [ ] **Skills library reviewed and updated** (see Skills Library Maintenance above)
 - [ ] Tests written and passing
 - [ ] No temporary `.md` files in project root
 - [ ] CHANGELOG.md updated with changes
