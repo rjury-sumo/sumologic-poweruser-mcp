@@ -54,26 +54,123 @@ MCP: explore_log_metadata
 ```
 
 #### Rule 2: Add Keyword Expressions for Bloom Filters
-**Bad:**
+
+Keyword expressions in scope are processed by backend bloom filters for extremely fast pre-filtering. This technique can reduce scan volume by 10x-1000x by eliminating log blocks that don't contain your keywords.
+
+**Bad (filters after pipe):**
 ```
 _index=prod_logs _sourceCategory=prod/app
-| where status_code = "500"
+| json "status_code" as status_code
+| where status_code = 500
 ```
 
-**Good:**
+**Good Option 1 (indexed field with wildcard):**
 ```
-_index=prod_logs _sourceCategory=prod/app "status_code"="500"
+_index=prod_logs _sourceCategory=prod/app status_code=5*
+| json "status_code" as status_code
+| where status_code = 500
 ```
 
-**Why:**
-- Bloom filters in Sumo index keyword expressions
-- Scopes to specific log blocks
-- Reduces scan before full message processing
+**Good Option 2 (high-selectivity keyword):**
+```
+_index=prod_logs _sourceCategory=prod/app 500
+| json "status_code" as status_code
+| where status_code = 500
+```
 
-**Pattern:**
-- If filtering on field=value, include in scope if indexed
-- Use quotes for exact match: `"error"`
-- Combine multiple keywords: `error exception failed`
+**Why Option 2 Works:**
+- `500` is an unusual, highly selective string
+- Bloom filter eliminates blocks without "500" anywhere in the event
+- May include some false positives (e.g., "user_id=50012"), but the post-pipe `where` filter handles exact matching
+- Massive performance gain from smaller initial result set
+
+**Advanced Technique 1: Push-Down Optimization**
+
+The query engine automatically does this for some `where` filters, but you can be explicit:
+
+**Automatic Push-Down:**
+```
+_index=prod_logs _sourceCategory=prod/app
+| where foo = "bar"
+```
+Engine may add "bar" as keyword automatically.
+
+**Explicit Push-Down (more reliable):**
+```
+_index=prod_logs _sourceCategory=prod/app bar
+| json "foo" as foo
+| where foo = "bar"
+```
+
+**Advanced Technique 2: Selective Keywords for Optional Fields**
+
+When a field only exists in a small subset of events:
+
+**Inefficient:**
+```
+_sourceCategory=*cloudtrail*
+| json "errorCode" as errorCode
+| where errorCode = "AccessDenied"
+```
+Scans all CloudTrail events.
+
+**Efficient:**
+```
+_sourceCategory=*cloudtrail* errorcode
+| json "errorCode" as errorCode
+| where errorCode = "AccessDenied"
+```
+Only scans events containing the string "errorcode" (field is only in error events).
+
+**Advanced Technique 3: Extract Keywords from Regex/Matches**
+
+When using `where matches` with patterns, extract literal strings:
+
+**Inefficient:**
+```
+_index=prod_logs
+| json "url" as url
+| where url matches "*/foo/bar/*"
+```
+
+**Efficient:**
+```
+_index=prod_logs foo bar
+| json "url" as url
+| where url matches "*/foo/bar/*"
+```
+Using "foo" and "bar" as keywords (if highly selective) dramatically reduces initial scan.
+
+**Advanced Technique 4: JSON Literal Expression (Cheat Code)**
+
+For JSON logs with known key-value pairs, use literal string matching:
+
+**Inefficient:**
+```
+_index=prod_logs
+| json "errorCode" as errorCode
+| where errorCode = "AccessDenied"
+```
+
+**Ultra-Efficient (JSON Literal):**
+```
+_index=prod_logs "\"errorCode\":\"AccessDenied\""
+| json "errorCode" as errorCode
+| where errorCode = "AccessDenied"
+```
+
+**Why This Works:**
+- Literal string `"errorCode":"AccessDenied"` matches exact JSON structure in raw event
+- Bloom filter processes this at index level (fastest possible)
+- Only works when the literal string appears in the event exactly as specified
+
+**Pattern Summary:**
+- **Indexed fields:** Use field=value or field=wildcard* in scope
+- **High-selectivity strings:** Add unusual literal strings (GUIDs, error codes, specific IDs)
+- **Optional fields:** Add field name as keyword when field only in subset of events
+- **Regex patterns:** Extract literal string fragments from patterns
+- **JSON logs:** Use `"\"key\":\"value\""` for known key-value pairs
+- **Multiple keywords:** Combine for maximum selectivity: `error exception sqlexception`
 
 #### Rule 3: Scope Selectivity Analysis
 Use `ScopePattern.analyze_scope()` pattern from query_patterns.py:
