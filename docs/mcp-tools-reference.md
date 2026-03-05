@@ -207,6 +207,15 @@ Analyze search scan costs with detailed tier/metering breakdown for Infrequent a
 
 ## Audit Index Tools (3)
 
+**⚠️ NOTE ON TERMINOLOGY:**
+- **"Audit Index Tools"** (below): Search audit *event* indexes for user actions, authentication, system operations
+  - Indexes: `_index=sumologic_audit`, `_index=sumologic_audit_events`, `_index=sumologic_system_events`
+  - Track: Login events, content changes, collector health, CSE operations, etc.
+
+- **"Search Audit Tools"** (tools #6 and #8): Analyze search *query* usage and performance
+  - View: `_view=sumologic_search_usage_per_query`
+  - Track: What searches were run, data scanned, query performance, costs
+
 ### 9. `search_legacy_audit`
 Search the legacy Sumo Logic audit index (_index=sumologic_audit) for user activity, authentication, and system events.
 

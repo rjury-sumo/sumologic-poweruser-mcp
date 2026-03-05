@@ -4800,6 +4800,10 @@ async def search_legacy_audit(
     """
     Search the legacy Sumo Logic audit index (_index=sumologic_audit).
 
+    **IMPORTANT - Terminology Clarification:**
+    This tool searches the audit EVENT index (user actions, logins, system events).
+    For analyzing SEARCH QUERY usage/performance, use run_search_audit_query or analyze_search_scan_cost.
+
     The legacy audit index contains audit events in unstructured text format with varying
     structures depending on event type. This tool helps construct queries for common use cases.
 
@@ -4924,6 +4928,10 @@ async def search_audit_events(
 ) -> str:
     """
     Search the enterprise audit events index (_index=sumologic_audit_events).
+
+    **IMPORTANT - Terminology Clarification:**
+    This tool searches the audit EVENT index (user actions, content changes, CSE operations).
+    For analyzing SEARCH QUERY usage/performance, use run_search_audit_query or analyze_search_scan_cost.
 
     The enterprise audit events index contains structured JSON logs for user and system actions
     across all Sumo Logic features. Events are organized by _sourceCategory (feature area).
@@ -5050,6 +5058,10 @@ async def search_system_events(
 ) -> str:
     """
     Search the enterprise system events index (_index=sumologic_system_events).
+
+    **IMPORTANT - Terminology Clarification:**
+    This tool searches the system EVENT index (collector health, monitor alerts, system operations).
+    For analyzing SEARCH QUERY usage/performance, use run_search_audit_query or analyze_search_scan_cost.
 
     The enterprise system events index contains structured JSON logs for system-level operations
     and automated processes in Sumo Logic. Similar structure to audit_events but focused on
