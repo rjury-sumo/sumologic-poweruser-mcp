@@ -1,7 +1,7 @@
 # Sumo Logic MCP Server - Tools Reference
 
 ## Overview
-Total Tools: **45**
+Total Tools: **46**
 
 ---
 
@@ -1335,6 +1335,58 @@ Advanced data volume analysis with cardinality reduction for large-scale environ
 
 ---
 
+## Utility Tools (1)
+
+### 46. `get_skill`
+Get a skill definition from the skills library. Skills are reusable knowledge artifacts that describe **how to accomplish specific tasks** in Sumo Logic using MCP tools and best practices.
+
+**Parameters:**
+- `skill_name` (str) - Skill filename without .md extension (e.g., 'search-write-queries', 'discovery-logs-without-metadata')
+
+**Returns:** Full markdown content of the requested skill, or error with list of available skills if not found
+
+**Skill Categories:**
+- `search-*` - Query writing, optimization, views
+- `discovery-*` - Finding logs, schemas, partitions, views
+- `cost-*` - Search costs, data volume, credit analysis
+- `audit-*` - Audit indexes, user activity, system health
+- `content-*` - Content library navigation, URLs
+- `admin-*` - Collectors, users, field extraction
+- `ui-*` - Interactive UI features
+
+**Common Skills:**
+- `search-write-queries` - 5-phase query construction pattern (Scope → Parse → Filter → Aggregate → Format)
+- `search-optimize-queries` - Performance and cost optimization techniques
+- `search-optimize-with-views` - Using scheduled views for 10x-100x improvements
+- `discovery-logs-without-metadata` - Find logs when metadata is unknown
+- `discovery-scheduled-views` - Inventory and use scheduled views
+- `cost-analyze-search-costs` - Flex/Infrequent tier cost analysis
+- `audit-user-activity` - Audit events and user tracking
+- `audit-system-health` - System events and monitoring
+- `content-library-navigation` - Browse and export content
+- `ui-navigate-and-search` - Interactive UI investigation
+
+**Use Cases:**
+- **Learn best practices**: Get comprehensive guides for common tasks
+- **Query construction**: Load the 5-phase query pattern skill
+- **Cost optimization**: Learn how to reduce search costs using views
+- **Discovery workflows**: Multi-phase approaches to finding logs
+- **Dynamic access**: Fetch latest skill version without restarting
+
+**Example:**
+```json
+{
+  "skill_name": "search-write-queries"
+}
+```
+
+**Skill Index:**
+See `skills/README.md` for complete list of available skills.
+
+**Note:** Skills can also be accessed directly by reading files from the `skills/` directory.
+
+---
+
 ## Tool Categories Summary
 
 | Category | Count | Tools |
@@ -1350,6 +1402,7 @@ Advanced data volume analysis with cardinality reduction for large-scale environ
 | **Dashboards & Monitors** | 2 | List dashboards, search monitors |
 | **System** | 2 | List partitions, list instances |
 | **Account Management** | 6 | Account status, usage forecast, usage report, estimated usage, data volume analysis |
+| **Utility** | 1 | Skills library access |
 
 ---
 

@@ -20,6 +20,7 @@ import asyncio
 import json
 import logging
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, Dict, Optional
 from urllib.parse import urljoin
 
@@ -5327,6 +5328,88 @@ async def search_system_events(
 
     except Exception as e:
         return handle_tool_error(e, "search_system_events")
+
+
+# ============================================================================
+# UTILITY TOOLS
+# ============================================================================
+
+@mcp.tool()
+async def get_skill(
+    skill_name: str = Field(description="Skill filename without .md extension (e.g., 'search-write-queries', 'discovery-logs-without-metadata')")
+) -> str:
+    """
+    Get a skill definition from the skills library.
+
+    Skills are reusable knowledge artifacts that describe **how to accomplish specific tasks**
+    in the Sumo Logic platform using MCP tools and best practices.
+
+    **Skill Categories:**
+    - `search-*` - Query writing, optimization, views
+    - `discovery-*` - Finding logs, schemas, partitions, views
+    - `cost-*` - Search costs, data volume, credit analysis
+    - `audit-*` - Audit indexes, user activity, system health
+    - `content-*` - Content library navigation, URLs
+    - `admin-*` - Collectors, users, field extraction
+    - `ui-*` - Interactive UI features
+
+    **Common Skills:**
+    - `search-write-queries` - 5-phase query construction pattern
+    - `search-optimize-queries` - Performance and cost optimization
+    - `search-optimize-with-views` - Using scheduled views
+    - `discovery-logs-without-metadata` - Find logs when metadata unknown
+    - `discovery-scheduled-views` - Inventory and use scheduled views
+    - `cost-analyze-search-costs` - Flex/Infrequent tier cost analysis
+    - `audit-user-activity` - Audit events and user tracking
+    - `audit-system-health` - System events and monitoring
+    - `content-library-navigation` - Browse and export content
+    - `ui-navigate-and-search` - Interactive UI investigation
+
+    **Returns:**
+    Full markdown content of the requested skill, or error if not found.
+
+    **Example:**
+    ```
+    get_skill("search-write-queries")
+    ```
+
+    **Skill Index:**
+    See `skills/README.md` for complete list of available skills.
+    """
+    try:
+        # Get the skills directory (relative to this file)
+        current_file = Path(__file__)
+        skills_dir = current_file.parent.parent.parent / "skills"
+
+        # Construct skill file path
+        skill_file = skills_dir / f"{skill_name}.md"
+
+        # Check if skill exists
+        if not skill_file.exists():
+            # List available skills for helpful error message
+            available_skills = []
+            if skills_dir.exists():
+                available_skills = [
+                    f.stem for f in skills_dir.glob("*.md")
+                    if f.name != "README.md"
+                ]
+                available_skills.sort()
+
+            error_response = {
+                "error": f"Skill not found: {skill_name}",
+                "skills_directory": str(skills_dir),
+                "available_skills": available_skills,
+                "hint": "Use skill filename without .md extension (e.g., 'search-write-queries')"
+            }
+            return json.dumps(error_response, indent=2)
+
+        # Read and return skill content
+        skill_content = skill_file.read_text(encoding='utf-8')
+
+        return skill_content
+
+    except Exception as e:
+        return handle_tool_error(e, "get_skill")
 
 
 # Cleanup handler

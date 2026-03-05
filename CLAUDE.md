@@ -53,6 +53,54 @@ sumologic-python-mcp/
 - Apply rate limiting with `get_rate_limiter()`
 - Log all operations via audit logger when enabled
 
+## Skills Reference
+
+Before performing common tasks, consult the relevant skill in `skills/`. Skills capture **how to accomplish tasks** using MCP tools and Sumo Logic best practices.
+
+### Query & Search Tasks
+- **Before writing Sumo Logic queries**: Read [skills/search-write-queries.md](skills/search-write-queries.md)
+  - 5-phase query construction pattern (Scope → Parse → Filter → Aggregate → Format)
+  - Dashboard panel patterns and complete examples
+- **Before optimizing slow/expensive queries**: Read [skills/search-optimize-queries.md](skills/search-optimize-queries.md)
+  - Scope optimization techniques for 10x-100x cost reduction
+  - Anti-patterns to avoid
+- **Before using scheduled views**: Read [skills/search-optimize-with-views.md](skills/search-optimize-with-views.md)
+  - Transform raw log queries to use pre-aggregated views
+  - Achieve dramatic performance and cost improvements
+- **For interactive UI investigation**: Read [skills/ui-navigate-and-search.md](skills/ui-navigate-and-search.md)
+  - Field Browser, Log Inspector, histogram features
+  - Iterative workflow patterns
+
+### Discovery Tasks
+- **Before helping users find logs**: Read [skills/discovery-logs-without-metadata.md](skills/discovery-logs-without-metadata.md)
+  - Multi-phase discovery when metadata is unknown
+  - Collector/partition/schema exploration
+- **Before working with scheduled views**: Read [skills/discovery-scheduled-views.md](skills/discovery-scheduled-views.md)
+  - Inventory views, understand schemas, match to use cases
+  - Query patterns for versioned views
+
+### Cost Analysis Tasks
+- **Before analyzing search costs**: Read [skills/cost-analyze-search-costs.md](skills/cost-analyze-search-costs.md)
+  - Flex/Infrequent tier scan cost breakdown
+  - User/query cost ranking
+
+### Audit & Compliance Tasks
+- **Before searching audit indexes**: Read [skills/audit-user-activity.md](skills/audit-user-activity.md) or [skills/audit-system-health.md](skills/audit-system-health.md)
+  - Audit events vs system events vs search audit
+  - Pre-built use cases and query patterns
+
+### Content Management Tasks
+- **Before navigating content library**: Read [skills/content-library-navigation.md](skills/content-library-navigation.md)
+  - Export dashboards, searches, folders
+  - Path resolution and URL generation
+
+### Development Tasks
+- **Before adding new MCP tools**: Review patterns in existing skills to understand tool usage
+- **After adding tools**: Update related skills per "Skills Library Maintenance" section below
+- **For skill overview**: See [skills/README.md](skills/README.md) index
+
+**Quick Access:** Use the `get_skill` MCP tool to fetch skill content dynamically.
+
 ## Development Workflow
 
 ### Adding a New MCP Tool
