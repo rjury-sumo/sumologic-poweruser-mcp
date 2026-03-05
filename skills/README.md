@@ -17,9 +17,10 @@ Skills are reusable knowledge artifacts that describe **how to accomplish specif
 
 Skills are organized by domain:
 
-### Search & Query (`search-*.md`)
-- Log search techniques
-- Query optimization
+### Search & Query (`search-*.md`, `ui-*.md`)
+- **Writing queries**: Complete 5-phase construction guide
+- **Query optimization**: Performance and cost optimization
+- **UI navigation**: Interactive investigation techniques
 - Metrics querying
 - Search cost analysis
 
@@ -103,18 +104,20 @@ Links to official documentation
 
 ## Skill Index
 
-| Skill | Category | Description |
-|-------|----------|-------------|
-| [Log Discovery](./discovery-logs-without-metadata.md) | Discovery | Find logs when you don't know metadata |
-| [Search Cost Analysis](./cost-analyze-search-costs.md) | Cost | Analyze Flex/Infrequent tier search costs |
-| [Data Volume Analysis](./cost-analyze-data-volume.md) | Cost | Track ingestion and identify cost drivers |
-| [Query Optimization](./search-optimize-queries.md) | Search | Build efficient, cost-effective queries |
-| [Audit User Activity](./audit-user-activity.md) | Audit | Track authentication and user actions |
-| [Monitor System Health](./audit-system-health.md) | Audit | Monitor collectors and alerts |
-| [Navigate Content Library](./content-library-navigation.md) | Content | Browse and export dashboards/searches |
-| [Generate Web URLs](./content-generate-urls.md) | Content | Create shareable links to content |
-| [Manage Collectors](./admin-collector-management.md) | Admin | List and inspect collectors/sources |
-| [Field Extraction](./admin-field-extraction.md) | Admin | Work with custom fields and FERs |
+| Skill | Category | Description | MCP Tools |
+|-------|----------|-------------|-----------|
+| [Log Discovery](./discovery-logs-without-metadata.md) | Discovery | Find logs when you don't know metadata | Yes |
+| [Search Cost Analysis](./cost-analyze-search-costs.md) | Cost | Analyze Flex/Infrequent tier search costs | Yes |
+| [Data Volume Analysis](./cost-analyze-data-volume.md) | Cost | Track ingestion and identify cost drivers | Yes |
+| **[Writing Queries](./search-write-queries.md)** | **Search** | **Complete query construction guide (5 phases)** | **Yes** |
+| [Query Optimization](./search-optimize-queries.md) | Search | Build efficient, cost-effective queries | Yes |
+| **[UI Navigation](./ui-navigate-and-search.md)** | **Search** | **Interactive UI features for investigation** | **No** |
+| [Audit User Activity](./audit-user-activity.md) | Audit | Track authentication and user actions | Yes |
+| [Monitor System Health](./audit-system-health.md) | Audit | Monitor collectors and alerts | Yes |
+| [Navigate Content Library](./content-library-navigation.md) | Content | Browse and export dashboards/searches | Yes |
+| [Generate Web URLs](./content-generate-urls.md) | Content | Create shareable links to content | Yes |
+| [Manage Collectors](./admin-collector-management.md) | Admin | List and inspect collectors/sources | Yes |
+| [Field Extraction](./admin-field-extraction.md) | Admin | Work with custom fields and FERs | Yes |
 
 ## Maintenance
 
@@ -127,8 +130,36 @@ When adding new tools or capabilities to the MCP server:
 
 See [CLAUDE.md](../CLAUDE.md) for developer guidelines on keeping skills synchronized with code.
 
+## Skill Summaries
+
+### Core Query Skills
+
+**[Writing Queries](./search-write-queries.md)** - Start here for query construction
+- 5-phase pattern: Scope → Parse → Filter → Aggregate → Format
+- Complete examples for each phase
+- Dashboard panel patterns
+- Integrates with MCP tools
+
+**[UI Navigation](./ui-navigate-and-search.md)** - Interactive investigation
+- Field Browser and Log Message Inspector
+- Iterative workflow patterns
+- Histogram and auto log level features
+- UI-only (no MCP tools)
+
+**[Query Optimization](./search-optimize-queries.md)** - Make queries faster and cheaper
+- Scope optimization techniques
+- Cost reduction strategies (10x-100x improvements)
+- Anti-patterns to avoid
+- Uses MCP tools for analysis
+
+**Combined Workflow:**
+1. Use **UI Navigation** to explore and build queries interactively
+2. Apply **Writing Queries** patterns for proper structure
+3. Optimize with **Query Optimization** techniques
+4. Execute via MCP tools for automation
+
 ---
 
-**Version:** 1.0.0
-**Last Updated:** 2026-03-05
+**Version:** 1.1.0
+**Last Updated:** 2026-03-06
 **Maintained by:** sumologic-python-mcp project

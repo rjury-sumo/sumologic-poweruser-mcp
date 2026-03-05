@@ -478,10 +478,78 @@ For dashboards specifically:
 - [ ] Considered scheduled search for pre-aggregation
 - [ ] Each panel's time range is justified
 
+## Query Construction Helpers
+
+The `search_helpers` module provides utilities to help build optimized queries:
+
+### Build Scope Expression
+```python
+from search_helpers import build_scope_expression
+
+scope = build_scope_expression(
+    source_category="prod/app",
+    index="prod_logs",
+    keywords=["error", "exception"],
+    additional_metadata={"_sourceHost": "server1"}
+)
+# Returns: "_sourceCategory=prod/app _index=prod_logs _sourceHost=server1 error exception"
+```
+
+### Suggest Scope from Discovery
+```python
+from search_helpers import suggest_scope_from_discovery
+
+# After running explore_log_metadata
+metadata_results = {...}  # Results from MCP tool
+suggested_scope = suggest_scope_from_discovery(metadata_results)
+# Returns optimal scope based on discovery
+```
+
+### Validate Query Structure
+```python
+from search_helpers import validate_query_structure
+
+query = "_sourceCategory=prod/app error | count"
+validation = validate_query_structure(query)
+# Returns: {
+#   'is_valid': True,
+#   'has_scope': True,
+#   'has_aggregation': True,
+#   'warnings': [],
+#   'suggestions': ['Add _index to reduce scan volume']
+# }
+```
+
+### Common Query Patterns
+```python
+from search_helpers import get_common_query_patterns
+
+patterns = get_common_query_patterns()
+# Access optimized patterns:
+# - patterns['categorical_count']
+# - patterns['time_series_by_field']
+# - patterns['filtering_where']
+# - patterns['aggregation_stats']
+```
+
+### Operator Categories Reference
+```python
+from search_helpers import get_operator_category_info
+
+operators = get_operator_category_info()
+# Returns operators grouped by category:
+# - parsing: json, parse, csv, xml, keyvalue
+# - filtering: where, matches, in, contains
+# - aggregation: count, sum, avg, pct, stddev
+# - time_series: timeslice, transpose
+# - formatting: fields, concat, format
+```
+
 ## Related Skills
-- [Log Discovery](./discovery-logs-without-metadata.md) - Find right partitions
+- [Writing Queries](./search-write-queries.md) - Complete query construction guide
+- [UI Navigation](./ui-navigate-and-search.md) - Interactive query building
+- [Log Discovery](./discovery-logs-without-metadata.md) - Find right partitions and scope
 - [Search Cost Analysis](./cost-analyze-search-costs.md) - Measure optimization impact
-- [Query Examples Search](./search-query-examples.md) - Find proven patterns
 
 ## MCP Tools Used
 - `explore_log_metadata` - Find partitions
