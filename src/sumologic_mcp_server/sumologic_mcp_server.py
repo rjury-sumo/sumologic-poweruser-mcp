@@ -4779,6 +4779,399 @@ Present your findings in a clear, actionable format.
 """
 
 
+# ============================================================================
+# Audit Index Search Tools
+# ============================================================================
+
+@mcp.tool()
+async def search_legacy_audit(
+    action: Optional[str] = Field(default=None, description="Action filter (e.g., 'login', 'create', 'update')"),
+    status: Optional[str] = Field(default=None, description="Status filter (e.g., 'SUCCESS', 'FAILURE')"),
+    source_category: Optional[str] = Field(default=None, description="Source category filter (e.g., 'user_activity', 'scheduled_search')"),
+    keywords: Optional[str] = Field(default=None, description="Additional keyword search terms"),
+    use_case: Optional[str] = Field(default=None, description="Pre-built use case: 'logins', 'scheduled_search_triggers', 'user_activity', 'content_changes'"),
+    aggregate_by: Optional[str] = Field(default=None, description="Comma-separated fields to aggregate by (e.g., 'action,status')"),
+    hours_back: int = Field(default=24, description="Number of hours to search back from now (ignored if from_time/to_time provided)"),
+    from_time: Optional[str] = Field(default=None, description="Start time: ISO8601, epoch ms, or relative like '-1h'"),
+    to_time: Optional[str] = Field(default=None, description="End time: ISO8601, epoch ms, or relative like 'now'"),
+    limit: int = Field(default=100, description="Maximum number of results to return"),
+    instance: str = Field(default='default', description="Sumo Logic instance name")
+) -> str:
+    """
+    Search the legacy Sumo Logic audit index (_index=sumologic_audit).
+
+    The legacy audit index contains audit events in unstructured text format with varying
+    structures depending on event type. This tool helps construct queries for common use cases.
+
+    **Use Cases:**
+    - User authentication: action="login", source_category="user_activity"
+    - Scheduled search alerts: keywords="triggered", source_category="scheduled_search"
+    - Content changes: source_category="content"
+    - General user activity: source_category="user_activity"
+
+    **Pre-built Use Cases:**
+    Set use_case parameter to one of:
+    - "logins": User login events
+    - "scheduled_search_triggers": Scheduled search alert triggers
+    - "user_activity": General user activity
+    - "content_changes": Content creation/modification/deletion
+
+    **Example Events:**
+    - Login: "User rjury@sumologic.com successfully logged in via SAML"
+    - Alert: "Scheduled search alert triggered [Name=...] [SchSearchId=...][AlertType=...]"
+
+    **Parameters:**
+    - action: Filter by action keyword (login, create, update, delete)
+    - status: Filter by status (SUCCESS, FAILURE)
+    - source_category: Filter by _sourceCategory (user_activity, scheduled_search, content)
+    - keywords: Additional keyword search terms
+    - use_case: Use a pre-built query pattern
+    - aggregate_by: Fields to group by (adds '| count by' operator)
+    - limit: Maximum results (default 100)
+
+    **Returns:**
+    JSON with query results. If aggregate_by is specified, returns aggregated counts.
+    Otherwise returns raw log events (limited by limit parameter).
+
+    **API Reference:**
+    https://www.sumologic.com/help/docs/manage/security/audit-indexes/audit-index/
+    """
+    try:
+        from .audit_helpers import build_legacy_audit_query, get_audit_use_case_query
+
+        _ensure_config_initialized()
+        config = get_config()
+        limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
+        await limiter.acquire("search_legacy_audit")
+
+        instance = validate_instance_name(instance)
+
+        # Handle pre-built use case
+        if use_case:
+            use_case_info = get_audit_use_case_query(use_case)
+            if not use_case_info:
+                from .audit_helpers import list_audit_use_cases
+                available = list_audit_use_cases()
+                return json.dumps({
+                    "error": f"Unknown use case: {use_case}",
+                    "available_use_cases": available
+                }, indent=2)
+
+            # Use the pre-built query as a base, but allow overrides
+            query = use_case_info["query_pattern"]
+            if keywords:
+                query += f" {keywords}"
+            if aggregate_by:
+                agg_fields = aggregate_by
+            else:
+                # Use example fields from use case
+                agg_fields = ",".join(use_case_info.get("example_fields", []))
+                if agg_fields:
+                    query += f" | count by {agg_fields} | sort _count | limit {limit}"
+        else:
+            # Build custom query
+            agg_list = aggregate_by.split(",") if aggregate_by else None
+            query = build_legacy_audit_query(
+                action=action,
+                status=status,
+                source_category=source_category,
+                keywords=keywords,
+                aggregate_by=agg_list,
+                limit=limit
+            )
+
+        # Execute search using existing search_sumo_logs tool
+        client = await get_sumo_client(instance)
+
+        # Determine time range
+        if from_time is not None and to_time is not None:
+            from_str = from_time
+            to_str = to_time
+        else:
+            hours_back = validate_time_range(hours_back)
+            to_time_dt = datetime.now(timezone.utc)
+            from_time_dt = to_time_dt - timedelta(hours=hours_back)
+            from_str = from_time_dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+            to_str = to_time_dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+        results = await client.search_logs(
+            query,
+            from_str,
+            to_str,
+            "UTC",
+            False
+        )
+
+        return json.dumps(results, indent=2)
+
+    except Exception as e:
+        return handle_tool_error(e, "search_legacy_audit")
+
+
+@mcp.tool()
+async def search_audit_events(
+    event_name: Optional[str] = Field(default=None, description="Event name filter (e.g., 'UserLoginSuccess', 'ContentUpdated', 'InsightCreated')"),
+    source_category: Optional[str] = Field(default=None, description="Source category filter (e.g., 'userSessions', 'content', 'cseInsight')"),
+    operator_email: Optional[str] = Field(default=None, description="Filter by operator email address"),
+    keywords: Optional[str] = Field(default=None, description="Additional keyword search terms"),
+    extract_fields: Optional[str] = Field(default=None, description="Comma-separated JSON fields to extract (default: eventName,eventTime,operator.email,operator.id,operator.sourceIp)"),
+    aggregate_by: Optional[str] = Field(default=None, description="Comma-separated fields to aggregate by (e.g., 'eventName,operator_email')"),
+    hours_back: int = Field(default=24, description="Number of hours to search back from now (ignored if from_time/to_time provided)"),
+    from_time: Optional[str] = Field(default=None, description="Start time: ISO8601, epoch ms, or relative like '-1h'"),
+    to_time: Optional[str] = Field(default=None, description="End time: ISO8601, epoch ms, or relative like 'now'"),
+    limit: int = Field(default=100, description="Maximum number of results to return"),
+    instance: str = Field(default='default', description="Sumo Logic instance name")
+) -> str:
+    """
+    Search the enterprise audit events index (_index=sumologic_audit_events).
+
+    The enterprise audit events index contains structured JSON logs for user and system actions
+    across all Sumo Logic features. Events are organized by _sourceCategory (feature area).
+
+    **Common Event Categories:**
+    - Authentication: UserLoginSuccess, UserLoginFailure, UserLogout, MfaEnabled
+    - Content Management: ContentCreated, ContentUpdated, ContentDeleted, ContentMoved
+    - Data Collection: CollectorCreated, SourceCreated, SourceUpdated
+    - CSE Operations: InsightCreated, InsightUpdated, InsightClosed
+    - User Management: UserCreated, UserUpdated, RoleAssigned
+    - Monitoring: MonitorCreated, MonitorUpdated, MonitorTriggered
+
+    **Common Source Categories:**
+    - userSessions: Authentication events
+    - content: Content library operations
+    - dashboards: Dashboard operations
+    - searches: Saved search operations
+    - collectors/sources: Data collection configuration
+    - cseInsight/cseSignal/cseRule: Cloud SIEM operations
+    - monitors: Monitor and alert operations
+
+    **Key Fields (automatically extracted):**
+    - eventName: Type of event
+    - eventTime: When the event occurred
+    - operator.email: User who performed the action
+    - operator.id: User ID
+    - operator.sourceIp: Source IP address
+
+    Additional fields vary by event type (e.g., sourceIdentity.collectorName, sourceIdentity.sourceName)
+
+    **Example Queries:**
+    - User logins: source_category="userSessions", event_name="UserLoginSuccess"
+    - CSE insights: source_category="cseInsight", keywords="InsightUpdated"
+    - Content changes by user: operator_email="user@example.com", source_category="content"
+    - Top events: aggregate_by="_sourcecategory,eventName"
+
+    **Parameters:**
+    - event_name: Filter by event name (can use keyword matching)
+    - source_category: Filter by _sourceCategory (feature area)
+    - operator_email: Filter by user email
+    - keywords: Additional keyword search
+    - extract_fields: Custom JSON fields to extract
+    - aggregate_by: Fields to group by (adds '| count by' operator)
+    - limit: Maximum results (default 100)
+
+    **Returns:**
+    JSON with parsed event data including extracted fields. If aggregate_by is specified,
+    returns aggregated counts by the specified fields.
+
+    **API Reference:**
+    https://www.sumologic.com/help/docs/manage/security/audit-indexes/audit-event-index/
+    https://service.sumologic.com/audit/docs/
+    """
+    try:
+        from .audit_helpers import build_enterprise_audit_query
+
+        _ensure_config_initialized()
+        config = get_config()
+        limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
+        await limiter.acquire("search_audit_events")
+
+        instance = validate_instance_name(instance)
+
+        # Parse extract_fields
+        extract_list = extract_fields.split(",") if extract_fields else None
+
+        # Parse aggregate_by
+        agg_list = aggregate_by.split(",") if aggregate_by else None
+
+        # Build query
+        query = build_enterprise_audit_query(
+            index="sumologic_audit_events",
+            event_name=event_name,
+            source_category=source_category,
+            operator_email=operator_email,
+            keywords=keywords,
+            parse_json=True,
+            extract_fields=extract_list,
+            aggregate_by=agg_list,
+            limit=limit
+        )
+
+        # Execute search
+        client = await get_sumo_client(instance)
+
+        # Determine time range
+        if from_time is not None and to_time is not None:
+            from_str = from_time
+            to_str = to_time
+        else:
+            hours_back = validate_time_range(hours_back)
+            to_time_dt = datetime.now(timezone.utc)
+            from_time_dt = to_time_dt - timedelta(hours=hours_back)
+            from_str = from_time_dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+            to_str = to_time_dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+        results = await client.search_logs(
+            query,
+            from_str,
+            to_str,
+            "UTC",
+            False
+        )
+
+        return json.dumps(results, indent=2)
+
+    except Exception as e:
+        return handle_tool_error(e, "search_audit_events")
+
+
+@mcp.tool()
+async def search_system_events(
+    use_case: Optional[str] = Field(default=None, description="Pre-built use case: 'collector_source_health', 'monitor_alerts', or 'monitor_alert_timeline'"),
+    event_name: Optional[str] = Field(default=None, description="Event name filter (e.g., system-specific events)"),
+    source_category: Optional[str] = Field(default=None, description="Source category filter for system events"),
+    keywords: Optional[str] = Field(default=None, description="Additional keyword search terms"),
+    extract_fields: Optional[str] = Field(default=None, description="Comma-separated JSON fields to extract (default: eventName,eventTime,operator.email,operator.id,operator.sourceIp)"),
+    aggregate_by: Optional[str] = Field(default=None, description="Comma-separated fields to aggregate by"),
+    hours_back: int = Field(default=24, description="Number of hours to search back from now (ignored if from_time/to_time provided)"),
+    from_time: Optional[str] = Field(default=None, description="Start time: ISO8601, epoch ms, or relative like '-1h'"),
+    to_time: Optional[str] = Field(default=None, description="End time: ISO8601, epoch ms, or relative like 'now'"),
+    limit: int = Field(default=100, description="Maximum number of results to return"),
+    instance: str = Field(default='default', description="Sumo Logic instance name")
+) -> str:
+    """
+    Search the enterprise system events index (_index=sumologic_system_events).
+
+    The enterprise system events index contains structured JSON logs for system-level operations
+    and automated processes in Sumo Logic. Similar structure to audit_events but focused on
+    system operations rather than user actions.
+
+    **Pre-built Use Cases:**
+    Set use_case parameter to:
+    - "collector_source_health": Monitor unhealthy collector/source states (ideal for monitors)
+      Returns aggregated health events with resource name, error, and tracker ID
+    - "monitor_alerts": Analyze monitor alert state changes and frequency
+      Returns alert counts by monitor name (excludes Normal states)
+    - "monitor_alert_timeline": Timeline view of alert status changes with durations
+      Returns chronological alert state changes with duration in minutes
+
+    **Common System Events:**
+    - Health-Change events: Collector/source health status changes (healthy/unhealthy)
+    - Alert state changes: Monitor alert transitions (Normal, Critical, Warning, etc.)
+    - Automated data management operations
+    - System-triggered searches and alerts
+    - Background processing events
+    - System configuration changes
+
+    **Key Fields (automatically extracted):**
+    - eventName: Type of system event
+    - eventTime: When the event occurred
+    - operator.email: System or service account (if applicable)
+    - operator.id: System/service account ID
+    - operator.sourceIp: Source IP address
+
+    **Example Queries:**
+    - System events by type: aggregate_by="eventName"
+    - Recent system operations: keywords="system", limit=50
+    - Collector health monitoring: use_case="collector_source_health"
+
+    **Parameters:**
+    - use_case: Pre-built use case (overrides other parameters)
+    - event_name: Filter by event name
+    - source_category: Filter by _sourceCategory
+    - keywords: Additional keyword search
+    - extract_fields: Custom JSON fields to extract
+    - aggregate_by: Fields to group by (adds '| count by' operator)
+    - limit: Maximum results (default 100)
+
+    **Returns:**
+    JSON with parsed system event data. If aggregate_by is specified,
+    returns aggregated counts by the specified fields.
+
+    **API Reference:**
+    https://www.sumologic.com/help/docs/manage/security/audit-indexes/system-event-index/
+    https://service.sumologic.com/audit/docs/#tag/Health-Events-(System)
+    """
+    try:
+        from .audit_helpers import build_enterprise_audit_query, get_system_event_use_case
+
+        _ensure_config_initialized()
+        config = get_config()
+        limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
+        await limiter.acquire("search_system_events")
+
+        instance = validate_instance_name(instance)
+
+        # Handle pre-built use case
+        if use_case:
+            use_case_info = get_system_event_use_case(use_case)
+            if not use_case_info:
+                return json.dumps({
+                    "error": f"Unknown use case: {use_case}",
+                    "available_use_cases": ["collector_source_health", "monitor_alerts", "monitor_alert_timeline"]
+                }, indent=2)
+
+            # Use the pre-built query
+            query = use_case_info["query_pattern"]
+            if keywords:
+                query += f" {keywords}"
+        else:
+            # Parse extract_fields
+            extract_list = extract_fields.split(",") if extract_fields else None
+
+            # Parse aggregate_by
+            agg_list = aggregate_by.split(",") if aggregate_by else None
+
+            # Build query
+            query = build_enterprise_audit_query(
+                index="sumologic_system_events",
+                event_name=event_name,
+                source_category=source_category,
+                operator_email=None,  # System events may not have operator email
+                keywords=keywords,
+                parse_json=True,
+                extract_fields=extract_list,
+                aggregate_by=agg_list,
+                limit=limit
+            )
+
+        # Execute search
+        client = await get_sumo_client(instance)
+
+        # Determine time range
+        if from_time is not None and to_time is not None:
+            from_str = from_time
+            to_str = to_time
+        else:
+            hours_back = validate_time_range(hours_back)
+            to_time_dt = datetime.now(timezone.utc)
+            from_time_dt = to_time_dt - timedelta(hours=hours_back)
+            from_str = from_time_dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+            to_str = to_time_dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+        results = await client.search_logs(
+            query,
+            from_str,
+            to_str,
+            "UTC",
+            False
+        )
+
+        return json.dumps(results, indent=2)
+
+    except Exception as e:
+        return handle_tool_error(e, "search_system_events")
+
+
 # Cleanup handler
 async def cleanup():
     """Clean up resources when the server shuts down."""

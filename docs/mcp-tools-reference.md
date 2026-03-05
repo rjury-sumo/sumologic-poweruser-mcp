@@ -1,7 +1,7 @@
 # Sumo Logic MCP Server - Tools Reference
 
 ## Overview
-Total Tools: **41**
+Total Tools: **44**
 
 ---
 
@@ -205,9 +205,163 @@ Analyze search scan costs with detailed tier/metering breakdown for Infrequent a
 
 ---
 
+## Audit Index Tools (3)
+
+### 9. `search_legacy_audit`
+Search the legacy Sumo Logic audit index (_index=sumologic_audit) for user activity, authentication, and system events.
+
+**Parameters:**
+- `action` (str, optional) - Action filter (e.g., "login", "create", "update")
+- `status` (str, optional) - Status filter (e.g., "SUCCESS", "FAILURE")
+- `source_category` (str, optional) - Source category filter (e.g., "user_activity", "scheduled_search")
+- `keywords` (str, optional) - Additional keyword search terms
+- `use_case` (str, optional) - Pre-built use case: "logins", "scheduled_search_triggers", "user_activity", "content_changes"
+- `aggregate_by` (str, optional) - Comma-separated fields to aggregate by
+- `hours_back` (int, default=24) - Hours to search back
+- `from_time` (str, optional) - Start time (ISO8601, epoch ms, or relative)
+- `to_time` (str, optional) - End time (ISO8601, epoch ms, or relative)
+- `limit` (int, default=100) - Maximum results
+- `instance` (str, default='default') - Instance name
+
+**Returns:** Query results with audit events. If aggregate_by specified, returns aggregated counts.
+
+**Pre-built Use Cases:**
+- `logins` - User login events
+- `scheduled_search_triggers` - Scheduled search alert triggers
+- `user_activity` - General user activity
+- `content_changes` - Content creation/modification/deletion
+
+**Example Events:**
+- Login: "User user@example.com successfully logged in via SAML"
+- Alert: "Scheduled search alert triggered [Name=...] [SchSearchId=...][AlertType=...]"
+
+**Use Cases:**
+- Track user authentication activity
+- Monitor scheduled search alert triggers
+- Audit content changes
+- Investigate user actions
+
+**API Reference:** https://www.sumologic.com/help/docs/manage/security/audit-indexes/audit-index/
+
+---
+
+### 10. `search_audit_events`
+Search the enterprise audit events index (_index=sumologic_audit_events) for structured JSON audit logs.
+
+**Parameters:**
+- `event_name` (str, optional) - Event name filter (e.g., "UserLoginSuccess", "ContentUpdated", "InsightCreated")
+- `source_category` (str, optional) - Source category filter (e.g., "userSessions", "content", "cseInsight")
+- `operator_email` (str, optional) - Filter by operator email address
+- `keywords` (str, optional) - Additional keyword search terms
+- `extract_fields` (str, optional) - Comma-separated JSON fields to extract
+- `aggregate_by` (str, optional) - Comma-separated fields to aggregate by
+- `hours_back` (int, default=24) - Hours to search back
+- `from_time` (str, optional) - Start time
+- `to_time` (str, optional) - End time
+- `limit` (int, default=100) - Maximum results
+- `instance` (str, default='default') - Instance name
+
+**Returns:** Parsed JSON audit events with extracted fields. If aggregate_by specified, returns aggregated counts.
+
+**Common Event Categories:**
+- **Authentication**: UserLoginSuccess, UserLoginFailure, UserLogout, MfaEnabled
+- **Content Management**: ContentCreated, ContentUpdated, ContentDeleted, ContentMoved
+- **Data Collection**: CollectorCreated, SourceCreated, SourceUpdated
+- **CSE Operations**: InsightCreated, InsightUpdated, InsightClosed
+- **User Management**: UserCreated, UserUpdated, RoleAssigned
+- **Monitoring**: MonitorCreated, MonitorUpdated, MonitorTriggered
+
+**Common Source Categories:**
+- `userSessions` - Authentication events
+- `content` - Content library operations
+- `dashboards` - Dashboard operations
+- `collectors/sources` - Data collection configuration
+- `cseInsight/cseSignal/cseRule` - Cloud SIEM operations
+
+**Default Extracted Fields:**
+- eventName, eventTime, operator.email, operator.id, operator.sourceIp
+
+**Use Cases:**
+- Track user authentication patterns
+- Audit content library changes by specific users
+- Monitor Cloud SIEM insight creation and updates
+- Analyze collector and source configuration changes
+- Generate compliance reports on user activity
+
+**API Reference:**
+- https://www.sumologic.com/help/docs/manage/security/audit-indexes/audit-event-index/
+- https://service.sumologic.com/audit/docs/
+
+---
+
+### 11. `search_system_events`
+Search the enterprise system events index (_index=sumologic_system_events) for system-level operations and health events.
+
+**Parameters:**
+- `use_case` (str, optional) - Pre-built use case: "collector_source_health"
+- `event_name` (str, optional) - Event name filter
+- `source_category` (str, optional) - Source category filter
+- `keywords` (str, optional) - Additional keyword search terms
+- `extract_fields` (str, optional) - Comma-separated JSON fields to extract
+- `aggregate_by` (str, optional) - Comma-separated fields to aggregate by
+- `hours_back` (int, default=24) - Hours to search back
+- `from_time` (str, optional) - Start time
+- `to_time` (str, optional) - End time
+- `limit` (int, default=100) - Maximum results
+- `instance` (str, default='default') - Instance name
+
+**Returns:** Parsed JSON system events. If aggregate_by specified, returns aggregated counts.
+
+**Pre-built Use Cases:**
+- `collector_source_health` - Monitor unhealthy collector/source states (ideal for alerts/monitors)
+- `monitor_alerts` - Analyze monitor alert state changes and frequency (find most frequently alerting monitors)
+- `monitor_alert_timeline` - Timeline view of alert status changes with durations and details
+
+**Common System Events:**
+- **Health-Change** events - Collector/source health status changes (healthy/unhealthy)
+- **Alert state changes** - Monitor alert transitions (Normal, Critical, Warning, etc.)
+- Automated data management operations
+- System-triggered searches and alerts
+- Background processing events
+- System configuration changes
+
+**Use Cases:**
+- Monitor collector and source health status
+- Create alerts for unhealthy data collection infrastructure
+- Analyze monitor alert patterns and identify noisy monitors
+- Track automated system operations
+- Audit system-level configuration changes
+- Build monitors using resource_name as alert grouping
+
+**Use Case Examples:**
+
+*collector_source_health*:
+- Filters for "Health-Change" unhealthy events
+- Extracts resource name, error message, tracker ID
+- Aggregates by resource for one alert per unhealthy collector/source
+
+*monitor_alerts*:
+- Analyzes monitor alert state changes (excludes Normal states)
+- Shows alert counts by monitor name
+- Helps identify frequently alerting monitors
+- Useful for alert fatigue analysis
+
+*monitor_alert_timeline*:
+- Shows chronological timeline of all alert state changes
+- Includes alert duration in minutes, monitor path, and granularity
+- Displays time series grouping and previous/current status
+- Useful for understanding alert patterns and timing over time
+- Can be filtered by specific monitors in query scope
+
+**API Reference:**
+- https://www.sumologic.com/help/docs/manage/security/audit-indexes/system-event-index/
+- https://service.sumologic.com/audit/docs/#tag/Health-Events-(System)
+
+---
+
 ## Query Examples Tools (1)
 
-### 9. `search_query_examples`
+### 12. `search_query_examples`
 Search through 11,000+ real Sumo Logic queries from 280+ published apps using intelligent scoring and relevance ranking.
 
 **Parameters:**
@@ -244,7 +398,7 @@ Search through 11,000+ real Sumo Logic queries from 280+ published apps using in
 
 ## Log Volume Analysis Tools (2)
 
-### 10. `analyze_log_volume`
+### 13. `analyze_log_volume`
 Analyze raw log volume using the _size field to understand ingestion drivers and optimize Infrequent tier usage.
 
 **Parameters:**
@@ -267,7 +421,7 @@ Analyze raw log volume using the _size field to understand ingestion drivers and
 
 ---
 
-### 11. `profile_log_schema`
+### 14. `profile_log_schema`
 Discover available fields and suggest good dimensions for volume analysis using the facets operator.
 
 **Parameters:**
@@ -288,7 +442,7 @@ Discover available fields and suggest good dimensions for volume analysis using 
 
 ## Content Library Tools (10)
 
-### 12. `get_personal_folder`
+### 15. `get_personal_folder`
 Get user's personal folder with optional children. Fast synchronous access to personal library.
 
 **Parameters:**
@@ -303,7 +457,7 @@ Get user's personal folder with optional children. Fast synchronous access to pe
 
 ---
 
-### 13. `get_folder_by_id`
+### 16. `get_folder_by_id`
 Get a specific folder by ID with optional children. Navigate folder hierarchy.
 
 **Parameters:**
@@ -319,7 +473,7 @@ Get a specific folder by ID with optional children. Navigate folder hierarchy.
 
 ---
 
-### 14. `get_content_by_path`
+### 17. `get_content_by_path`
 Get content item by its library path.
 
 **Parameters:**
@@ -334,7 +488,7 @@ Get content item by its library path.
 
 ---
 
-### 15. `get_content_path_by_id`
+### 18. `get_content_path_by_id`
 Get the full library path for a content ID.
 
 **Parameters:**
@@ -349,7 +503,7 @@ Get the full library path for a content ID.
 
 ---
 
-### 16. `export_content`
+### 19. `export_content`
 Export full content structure (dashboards, searches, etc.) with async job handling.
 
 **Parameters:**
@@ -368,7 +522,7 @@ Export full content structure (dashboards, searches, etc.) with async job handli
 
 ---
 
-### 17. `export_global_folder`
+### 20. `export_global_folder`
 Export Global folder contents (async) with optional truncation. **IMPORTANT:** Uses 'data' array instead of 'children'.
 
 **Parameters:**
@@ -390,7 +544,7 @@ Export Global folder contents (async) with optional truncation. **IMPORTANT:** U
 
 ---
 
-### 18. `export_admin_recommended_folder`
+### 21. `export_admin_recommended_folder`
 Export Admin Recommended folder (async) with optional truncation. Uses 'children' array (unlike Global folder).
 
 **Parameters:**
@@ -411,7 +565,7 @@ Export Admin Recommended folder (async) with optional truncation. Uses 'children
 
 ---
 
-### 19. `export_installed_apps`
+### 22. `export_installed_apps`
 Export Installed Apps folder to discover pre-built apps available in your Sumo Logic instance (async).
 
 **Parameters:**
@@ -451,7 +605,7 @@ Export Installed Apps folder to discover pre-built apps available in your Sumo L
 
 ---
 
-### 20. `list_installed_apps`
+### 23. `list_installed_apps`
 List all installed Sumo Logic apps with optional filtering (lightweight alternative to export_installed_apps).
 
 **Parameters:**
@@ -496,7 +650,7 @@ This endpoint may require admin permissions in some organizations. If it fails w
 
 ## Content ID Utilities (3)
 
-### 21. `convert_content_id_hex_to_decimal`
+### 24. `convert_content_id_hex_to_decimal`
 Convert hex content ID to decimal format for web UI URLs.
 
 **Parameters:**
@@ -512,7 +666,7 @@ Convert hex content ID to decimal format for web UI URLs.
 
 ---
 
-### 22. `convert_content_id_decimal_to_hex`
+### 25. `convert_content_id_decimal_to_hex`
 Convert decimal content ID to hex format for API calls.
 
 **Parameters:**
@@ -528,7 +682,7 @@ Convert decimal content ID to hex format for API calls.
 
 ---
 
-### 23. `get_content_web_url`
+### 26. `get_content_web_url`
 Generate web UI URL for a content item with proper handling for different content types.
 
 **Parameters:**
@@ -556,7 +710,7 @@ Generate web UI URL for a content item with proper handling for different conten
 
 ---
 
-### 24. `build_search_web_url`
+### 27. `build_search_web_url`
 Build a web UI URL to open a log search query with pre-filled query and time range.
 
 **Parameters:**
@@ -584,7 +738,7 @@ Build a web UI URL to open a log search query with pre-filled query and time ran
 
 ## Field Management Tools (3)
 
-### 25. `list_custom_fields`
+### 28. `list_custom_fields`
 List all custom fields defined in the organization.
 
 **Parameters:**
@@ -601,7 +755,7 @@ List all custom fields defined in the organization.
 
 ---
 
-### 26. `list_field_extraction_rules`
+### 29. `list_field_extraction_rules`
 List all field extraction rules (FERs) for pre-parsing logs.
 
 **Parameters:**
@@ -619,7 +773,7 @@ List all field extraction rules (FERs) for pre-parsing logs.
 
 ---
 
-### 27. `get_field_extraction_rule`
+### 30. `get_field_extraction_rule`
 Get detailed information about a specific field extraction rule.
 
 **Parameters:**
@@ -640,7 +794,7 @@ Get detailed information about a specific field extraction rule.
 
 ## Collectors & Sources Tools (2)
 
-### 28. `get_sumo_collectors`
+### 31. `get_sumo_collectors`
 Get list of Sumo Logic collectors with pagination and optional client-side filtering.
 
 **Parameters:**
@@ -671,7 +825,7 @@ Get list of Sumo Logic collectors with pagination and optional client-side filte
 
 ---
 
-### 29. `get_sumo_sources`
+### 32. `get_sumo_sources`
 Get sources for a specific Sumo Logic collector.
 
 **Parameters:**
@@ -684,7 +838,7 @@ Get sources for a specific Sumo Logic collector.
 
 ## Users & Roles Tools (2)
 
-### 30. `get_sumo_users`
+### 33. `get_sumo_users`
 Get list of Sumo Logic users.
 
 **Parameters:**
@@ -695,7 +849,7 @@ Get list of Sumo Logic users.
 
 ---
 
-### 31. `get_sumo_roles_v2`
+### 34. `get_sumo_roles_v2`
 Get list of roles using the v2 Roles API.
 
 **Parameters:**
@@ -708,7 +862,7 @@ Get list of roles using the v2 Roles API.
 
 ## Dashboards & Monitors Tools (2)
 
-### 32. `get_sumo_dashboards`
+### 35. `get_sumo_dashboards`
 Get list of Sumo Logic dashboards with pagination, mode filtering, and client-side filtering.
 
 **Parameters:**
@@ -758,7 +912,7 @@ Get list of Sumo Logic dashboards with pagination, mode filtering, and client-si
 
 ---
 
-### 33. `search_sumo_monitors`
+### 36. `search_sumo_monitors`
 Search for monitors and monitor folders.
 
 **Parameters:**
@@ -779,7 +933,7 @@ Search for monitors and monitor folders.
 
 ## System Tools (2)
 
-### 34. `get_sumo_partitions`
+### 37. `get_sumo_partitions`
 Get list of partitions.
 
 **Parameters:**
@@ -790,7 +944,7 @@ Get list of partitions.
 
 ---
 
-### 35. `list_sumo_instances`
+### 38. `list_sumo_instances`
 List all configured Sumo Logic instances.
 
 **Parameters:** None
@@ -801,7 +955,7 @@ List all configured Sumo Logic instances.
 
 ## Account Management Tools (6)
 
-### 36. `get_account_status`
+### 39. `get_account_status`
 Get account status including subscription, plan type, and usage information.
 
 **Parameters:**
@@ -818,7 +972,7 @@ Get account status including subscription, plan type, and usage information.
 
 ---
 
-### 37. `get_usage_forecast`
+### 40. `get_usage_forecast`
 Get usage forecast for specified number of days based on recent consumption patterns.
 
 **Parameters:**
@@ -836,7 +990,7 @@ Get usage forecast for specified number of days based on recent consumption patt
 
 ---
 
-### 38. `export_usage_report`
+### 41. `export_usage_report`
 Export detailed usage report for a date range (async operation). Returns download URL for CSV report.
 
 **Parameters:**
@@ -860,7 +1014,7 @@ Export detailed usage report for a date range (async operation). Returns downloa
 
 ---
 
-### 39. `get_estimated_log_search_usage`
+### 42. `get_estimated_log_search_usage`
 Get estimated data volume that would be scanned for a log search query in Infrequent Data Tier and Flex.
 
 **Parameters:**
@@ -901,7 +1055,7 @@ Get estimated data volume that would be scanned for a log search query in Infreq
 
 ---
 
-### 40. `analyze_data_volume`
+### 43. `analyze_data_volume`
 Analyze data volume ingestion from the Sumo Logic Data Volume Index for capacity planning and cost analysis.
 
 **Parameters:**
@@ -998,7 +1152,7 @@ When `include_timeshift=True`, the tool handles edge cases properly:
 
 ---
 
-### 41. `analyze_data_volume_grouped`
+### 44. `analyze_data_volume_grouped`
 Advanced data volume analysis with cardinality reduction for large-scale environments (5000+ source categories).
 
 **Parameters:**

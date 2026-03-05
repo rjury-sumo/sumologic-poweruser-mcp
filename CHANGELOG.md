@@ -1,6 +1,43 @@
 # Changelog
 
-## [Unreleased] - 2026-03-04
+## [Unreleased] - 2026-03-05
+
+### Added
+- **Audit Index Search Tools (3 new tools)**: Comprehensive tools for searching Sumo Logic audit indexes
+  - `search_legacy_audit`: Search legacy audit index (_index=sumologic_audit) for user activity and system events
+    - Pre-built use cases: logins, scheduled_search_triggers, user_activity, content_changes
+    - Supports action, status, and source_category filtering
+    - Optional aggregation and keyword search
+  - `search_audit_events`: Search enterprise audit events (_index=sumologic_audit_events) with JSON parsing
+    - Structured JSON logs for user and system actions across all Sumo Logic features
+    - Auto-extracts: eventName, eventTime, operator.email, operator.id, operator.sourceIp
+    - Common event categories: authentication, content management, CSE operations, user management
+  - `search_system_events`: Search enterprise system events (_index=sumologic_system_events) for system operations
+    - Pre-built use cases: collector_source_health, monitor_alerts, monitor_alert_timeline
+    - Collector/source health monitoring with unhealthy state detection
+    - Monitor alert analysis and timeline views with alert duration tracking
+- **Audit Helpers Module**: New `audit_helpers.py` with query builders and use case patterns
+  - `build_legacy_audit_query()`: Construct queries for legacy audit index
+  - `build_enterprise_audit_query()`: Construct queries for enterprise audit indexes with JSON parsing
+  - Pre-built query patterns for common audit use cases
+  - Event category documentation and field extraction helpers
+- **Use Case Examples**: Pre-built queries for common audit scenarios
+  - User login tracking and authentication analysis
+  - Scheduled search alert trigger monitoring
+  - Collector/source health monitoring for alerting
+  - Monitor alert frequency and timeline analysis
+  - Content change auditing
+- **Tests**: Comprehensive test suite for audit tools (28 tests covering all query builders and use cases)
+- **Documentation**: Full documentation in `docs/mcp-tools-reference.md` for all 3 new audit tools
+
+### Changed
+- Updated `docs/mcp-tools-reference.md`:
+  - Total tools: 41 → 44 (added 3 audit index search tools)
+  - Added new "Audit Index Tools (3)" category
+  - Renumbered existing tools to maintain sequential order (tools 10-41 became 13-44)
+- Enhanced documentation with comprehensive use cases for audit index searches
+
+## [Previous] - 2026-03-04
 
 ### Added
 - **Development Guidelines**: Comprehensive development documentation for consistent AI-assisted development
