@@ -79,7 +79,7 @@ These capabilities are particularly valuable for:
 
 ## Available Tools
 
-**Total: 40 MCP Tools + 1 Resource** organized into 11 categories
+**Total: 46 MCP Tools + 1 Resource** organized into 12 categories
 
 For complete tool documentation with parameters, examples, and use cases, see **[MCP Tools Reference](docs/mcp-tools-reference.md)**.
 
@@ -98,6 +98,7 @@ For complete tool documentation with parameters, examples, and use cases, see **
 | **Dashboards & Monitors** | 2 | List dashboards, search monitors |
 | **Field Management** | 3 | Custom fields, field extraction rules |
 | **System** | 2 | List partitions, list instances |
+| **Utility** | 1 | Skills library access |
 
 ### Featured Tools
 
@@ -136,6 +137,9 @@ For complete tool documentation with parameters, examples, and use cases, see **
 **Query Examples:**
 - `search_query_examples` - Search through 11,000+ real Sumo Logic queries from 280+ published apps by app name, use case, or keywords
 - Resource: `sumo://query-examples` - Browse sample query examples via MCP resources (returns 20 diverse examples)
+
+**Skills Library:**
+- `get_skill` - Fetch portable skill definitions (query construction, optimization, discovery workflows, cost analysis)
 
 All tools support an `instance` parameter to target specific Sumo Logic deployments.
 
@@ -661,6 +665,65 @@ uv run sumologic-mcp-server
 uv run python -m sumologic_mcp_server.sumologic_mcp_server
 ```
 
+## Skills Library
+
+The `skills/` directory contains **portable knowledge artifacts** that teach how to accomplish specific tasks in Sumo Logic using MCP tools and best practices. Skills are designed for use with Claude Code, Claude Desktop, and other AI assistants.
+
+### What are Skills?
+
+Skills capture the **"how-to"** knowledge for working with Sumo Logic:
+- **Query construction patterns** - 5-phase approach (Scope → Parse → Filter → Aggregate → Format)
+- **Discovery workflows** - Finding logs when you don't know metadata
+- **Cost optimization techniques** - Using scheduled views for 10x-100x improvements
+- **Audit patterns** - Searching audit indexes effectively
+- **Best practices** - Common pitfalls and optimization strategies
+
+### Available Skills
+
+| Category | Skills | Description |
+|----------|--------|-------------|
+| **Search & Query** | 4 skills | Writing queries, optimization, scheduled views, UI navigation |
+| **Discovery** | 2 skills | Finding logs without metadata, scheduled view inventory |
+| **Cost Analysis** | 2 skills | Search costs, data volume analysis |
+| **Audit** | 2 skills | User activity, system health monitoring |
+| **Content** | 2 skills | Library navigation, URL generation |
+| **Admin** | 2 skills | Collector management, field extraction |
+
+**Featured Skills:**
+- **[search-write-queries.md](skills/search-write-queries.md)** - Complete 5-phase query construction guide
+- **[search-optimize-queries.md](skills/search-optimize-queries.md)** - Performance and cost optimization
+- **[search-optimize-with-views.md](skills/search-optimize-with-views.md)** - Transform queries to use scheduled views
+- **[discovery-logs-without-metadata.md](skills/discovery-logs-without-metadata.md)** - Multi-phase log discovery
+- **[cost-analyze-search-costs.md](skills/cost-analyze-search-costs.md)** - Flex/Infrequent tier analysis
+
+📖 **[View Complete Skills Index →](skills/README.md)**
+
+### Using Skills
+
+**With the MCP Server:**
+Use the `get_skill` tool to fetch skills dynamically:
+```
+get_skill("search-write-queries")
+```
+
+**With Claude Code:**
+Skills are automatically loaded from the `skills/` directory and referenced in [CLAUDE.md](CLAUDE.md).
+
+**Standalone:**
+Copy any skill markdown file and provide it as context to your AI assistant.
+
+### Skill Format
+
+Each skill includes:
+- **Intent** - What the skill accomplishes
+- **Prerequisites** - Required knowledge/access
+- **Context** - When to use it
+- **Approach** - Step-by-step methodology with MCP tool calls
+- **Query Patterns** - Reusable code snippets
+- **Examples** - Real-world scenarios
+- **Common Pitfalls** - Mistakes to avoid
+- **Related Skills** - Cross-references
+
 ## Architecture
 
 ```
@@ -676,12 +739,25 @@ sumologic-python-mcp/
 │   ├── search_helpers.py         # Search utility functions
 │   ├── content_id_utils.py       # Content ID manipulation
 │   └── async_export_helper.py    # Async job polling helpers
+├── skills/                       # Portable skill definitions
+│   ├── README.md                 # Skills index and documentation
+│   ├── search-*.md               # Query writing and optimization skills
+│   ├── discovery-*.md            # Log discovery workflows
+│   ├── cost-*.md                 # Cost analysis skills
+│   ├── audit-*.md                # Audit index skills
+│   ├── content-*.md              # Content library skills
+│   ├── admin-*.md                # Administration skills
+│   └── ui-*.md                   # UI navigation skills
 ├── tests/
 │   ├── integration/              # Integration tests
 │   ├── utilities/                # Unit tests for helpers
 │   └── debug/                    # Debug test scripts
+├── docs/
+│   ├── mcp-tools-reference.md    # Complete tool documentation
+│   └── development/              # Development notes
 ├── .env.example                  # Configuration template
 ├── .gitignore
+├── CLAUDE.md                     # Development guidelines
 ├── SECURITY.md                   # Security policy
 ├── LICENSE
 ├── README.md
