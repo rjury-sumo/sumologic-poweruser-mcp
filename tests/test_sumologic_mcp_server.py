@@ -265,11 +265,11 @@ class TestSearchHelpers:
         """Test that times are converted to epoch milliseconds."""
         from sumologic_mcp_server.search_helpers import parse_relative_time
 
-        # ISO8601 should be converted to epoch milliseconds
+        # ISO8601 should be converted to epoch milliseconds (UTC)
         iso_time = "2024-01-15T10:00:00Z"
         result = parse_relative_time(iso_time)
         assert isinstance(result, int)
-        assert result == 1705266000000  # 2024-01-15T10:00:00Z in epoch ms
+        assert result == 1705312800000  # 2024-01-15T10:00:00Z in epoch ms (UTC)
 
         # Epoch milliseconds string should be converted to int
         epoch_ms = "1705315200000"

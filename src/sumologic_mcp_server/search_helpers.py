@@ -122,6 +122,8 @@ def parse_relative_time(time_value: str | int) -> int:
         ]:
             try:
                 dt = datetime.strptime(time_str, fmt)
+                # Treat parsed datetime as UTC to ensure consistent epoch conversion
+                dt = dt.replace(tzinfo=timezone.utc)
                 return int(dt.timestamp() * 1000)
             except ValueError:
                 continue
