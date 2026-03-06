@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+
 import pytest
 
 
@@ -31,11 +32,11 @@ async def cleanup_clients():
     """Clean up clients after each test to prevent event loop issues."""
     yield
     # Clean up any clients created during the test
-    from sumologic_mcp_server.sumologic_mcp_server import clients
     from sumologic_mcp_server.config import reset_config
+    from sumologic_mcp_server.sumologic_mcp_server import clients
 
     for client in clients.values():
-        if hasattr(client, 'session') and client.session:
+        if hasattr(client, "session") and client.session:
             await client.session.aclose()
     clients.clear()
     # Reset config so it reloads from env vars for next test

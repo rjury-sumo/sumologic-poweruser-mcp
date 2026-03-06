@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Quick test script to verify setup is correct."""
 
-import sys
 import os
+import sys
+
 
 def test_imports():
     """Test that all modules can be imported."""

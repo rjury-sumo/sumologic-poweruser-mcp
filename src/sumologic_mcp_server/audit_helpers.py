@@ -1,30 +1,29 @@
 """Helper functions and patterns for Sumo Logic audit index searches."""
 
-from typing import Dict, List, Optional, Literal
-
+from typing import Dict, List, Literal, Optional
 
 # Common use case patterns for legacy audit index
 LEGACY_AUDIT_USE_CASES = {
     "logins": {
         "description": "User login events",
         "query_pattern": '_index=sumologic_audit action=login | where _sourceCategory="user_activity"',
-        "example_fields": ["user", "status", "method"]
+        "example_fields": ["user", "status", "method"],
     },
     "scheduled_search_triggers": {
         "description": "Scheduled search alert triggers",
-        "query_pattern": '_index=sumologic_audit triggered AND _sourceCategory=scheduled_search',
-        "example_fields": ["Name", "SchSearchId", "AlertType", "RecordType"]
+        "query_pattern": "_index=sumologic_audit triggered AND _sourceCategory=scheduled_search",
+        "example_fields": ["Name", "SchSearchId", "AlertType", "RecordType"],
     },
     "user_activity": {
         "description": "General user activity",
         "query_pattern": '_index=sumologic_audit _sourceCategory="user_activity"',
-        "example_fields": ["user", "action", "status"]
+        "example_fields": ["user", "action", "status"],
     },
     "content_changes": {
         "description": "Content creation/modification/deletion",
         "query_pattern": '_index=sumologic_audit _sourceCategory="content"',
-        "example_fields": ["user", "action", "content_type"]
-    }
+        "example_fields": ["user", "action", "content_type"],
+    },
 }
 
 
@@ -32,34 +31,45 @@ LEGACY_AUDIT_USE_CASES = {
 ENTERPRISE_AUDIT_EVENT_CATEGORIES = {
     "authentication": {
         "description": "User authentication events",
-        "example_events": ["UserLoginSuccess", "UserLoginFailure", "UserLogout", "MfaEnabled", "MfaDisabled"],
-        "source_categories": ["userSessions", "accessKeys"]
+        "example_events": [
+            "UserLoginSuccess",
+            "UserLoginFailure",
+            "UserLogout",
+            "MfaEnabled",
+            "MfaDisabled",
+        ],
+        "source_categories": ["userSessions", "accessKeys"],
     },
     "content_management": {
         "description": "Content library operations",
         "example_events": ["ContentCreated", "ContentUpdated", "ContentDeleted", "ContentMoved"],
-        "source_categories": ["content", "dashboards", "searches"]
+        "source_categories": ["content", "dashboards", "searches"],
     },
     "data_collection": {
         "description": "Collector and source operations",
-        "example_events": ["CollectorCreated", "CollectorUpdated", "SourceCreated", "SourceUpdated"],
-        "source_categories": ["collectors", "sources"]
+        "example_events": [
+            "CollectorCreated",
+            "CollectorUpdated",
+            "SourceCreated",
+            "SourceUpdated",
+        ],
+        "source_categories": ["collectors", "sources"],
     },
     "cse_operations": {
         "description": "Cloud SIEM operations",
         "example_events": ["InsightCreated", "InsightUpdated", "InsightClosed"],
-        "source_categories": ["cseInsight", "cseSignal", "cseRule"]
+        "source_categories": ["cseInsight", "cseSignal", "cseRule"],
     },
     "user_management": {
         "description": "User and role management",
         "example_events": ["UserCreated", "UserUpdated", "UserDeleted", "RoleAssigned"],
-        "source_categories": ["users", "roles"]
+        "source_categories": ["users", "roles"],
     },
     "monitoring": {
         "description": "Monitor and alert operations",
         "example_events": ["MonitorCreated", "MonitorUpdated", "MonitorTriggered"],
-        "source_categories": ["monitors"]
-    }
+        "source_categories": ["monitors"],
+    },
 }
 
 
@@ -69,7 +79,7 @@ def build_legacy_audit_query(
     source_category: Optional[str] = None,
     keywords: Optional[str] = None,
     aggregate_by: Optional[List[str]] = None,
-    limit: int = 100
+    limit: int = 100,
 ) -> str:
     """
     Build a query for the legacy audit index (_index=sumologic_audit).
@@ -88,10 +98,10 @@ def build_legacy_audit_query(
     query_parts = ["_index=sumologic_audit"]
 
     if action:
-        query_parts.append(f'action={action}')
+        query_parts.append(f"action={action}")
 
     if status:
-        query_parts.append(f'status={status}')
+        query_parts.append(f"status={status}")
 
     if source_category:
         query_parts.append(f'_sourceCategory="{source_category}"')
@@ -120,7 +130,7 @@ def build_enterprise_audit_query(
     parse_json: bool = True,
     extract_fields: Optional[List[str]] = None,
     aggregate_by: Optional[List[str]] = None,
-    limit: int = 100
+    limit: int = 100,
 ) -> str:
     """
     Build a query for enterprise audit indexes (sumologic_audit_events or sumologic_system_events).
@@ -142,7 +152,7 @@ def build_enterprise_audit_query(
     query_parts = [f"_index={index}"]
 
     if source_category:
-        query_parts.append(f'_sourceCategory={source_category}')
+        query_parts.append(f"_sourceCategory={source_category}")
 
     if event_name:
         query_parts.append(event_name)
@@ -161,7 +171,7 @@ def build_enterprise_audit_query(
                 "eventTime",
                 "operator.email",
                 "operator.id",
-                "operator.sourceIp"
+                "operator.sourceIp",
             ]
 
         fields_str = ", ".join([f'"{field}"' for field in extract_fields])
@@ -236,8 +246,8 @@ SYSTEM_EVENT_USE_CASES = {
             "Use resource_name as alertgroup for one alert per resource",
             "Can filter with: | where resource_name matches /regex/",
             "Can exclude chatty events with: | where !(error IN (...))",
-            "See docs: https://service.au.sumologic.com/audit/docs/#tag/Health-Events-(System)"
-        ]
+            "See docs: https://service.au.sumologic.com/audit/docs/#tag/Health-Events-(System)",
+        ],
     },
     "monitor_alerts": {
         "description": "Analyze monitor alert state changes and alert frequency",
@@ -260,8 +270,8 @@ SYSTEM_EVENT_USE_CASES = {
             "Aggregates by monitor name to find highest alert counts",
             "Use timeslice for time-based analysis",
             "Filter by monitorid for specific monitor",
-            "See docs: https://service.au.sumologic.com/audit/docs/#tag/Alerts-(System)"
-        ]
+            "See docs: https://service.au.sumologic.com/audit/docs/#tag/Alerts-(System)",
+        ],
     },
     "monitor_alert_timeline": {
         "description": "Timeline view of monitor alert status changes with duration",
@@ -296,9 +306,9 @@ SYSTEM_EVENT_USE_CASES = {
             "Useful for understanding alert patterns over time",
             "Can filter by specific monitors in scope",
             "resourceid can be used to build URLs to alerts",
-            "See docs: https://service.au.sumologic.com/audit/docs/#tag/Alerts-(System)"
-        ]
-    }
+            "See docs: https://service.au.sumologic.com/audit/docs/#tag/Alerts-(System)",
+        ],
+    },
 }
 
 

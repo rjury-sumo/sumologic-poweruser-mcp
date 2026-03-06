@@ -1,9 +1,10 @@
 """Tests for audit index search tools."""
 
 import pytest
+
 from src.sumologic_mcp_server.audit_helpers import (
-    build_legacy_audit_query,
     build_enterprise_audit_query,
+    build_legacy_audit_query,
     get_audit_use_case_query,
     get_system_event_use_case,
     list_audit_use_cases,
@@ -70,33 +71,27 @@ class TestEnterpriseAuditQueryBuilder:
     def test_event_name_filter(self):
         """Test with event name filter."""
         query = build_enterprise_audit_query(
-            index="sumologic_audit_events",
-            event_name="UserLoginSuccess"
+            index="sumologic_audit_events", event_name="UserLoginSuccess"
         )
         assert "UserLoginSuccess" in query
 
     def test_source_category_filter(self):
         """Test with source category filter."""
         query = build_enterprise_audit_query(
-            index="sumologic_audit_events",
-            source_category="userSessions"
+            index="sumologic_audit_events", source_category="userSessions"
         )
         assert "_sourceCategory=userSessions" in query
 
     def test_operator_email_filter(self):
         """Test with operator email filter."""
         query = build_enterprise_audit_query(
-            index="sumologic_audit_events",
-            operator_email="user@example.com"
+            index="sumologic_audit_events", operator_email="user@example.com"
         )
         assert '| where operator_email = "user@example.com"' in query
 
     def test_json_parsing(self):
         """Test JSON field extraction."""
-        query = build_enterprise_audit_query(
-            index="sumologic_audit_events",
-            parse_json=True
-        )
+        query = build_enterprise_audit_query(index="sumologic_audit_events", parse_json=True)
         assert "| json" in query
         assert "eventName" in query
         assert "operator.email" in query
@@ -104,8 +99,7 @@ class TestEnterpriseAuditQueryBuilder:
     def test_custom_extract_fields(self):
         """Test custom field extraction."""
         query = build_enterprise_audit_query(
-            index="sumologic_audit_events",
-            extract_fields=["customField1", "customField2"]
+            index="sumologic_audit_events", extract_fields=["customField1", "customField2"]
         )
         assert "customField1" in query
         assert "customField2" in query
@@ -113,8 +107,7 @@ class TestEnterpriseAuditQueryBuilder:
     def test_aggregation(self):
         """Test with aggregation."""
         query = build_enterprise_audit_query(
-            index="sumologic_audit_events",
-            aggregate_by=["eventName", "operator_email"]
+            index="sumologic_audit_events", aggregate_by=["eventName", "operator_email"]
         )
         assert "| count by eventName, operator_email" in query
 

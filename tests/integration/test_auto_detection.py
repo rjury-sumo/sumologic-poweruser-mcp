@@ -2,6 +2,7 @@
 """Test auto-detection of Flex vs Tiered org in analyze_search_scan_cost."""
 import asyncio
 import json
+
 from sumologic_mcp_server.sumologic_mcp_server import analyze_search_scan_cost
 
 

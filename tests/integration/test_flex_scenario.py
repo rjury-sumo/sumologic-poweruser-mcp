@@ -20,14 +20,14 @@ def print_result_summary(title, data):
     params = data["query_parameters"]
     summary = data["summary"]
 
-    print(f"\n📊 Breakdown Type:")
+    print("\n📊 Breakdown Type:")
     print(f"   Requested: {params.get('breakdown_type_requested', 'N/A')}")
     print(f"   Used: {params['breakdown_type']}")
 
     if params.get('detected_org_type'):
         print(f"   Detected Org: {params['detected_org_type']}")
 
-    print(f"\n📈 Results:")
+    print("\n📈 Results:")
     print(f"   Queries: {summary['total_queries']:,}")
     print(f"   Scan GB: {summary['total_scan_gb']}")
     print(f"   Credits: {summary['total_scan_credits']}")
@@ -37,7 +37,7 @@ def print_result_summary(title, data):
         print(f"   Non-Billable Scan: {summary['total_non_billable_scan_gb']} GB")
 
     if 'warning' in data:
-        print(f"\n⚠️  WARNING DETECTED:")
+        print("\n⚠️  WARNING DETECTED:")
         print(f"   Type: {data['warning']['type']}")
         print(f"   Message: {data['warning']['message'][:100]}...")
         print(f"   ➡️  {data['warning']['recommendation']}")

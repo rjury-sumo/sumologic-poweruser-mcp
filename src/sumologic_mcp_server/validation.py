@@ -1,8 +1,7 @@
 """Input validation for Sumo Logic MCP Server."""
 
 import re
-from datetime import datetime, timedelta
-from typing import Optional
+
 from pydantic import BaseModel, Field, field_validator
 
 from .exceptions import ValidationError
@@ -13,7 +12,7 @@ class QueryValidation(BaseModel):
 
     query: str = Field(..., min_length=1, max_length=10000, description="Search query")
 
-    @field_validator('query')
+    @field_validator("query")
     @classmethod
     def validate_query(cls, v: str) -> str:
         """Validate query content."""
@@ -25,7 +24,7 @@ class QueryValidation(BaseModel):
             raise ValidationError("Query exceeds maximum length of 10,000 characters")
 
         # Basic sanitization - no null bytes
-        if '\x00' in v:
+        if "\x00" in v:
             raise ValidationError("Query contains invalid null bytes")
 
         return v.strip()
@@ -36,7 +35,7 @@ class TimeRangeValidation(BaseModel):
 
     hours_back: int = Field(default=1, ge=0, le=8760, description="Hours to look back")
 
-    @field_validator('hours_back')
+    @field_validator("hours_back")
     @classmethod
     def validate_hours_back(cls, v: int) -> int:
         """Validate hours_back parameter."""
@@ -61,7 +60,7 @@ class PaginationValidation(BaseModel):
     limit: int = Field(default=100, ge=1, le=1000, description="Maximum results to return")
     offset: int = Field(default=0, ge=0, description="Pagination offset")
 
-    @field_validator('limit')
+    @field_validator("limit")
     @classmethod
     def validate_limit(cls, v: int) -> int:
         """Validate limit parameter."""
@@ -71,7 +70,7 @@ class PaginationValidation(BaseModel):
             raise ValidationError("limit cannot exceed 1000")
         return v
 
-    @field_validator('offset')
+    @field_validator("offset")
     @classmethod
     def validate_offset(cls, v: int) -> int:
         """Validate offset parameter."""
@@ -87,7 +86,7 @@ class CollectorValidation(BaseModel):
 
     collector_id: int = Field(..., ge=1, description="Collector ID")
 
-    @field_validator('collector_id')
+    @field_validator("collector_id")
     @classmethod
     def validate_collector_id(cls, v: int) -> int:
         """Validate collector ID."""
@@ -99,9 +98,11 @@ class CollectorValidation(BaseModel):
 class InstanceValidation(BaseModel):
     """Validation model for instance selection."""
 
-    instance: str = Field(default='default', min_length=1, max_length=50, description="Instance name")
+    instance: str = Field(
+        default="default", min_length=1, max_length=50, description="Instance name"
+    )
 
-    @field_validator('instance')
+    @field_validator("instance")
     @classmethod
     def validate_instance(cls, v: str) -> str:
         """Validate instance name."""
@@ -109,7 +110,7 @@ class InstanceValidation(BaseModel):
             raise ValidationError("instance name cannot be empty")
 
         # Only allow alphanumeric, underscore, and hyphen
-        if not re.match(r'^[a-z0-9_-]+$', v, re.IGNORECASE):
+        if not re.match(r"^[a-z0-9_-]+$", v, re.IGNORECASE):
             raise ValidationError(
                 "instance name can only contain letters, numbers, underscores, and hyphens"
             )
@@ -122,19 +123,23 @@ class ContentTypeValidation(BaseModel):
 
     content_type: str = Field(default="Dashboard", description="Content type")
 
-    @field_validator('content_type')
+    @field_validator("content_type")
     @classmethod
     def validate_content_type(cls, v: str) -> str:
         """Validate content type."""
         valid_types = [
-            "Dashboard", "Search", "Folder", "Report", "ScheduledSearch",
-            "MetricsSearch", "LogsSearch", "TracesSearch"
+            "Dashboard",
+            "Search",
+            "Folder",
+            "Report",
+            "ScheduledSearch",
+            "MetricsSearch",
+            "LogsSearch",
+            "TracesSearch",
         ]
 
         if v not in valid_types:
-            raise ValidationError(
-                f"Invalid content_type. Must be one of: {', '.join(valid_types)}"
-            )
+            raise ValidationError(f"Invalid content_type. Must be one of: {', '.join(valid_types)}")
 
         return v
 
@@ -144,7 +149,7 @@ class MonitorSearchValidation(BaseModel):
 
     query: str = Field(..., min_length=1, max_length=1000, description="Monitor search query")
 
-    @field_validator('query')
+    @field_validator("query")
     @classmethod
     def validate_query(cls, v: str) -> str:
         """Validate monitor search query."""

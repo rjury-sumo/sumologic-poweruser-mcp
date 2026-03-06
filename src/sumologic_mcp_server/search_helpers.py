@@ -2,10 +2,10 @@
 
 import re
 from datetime import datetime, timedelta, timezone
-from typing import Literal, List, Dict, Any
+from typing import Any, Dict, List, Literal
 
 
-def detect_query_type(query: str) -> Literal['messages', 'records']:
+def detect_query_type(query: str) -> Literal["messages", "records"]:
     """
     Detect if a Sumo Logic query returns records (aggregates) or messages (raw logs).
 
@@ -27,27 +27,27 @@ def detect_query_type(query: str) -> Literal['messages', 'records']:
 
     # Aggregate operators that produce records
     aggregate_keywords = [
-        'count',
-        'sum',
-        'avg',
-        'min',
-        'max',
-        'pct',
-        'stddev',
-        'first',
-        'last',
-        'most_recent',
-        'least_recent',
-        'group by',
-        ' by ',  # e.g., "| count by field"
-        'timeslice',
+        "count",
+        "sum",
+        "avg",
+        "min",
+        "max",
+        "pct",
+        "stddev",
+        "first",
+        "last",
+        "most_recent",
+        "least_recent",
+        "group by",
+        " by ",  # e.g., "| count by field"
+        "timeslice",
     ]
 
     for keyword in aggregate_keywords:
         if keyword in query_lower:
-            return 'records'
+            return "records"
 
-    return 'messages'
+    return "messages"
 
 
 def parse_relative_time(time_value: str | int) -> int:
@@ -85,7 +85,7 @@ def parse_relative_time(time_value: str | int) -> int:
         return int(datetime.now(timezone.utc).timestamp() * 1000)
 
     # Handle relative time formats like "-1h", "-30m", "-2d", "-1w"
-    relative_pattern = r'^([+-]?)(\d+)([smhdw])$'
+    relative_pattern = r"^([+-]?)(\d+)([smhdw])$"
     match = re.match(relative_pattern, time_str.lower())
 
     if match:
@@ -93,17 +93,11 @@ def parse_relative_time(time_value: str | int) -> int:
         amount = int(amount)
 
         # Default to negative if no sign specified (going back in time)
-        if sign != '+':
+        if sign != "+":
             amount = -amount
 
         # Convert unit to timedelta
-        unit_map = {
-            's': 'seconds',
-            'm': 'minutes',
-            'h': 'hours',
-            'd': 'days',
-            'w': 'weeks'
-        }
+        unit_map = {"s": "seconds", "m": "minutes", "h": "hours", "d": "days", "w": "weeks"}
 
         if unit in unit_map:
             delta_kwargs = {unit_map[unit]: amount}
@@ -114,11 +108,11 @@ def parse_relative_time(time_value: str | int) -> int:
     try:
         # Handle various ISO formats
         for fmt in [
-            '%Y-%m-%dT%H:%M:%SZ',
-            '%Y-%m-%dT%H:%M:%S.%fZ',
-            '%Y-%m-%dT%H:%M:%S',
-            '%Y-%m-%d %H:%M:%S',
-            '%Y-%m-%d'
+            "%Y-%m-%dT%H:%M:%SZ",
+            "%Y-%m-%dT%H:%M:%S.%fZ",
+            "%Y-%m-%dT%H:%M:%S",
+            "%Y-%m-%d %H:%M:%S",
+            "%Y-%m-%d",
         ]:
             try:
                 dt = datetime.strptime(time_str, fmt)
@@ -162,8 +156,8 @@ def format_time_range_human(from_ms: int, to_ms: int) -> str:
     duration_ms = to_ms - from_ms
     duration_hours = duration_ms / (1000 * 60 * 60)
 
-    from_str = from_dt.strftime('%Y-%m-%d %H:%M:%S')
-    to_str = to_dt.strftime('%Y-%m-%d %H:%M:%S')
+    from_str = from_dt.strftime("%Y-%m-%d %H:%M:%S")
+    to_str = to_dt.strftime("%Y-%m-%d %H:%M:%S")
 
     if duration_hours < 1:
         duration_str = f"{duration_hours * 60:.0f}m"
@@ -177,12 +171,13 @@ def format_time_range_human(from_ms: int, to_ms: int) -> str:
 
 # Query Construction Helpers
 
+
 def build_scope_expression(
     source_category: str | None = None,
     index: str | None = None,
     view: str | None = None,
     keywords: List[str] | None = None,
-    additional_metadata: Dict[str, str] | None = None
+    additional_metadata: Dict[str, str] | None = None,
 ) -> str:
     """
     Build a Sumo Logic scope expression from components.
@@ -278,48 +273,53 @@ def get_operator_category_info() -> Dict[str, List[str]]:
     """
     return {
         "parsing": [
-            "parse", "parse regex", "parse anchor", "json", "xml", "csv",
-            "keyvalue", "split", "extract"
+            "parse",
+            "parse regex",
+            "parse anchor",
+            "json",
+            "xml",
+            "csv",
+            "keyvalue",
+            "split",
+            "extract",
         ],
-        "filtering": [
-            "where", "matches", "in", "not in", "contains", "startswith", "endswith"
-        ],
+        "filtering": ["where", "matches", "in", "not in", "contains", "startswith", "endswith"],
         "aggregation": [
-            "count", "sum", "avg", "min", "max", "pct", "stddev",
-            "first", "last", "most_recent", "least_recent",
-            "count_distinct", "count_frequent"
+            "count",
+            "sum",
+            "avg",
+            "min",
+            "max",
+            "pct",
+            "stddev",
+            "first",
+            "last",
+            "most_recent",
+            "least_recent",
+            "count_distinct",
+            "count_frequent",
         ],
-        "time_series": [
-            "timeslice", "transpose", "rollingstd", "smooth", "predict"
-        ],
-        "grouping": [
-            "group by", "by"
-        ],
+        "time_series": ["timeslice", "transpose", "rollingstd", "smooth", "predict"],
+        "grouping": ["group by", "by"],
         "formatting": [
-            "fields", "format", "concat", "substring", "toLowerCase", "toUpperCase",
-            "trim", "replace", "urlencode", "urldecode"
+            "fields",
+            "format",
+            "concat",
+            "substring",
+            "toLowerCase",
+            "toUpperCase",
+            "trim",
+            "replace",
+            "urlencode",
+            "urldecode",
         ],
-        "math": [
-            "abs", "ceil", "floor", "round", "sqrt", "pow", "exp", "log"
-        ],
-        "conditional": [
-            "if", "isEmpty", "isNull", "isBlank", "isNumeric", "isValidIP"
-        ],
-        "lookup": [
-            "lookup", "cat", "save", "lookupContains"
-        ],
-        "geo": [
-            "geoip", "latitude", "longitude"
-        ],
-        "time": [
-            "formatDate", "parseDate", "now", "toMillis"
-        ],
-        "sorting": [
-            "sort", "top", "topk"
-        ],
-        "other": [
-            "limit", "dedup", "join", "merge", "compare", "outlier", "fillmissing"
-        ]
+        "math": ["abs", "ceil", "floor", "round", "sqrt", "pow", "exp", "log"],
+        "conditional": ["if", "isEmpty", "isNull", "isBlank", "isNumeric", "isValidIP"],
+        "lookup": ["lookup", "cat", "save", "lookupContains"],
+        "geo": ["geoip", "latitude", "longitude"],
+        "time": ["formatDate", "parseDate", "now", "toMillis"],
+        "sorting": ["sort", "top", "topk"],
+        "other": ["limit", "dedup", "join", "merge", "compare", "outlier", "fillmissing"],
     }
 
 
@@ -332,61 +332,49 @@ def get_common_query_patterns() -> Dict[str, str]:
     """
     return {
         "raw_logs": "_sourceCategory=prod/app error",
-
         "parse_json_explicit": """_sourceCategory=prod/app
 | json field=_raw "errorCode" as error_code
 | json field=_raw "errorMessage" as error_msg""",
-
         "parse_tab_separated": """_sourceCategory=cloudfront
 | parse "*\\t*\\t*\\t*" as field1, field2, field3, field4""",
-
         "parse_regex": """_sourceCategory=app/logs
 | parse regex "(?<timestamp>\\d{4}-\\d{2}-\\d{2}) (?<level>\\w+) (?<message>.*)"
 """,
-
         "categorical_count": """_sourceCategory=prod/app error
 | json "errorCode" as code
 | count by code
 | sort _count desc""",
-
         "categorical_top_values": """_sourceCategory=prod/app error
 | json "errorCode" as code
 | count by code
 | top 10 code by _count""",
-
         "time_series_simple": """_sourceCategory=prod/app error
 | timeslice 5m
 | count by _timeslice""",
-
         "time_series_by_field": """_sourceCategory=prod/app error
 | json "errorCode" as code
 | timeslice 5m
 | count by _timeslice, code
 | transpose row _timeslice column code""",
-
         "filtering_where": """_sourceCategory=prod/app
 | json "status" as status_code
 | where status_code >= 400 and status_code < 500""",
-
         "filtering_matches": """_sourceCategory=prod/app
 | json "errorCode" as error
 | where error matches "*Limit*" or error matches "*Exceeded*" """,
-
         "aggregation_stats": """_sourceCategory=prod/app
 | json "duration" as duration_ms
 | avg(duration_ms) as avg_duration,
   max(duration_ms) as max_duration,
   pct(duration_ms, 95) as p95_duration""",
-
         "time_compare": """_sourceCategory=prod/app
 | timeslice 1h
 | count by _timeslice
 | compare with timeshift 24h""",
-
         "geo_location": """_sourceCategory=web/access
 | parse "* * *" as method, path, client_ip
 | geoip client_ip
-| count by latitude, longitude, country_name"""
+| count by latitude, longitude, country_name""",
     }
 
 
@@ -418,7 +406,7 @@ def validate_query_structure(query: str) -> Dict[str, Any]:
         "has_aggregation": False,
         "query_type": detect_query_type(query),
         "warnings": [],
-        "suggestions": []
+        "suggestions": [],
     }
 
     query_lower = query.lower()

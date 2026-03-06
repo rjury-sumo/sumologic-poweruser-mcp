@@ -3,6 +3,7 @@
 
 import asyncio
 import json
+
 from src.sumologic_mcp_server.sumologic_mcp_server import run_search_audit_query
 
 
@@ -22,7 +23,7 @@ async def main():
             instance="default"
         )
         data = json.loads(result)
-        print(f"✓ Legacy parameters work")
+        print("✓ Legacy parameters work")
         print(f"  Total searches: {data['summary']['total_searches']}")
         print(f"  Total scan GB: {data['summary']['total_scan_gb']:.2f}")
     except Exception as e:
@@ -39,7 +40,7 @@ async def main():
             instance="default"
         )
         data = json.loads(result)
-        print(f"✓ Scope filters work")
+        print("✓ Scope filters work")
         print(f"  Scope filters used: {data['query_parameters']['scope_filters']}")
         print(f"  Total searches: {data['summary']['total_searches']}")
     except Exception as e:
@@ -56,7 +57,7 @@ async def main():
             instance="default"
         )
         data = json.loads(result)
-        print(f"✓ Multiple scope filters work")
+        print("✓ Multiple scope filters work")
         print(f"  Filters: {data['query_parameters']['scope_filters']}")
         print(f"  Total searches: {data['summary']['total_searches']}")
     except Exception as e:
@@ -73,7 +74,7 @@ async def main():
             instance="default"
         )
         data = json.loads(result)
-        print(f"✓ Where filters work")
+        print("✓ Where filters work")
         print(f"  Where filters used: {data['query_parameters']['where_filters']}")
         print(f"  Total searches: {data['summary']['total_searches']}")
         if data['records']:
@@ -94,7 +95,7 @@ async def main():
             instance="default"
         )
         data = json.loads(result)
-        print(f"✓ Combined filters work")
+        print("✓ Combined filters work")
         print(f"  Scope: {data['query_parameters']['scope_filters']}")
         print(f"  Where: {data['query_parameters']['where_filters']}")
         print(f"  Total searches: {data['summary']['total_searches']}")
@@ -111,11 +112,11 @@ async def main():
             scope_filters=["execution_duration_ms=1000"],  # Should fail - not scope-filterable
             instance="default"
         )
-        print(f"✗ Validation should have failed")
+        print("✗ Validation should have failed")
     except Exception as e:
         error_msg = str(e)
         if "not supported as a scope filter" in error_msg:
-            print(f"✓ Validation correctly rejected invalid scope field")
+            print("✓ Validation correctly rejected invalid scope field")
             print(f"  Error: {error_msg[:100]}...")
         else:
             print(f"✗ Unexpected error: {e}")
@@ -130,11 +131,11 @@ async def main():
             scope_filters=["query_type Interactive"],  # Missing =
             instance="default"
         )
-        print(f"✗ Validation should have failed")
+        print("✗ Validation should have failed")
     except Exception as e:
         error_msg = str(e)
         if "must be in field=value format" in error_msg:
-            print(f"✓ Validation correctly rejected malformed expression")
+            print("✓ Validation correctly rejected malformed expression")
             print(f"  Error: {error_msg[:100]}...")
         else:
             print(f"✗ Unexpected error: {e}")
@@ -149,11 +150,11 @@ async def main():
             where_filters=["| where execution_duration_ms > 1000"],  # Should fail
             instance="default"
         )
-        print(f"✗ Validation should have failed")
+        print("✗ Validation should have failed")
     except Exception as e:
         error_msg = str(e)
         if "should not start with" in error_msg:
-            print(f"✓ Validation correctly rejected malformed where filter")
+            print("✓ Validation correctly rejected malformed where filter")
             print(f"  Error: {error_msg[:100]}...")
         else:
             print(f"✗ Unexpected error: {e}")
@@ -168,11 +169,11 @@ async def main():
             where_filters=["execution_duration_ms > 1000 | delete *"],  # Should fail
             instance="default"
         )
-        print(f"✗ Injection protection should have blocked this")
+        print("✗ Injection protection should have blocked this")
     except Exception as e:
         error_msg = str(e)
         if "cannot contain write operators" in error_msg:
-            print(f"✓ Injection protection working")
+            print("✓ Injection protection working")
             print(f"  Blocked: {error_msg[:100]}...")
         else:
             print(f"✗ Unexpected error: {e}")

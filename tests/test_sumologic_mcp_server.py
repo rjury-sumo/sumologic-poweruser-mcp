@@ -1,11 +1,12 @@
 """Basic tests for Sumo Logic MCP Server."""
 
-import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
 import os
+from unittest.mock import patch
 
-from sumologic_mcp_server.sumologic_mcp_server import SumoLogicClient, get_sumo_client, clients
+import pytest
+
 from sumologic_mcp_server.config import SumoInstanceConfig, reset_config
+from sumologic_mcp_server.sumologic_mcp_server import SumoLogicClient, clients, get_sumo_client
 
 
 class TestSumoLogicClient:
@@ -14,9 +15,7 @@ class TestSumoLogicClient:
     def test_client_initialization(self):
         """Test client initialization with valid parameters."""
         config = SumoInstanceConfig(
-            access_id="test_id",
-            access_key="test_key",
-            endpoint="https://api.sumologic.com"
+            access_id="test_id", access_key="test_key", endpoint="https://api.sumologic.com"
         )
         client = SumoLogicClient(config, "test")
         assert client.access_id == "test_id"
@@ -27,9 +26,7 @@ class TestSumoLogicClient:
     def test_endpoint_trailing_slash_removal(self):
         """Test that trailing slash is removed from endpoint."""
         config = SumoInstanceConfig(
-            access_id="test_id",
-            access_key="test_key",
-            endpoint="https://api.sumologic.com/"
+            access_id="test_id", access_key="test_key", endpoint="https://api.sumologic.com/"
         )
         client = SumoLogicClient(config, "test")
         assert client.endpoint == "https://api.sumologic.com"
@@ -48,7 +45,7 @@ class TestClientInitialization:
         """Test getting client with environment variables set (uses real creds)."""
         clients.clear()
 
-        client = await get_sumo_client('default')
+        client = await get_sumo_client("default")
         assert client.access_id is not None
         assert client.access_key is not None
         assert client.endpoint is not None
@@ -61,10 +58,9 @@ class TestClientInitialization:
             reset_config()
             clients.clear()
 
-            from sumologic_mcp_server.exceptions import InstanceNotFoundError
 
             with pytest.raises(Exception):  # Will raise either ValueError or InstanceNotFoundError
-                await get_sumo_client('default')
+                await get_sumo_client("default")
 
 
 class TestConfig:
@@ -74,40 +70,50 @@ class TestConfig:
         """Reset state before each test."""
         reset_config()
 
-    @patch.dict(os.environ, {
-        'SUMO_ACCESS_ID': 'test_id',
-        'SUMO_ACCESS_KEY': 'test_key',
-        'SUMO_ENDPOINT': 'https://api.sumologic.com'
-    }, clear=True)
+    @patch.dict(
+        os.environ,
+        {
+            "SUMO_ACCESS_ID": "test_id",
+            "SUMO_ACCESS_KEY": "test_key",
+            "SUMO_ENDPOINT": "https://api.sumologic.com",
+        },
+        clear=True,
+    )
     def test_config_loads_default_instance(self):
         """Test that config loads default instance from env vars."""
         from sumologic_mcp_server.config import get_config
+
         reset_config()
 
         config = get_config()
-        assert 'default' in config.list_instances()
+        assert "default" in config.list_instances()
 
-        instance = config.get_instance('default')
+        instance = config.get_instance("default")
         assert instance.access_id == "test_id"
         assert instance.access_key == "test_key"
 
-    @patch.dict(os.environ, {
-        'SUMO_ACCESS_ID': 'default_id',
-        'SUMO_ACCESS_KEY': 'default_key',
-        'SUMO_STAGING_ACCESS_ID': 'staging_id',
-        'SUMO_STAGING_ACCESS_KEY': 'staging_key',
-        'SUMO_STAGING_ENDPOINT': 'https://api.eu.sumologic.com'
-    }, clear=True)
+    @patch.dict(
+        os.environ,
+        {
+            "SUMO_ACCESS_ID": "default_id",
+            "SUMO_ACCESS_KEY": "default_key",
+            "SUMO_STAGING_ACCESS_ID": "staging_id",
+            "SUMO_STAGING_ACCESS_KEY": "staging_key",
+            "SUMO_STAGING_ENDPOINT": "https://api.eu.sumologic.com",
+        },
+        clear=True,
+    )
     def test_config_loads_multiple_instances(self):
         """Test that config loads multiple instances."""
         from sumologic_mcp_server.config import get_config
+
         reset_config()
 
         config = get_config()
         instances = config.list_instances()
 
-        assert 'default' in instances
-        assert 'staging' in instances
+        assert "default" in instances
+        assert "staging" in instances
         assert len(instances) >= 2
 
 
@@ -116,8 +122,8 @@ class TestValidation:
 
     def test_query_validation(self):
         """Test query validation."""
-        from sumologic_mcp_server.validation import validate_query_input
         from sumologic_mcp_server.exceptions import ValidationError
+        from sumologic_mcp_server.validation import validate_query_input
 
         # Valid query
         assert validate_query_input("error | count") == "error | count"
@@ -132,8 +138,8 @@ class TestValidation:
 
     def test_time_range_validation(self):
         """Test time range validation."""
-        from sumologic_mcp_server.validation import validate_time_range
         from sumologic_mcp_server.exceptions import ValidationError
+        from sumologic_mcp_server.validation import validate_time_range
 
         # Valid ranges
         assert validate_time_range(1) == 1
@@ -148,8 +154,8 @@ class TestValidation:
 
     def test_pagination_validation(self):
         """Test pagination validation."""
-        from sumologic_mcp_server.validation import validate_pagination
         from sumologic_mcp_server.exceptions import ValidationError
+        from sumologic_mcp_server.validation import validate_pagination
 
         # Valid pagination
         limit, offset = validate_pagination(100, 0)
@@ -229,8 +235,9 @@ class TestSearchHelpers:
 
     def test_parse_relative_time_now(self):
         """Test parsing 'now' relative time."""
-        from sumologic_mcp_server.search_helpers import parse_relative_time
         import time
+
+        from sumologic_mcp_server.search_helpers import parse_relative_time
 
         result = parse_relative_time("now")
         current_time_ms = int(time.time() * 1000)
@@ -239,8 +246,9 @@ class TestSearchHelpers:
 
     def test_parse_relative_time_hours(self):
         """Test parsing hours relative time."""
-        from sumologic_mcp_server.search_helpers import parse_relative_time
         import time
+
+        from sumologic_mcp_server.search_helpers import parse_relative_time
 
         result = parse_relative_time("-1h")
         expected = int((time.time() - 3600) * 1000)
@@ -253,8 +261,9 @@ class TestSearchHelpers:
 
     def test_parse_relative_time_minutes(self):
         """Test parsing minutes relative time."""
-        from sumologic_mcp_server.search_helpers import parse_relative_time
         import time
+
+        from sumologic_mcp_server.search_helpers import parse_relative_time
 
         result = parse_relative_time("-30m")
         expected = int((time.time() - 1800) * 1000)
@@ -296,10 +305,7 @@ class TestSearchJobIntegration:
 
         # This is an aggregate query that should return records
         result = await client.search_logs(
-            query="* | limit 10000 | count",
-            from_time="-24h",
-            to_time="now",
-            timezone_str="UTC"
+            query="* | limit 10000 | count", from_time="-24h", to_time="now", timezone_str="UTC"
         )
 
         # Verify it detected the correct query type
@@ -319,10 +325,7 @@ class TestSearchJobIntegration:
 
         # This is a raw message query
         result = await client.search_logs(
-            query="* | limit 1000",
-            from_time="-24h",
-            to_time="now",
-            timezone_str="UTC"
+            query="* | limit 1000", from_time="-24h", to_time="now", timezone_str="UTC"
         )
 
         # Verify it detected the correct query type
@@ -339,10 +342,7 @@ class TestSearchJobIntegration:
 
         # Create a search job
         job_info = await client.create_search_job(
-            query="* | limit 10000| count",
-            from_time="-1h",
-            to_time="now",
-            timezone_str="UTC"
+            query="* | limit 10000| count", from_time="-1h", to_time="now", timezone_str="UTC"
         )
 
         assert "id" in job_info
@@ -356,7 +356,7 @@ class TestSearchJobIntegration:
             "GATHERING RESULTS",
             "DONE GATHERING RESULTS",
             "CANCELLED",
-            "FORCE PAUSED"
+            "FORCE PAUSED",
         ]
 
 

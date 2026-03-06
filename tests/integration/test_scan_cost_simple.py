@@ -2,6 +2,7 @@
 """Simple test of analyze_search_scan_cost tool."""
 import asyncio
 import json
+
 from sumologic_mcp_server.sumologic_mcp_server import analyze_search_scan_cost
 
 

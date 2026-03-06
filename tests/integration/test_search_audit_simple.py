@@ -4,6 +4,7 @@
 import asyncio
 import json
 import logging
+
 from src.sumologic_mcp_server.sumologic_mcp_server import run_search_audit_query
 
 # Enable debug logging

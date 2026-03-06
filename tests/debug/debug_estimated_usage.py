@@ -2,6 +2,7 @@
 """Debug estimated usage response."""
 import asyncio
 import json
+
 from sumologic_mcp_server.sumologic_mcp_server import get_estimated_log_search_usage
 
 

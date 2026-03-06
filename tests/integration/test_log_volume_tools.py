@@ -3,10 +3,8 @@
 
 import asyncio
 import json
-from src.sumologic_mcp_server.sumologic_mcp_server import (
-    analyze_log_volume,
-    profile_log_schema
-)
+
+from src.sumologic_mcp_server.sumologic_mcp_server import analyze_log_volume, profile_log_schema
 
 
 async def main():
@@ -29,7 +27,7 @@ async def main():
         if "error" in data:
             print(f"✗ Error: {data['error']}")
         else:
-            print(f"✓ Schema profiling works")
+            print("✓ Schema profiling works")
             print(f"  Total fields: {data['summary']['total_fields']}")
             print(f"  Filtered fields: {data['summary'].get('filtered_fields', 'N/A')}")
             if 'suggested_analysis_fields' in data:
@@ -57,7 +55,7 @@ async def main():
         if "error" in data:
             print(f"✗ Error: {data['error']}")
         else:
-            print(f"✓ Volume analysis works")
+            print("✓ Volume analysis works")
             print(f"  Total records: {data['summary']['total_records']}")
             print(f"  Total volume: {data['summary']['total_gb']} GB")
             if data['results']:
@@ -85,7 +83,7 @@ async def main():
         if "error" in data:
             print(f"✗ Error: {data['error']}")
         else:
-            print(f"✓ Multi-dimensional analysis works")
+            print("✓ Multi-dimensional analysis works")
             print(f"  Total records: {data['summary']['total_records']}")
             if data['results']:
                 top = data['results'][0]
@@ -115,7 +113,7 @@ async def main():
         if "error" in data:
             print(f"✗ Error: {data['error']}")
         else:
-            print(f"✓ Metadata volume analysis works")
+            print("✓ Metadata volume analysis works")
             print(f"  Total records: {data['summary']['total_records']}")
             print(f"  Total volume: {data['summary']['total_gb']} GB")
     except Exception as e:
@@ -138,7 +136,7 @@ async def main():
         if "error" in data:
             print(f"✗ Error: {data['error']}")
         else:
-            print(f"✓ Full facets mode works")
+            print("✓ Full facets mode works")
             print(f"  Total facet records: {len(data.get('facets', []))}")
             if data.get('facets'):
                 # Show first facet record sample
@@ -166,7 +164,7 @@ async def main():
         if "error" in data:
             print(f"ℹ Expected (no apache logs): {data['error'][:80]}...")
         else:
-            print(f"✓ Parse statement analysis works")
+            print("✓ Parse statement analysis works")
             print(f"  Total records: {data['summary']['total_records']}")
     except Exception as e:
         print(f"ℹ Expected error (no apache logs): {str(e)[:80]}...")

@@ -29,11 +29,11 @@ def hex_to_decimal(hex_id: str) -> str:
     clean_hex = hex_id.strip()
 
     # Remove 0x prefix if present
-    if clean_hex.lower().startswith('0x'):
+    if clean_hex.lower().startswith("0x"):
         clean_hex = clean_hex[2:]
 
     # Validate hex format
-    if not all(c in '0123456789ABCDEFabcdef' for c in clean_hex):
+    if not all(c in "0123456789ABCDEFabcdef" for c in clean_hex):
         raise ValueError(f"Invalid hex ID format: {hex_id}")
 
     # Convert to decimal
@@ -114,7 +114,7 @@ def is_valid_hex_id(hex_id: str) -> bool:
     if len(clean_hex) != 16:
         return False
 
-    return all(c in '0123456789ABCDEFabcdef' for c in clean_hex)
+    return all(c in "0123456789ABCDEFabcdef" for c in clean_hex)
 
 
 def is_valid_decimal_id(decimal_id: str) -> bool:
@@ -157,9 +157,9 @@ def normalize_to_hex(id_str: str) -> str:
         return clean_id.upper()
 
     # Try to parse as hex with 0x prefix
-    if clean_id.lower().startswith('0x'):
+    if clean_id.lower().startswith("0x"):
         hex_part = clean_id[2:]
-        if all(c in '0123456789ABCDEFabcdef' for c in hex_part):
+        if all(c in "0123456789ABCDEFabcdef" for c in hex_part):
             return hex_part.upper().zfill(16)
 
     # Try as decimal

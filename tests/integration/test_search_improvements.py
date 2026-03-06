@@ -5,6 +5,7 @@ Test the improved search_query_examples tool with scoring and relevance ranking.
 
 import asyncio
 import json
+
 from src.sumologic_mcp_server.sumologic_mcp_server import search_query_examples
 
 
@@ -101,7 +102,7 @@ async def test_scoring_vs_and_logic():
     data = json.loads(result)
     print(f"   Matches: {data['summary']['matches_found']}")
     print(f"   Top score: {data['results'][0]['_score'] if data['results'] else 0}")
-    print(f"   Results with scoring: YES" if data['results'] else "   No results")
+    print("   Results with scoring: YES" if data['results'] else "   No results")
 
     # Strict AND mode
     print("\n4b. match_mode='all': app_name='Apache' + keywords='unschedulable':")

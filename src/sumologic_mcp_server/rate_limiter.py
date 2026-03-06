@@ -1,10 +1,10 @@
 """Rate limiting for Sumo Logic MCP Server."""
 
+import asyncio
 import time
 from collections import defaultdict, deque
-from typing import Dict, Deque
-import asyncio
 from functools import wraps
+from typing import Deque, Dict
 
 from .exceptions import RateLimitError
 
@@ -50,7 +50,7 @@ class RateLimiter:
                     f"Rate limit exceeded for {tool_name}. "
                     f"Maximum {self.requests_per_minute} requests per minute. "
                     f"Try again in {wait_time:.1f} seconds.",
-                    details=f"requests_in_window={len(requests)}, limit={self.requests_per_minute}"
+                    details=f"requests_in_window={len(requests)}, limit={self.requests_per_minute}",
                 )
 
             # Record this request
@@ -75,7 +75,7 @@ class RateLimiter:
         return {
             "current_requests": len(requests),
             "limit": self.requests_per_minute,
-            "remaining": max(0, self.requests_per_minute - len(requests))
+            "remaining": max(0, self.requests_per_minute - len(requests)),
         }
 
     def reset(self, tool_name: str | None = None) -> None:
@@ -119,11 +119,14 @@ def rate_limited(tool_name: str):
         async def search_logs_tool(...):
             ...
     """
+
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
             limiter = get_rate_limiter()
             await limiter.acquire(tool_name)
             return await func(*args, **kwargs)
+
         return wrapper
+
     return decorator

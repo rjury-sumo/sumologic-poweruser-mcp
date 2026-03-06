@@ -19,21 +19,25 @@ class SumoMCPError(Exception):
 
 class ConfigurationError(SumoMCPError):
     """Configuration-related errors."""
+
     pass
 
 
 class ValidationError(SumoMCPError):
     """Input validation errors."""
+
     pass
 
 
 class AuthenticationError(SumoMCPError):
     """Authentication/authorization errors."""
+
     pass
 
 
 class RateLimitError(SumoMCPError):
     """Rate limit exceeded errors."""
+
     pass
 
 
@@ -54,9 +58,11 @@ class APIError(SumoMCPError):
 
 class TimeoutError(SumoMCPError):
     """Search or request timeout errors."""
+
     pass
 
 
 class InstanceNotFoundError(SumoMCPError):
     """Requested Sumo Logic instance not configured."""
+
     pass

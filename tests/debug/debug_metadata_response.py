@@ -2,6 +2,7 @@
 """Debug metadata response to check field names."""
 import asyncio
 import json
+
 from sumologic_mcp_server.sumologic_mcp_server import explore_log_metadata
 
 

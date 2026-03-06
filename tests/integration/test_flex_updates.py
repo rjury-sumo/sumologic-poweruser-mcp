@@ -2,6 +2,7 @@
 """Test the updated Flex metering breakdown with TB values and no credits."""
 import asyncio
 import json
+
 from sumologic_mcp_server.sumologic_mcp_server import analyze_search_scan_cost
 
 

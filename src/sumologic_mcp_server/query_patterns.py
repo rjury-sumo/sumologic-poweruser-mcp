@@ -18,8 +18,8 @@ Usage Example:
     >>> query_parts.append(AggregationPatterns.top_n('gbytes', limit=100))
 """
 
-from typing import List, Optional, Literal, Union
 import re
+from typing import List, Literal, Optional
 
 
 class ScopePattern:
@@ -43,10 +43,10 @@ class ScopePattern:
     """
 
     # Built-in metadata fields that support partition routing
-    METADATA_FIELDS = ['_sourceCategory', '_collector', '_source', '_sourceName', '_sourceHost']
+    METADATA_FIELDS = ["_sourceCategory", "_collector", "_source", "_sourceName", "_sourceHost"]
 
     # Partition/view specifiers
-    PARTITION_FIELDS = ['_index', '_view']
+    PARTITION_FIELDS = ["_index", "_view"]
 
     @staticmethod
     def build_scope(
@@ -54,7 +54,7 @@ class ScopePattern:
         metadata: Optional[dict] = None,
         keywords: Optional[List[str]] = None,
         indexed_fields: Optional[dict] = None,
-        use_and: bool = True
+        use_and: bool = True,
     ) -> str:
         """Build a search scope with partition routing and selectivity filters.
 
@@ -87,8 +87,8 @@ class ScopePattern:
 
         # Add partition/view specifier
         if partition:
-            if not partition.startswith('_index=') and not partition.startswith('_view='):
-                partition = f'_index={partition}'
+            if not partition.startswith("_index=") and not partition.startswith("_view="):
+                partition = f"_index={partition}"
             components.append(partition)
 
         # Add metadata filters
@@ -100,10 +100,10 @@ class ScopePattern:
                     pass
 
                 # Quote value if it contains spaces or special chars
-                if ' ' in str(value) or any(c in str(value) for c in ['*', '?', '-', '/']):
+                if " " in str(value) or any(c in str(value) for c in ["*", "?", "-", "/"]):
                     components.append(f'{field}="{value}"')
                 else:
-                    components.append(f'{field}={value}')
+                    components.append(f"{field}={value}")
 
         # Add keyword expressions
         if keywords:
@@ -113,16 +113,16 @@ class ScopePattern:
         if indexed_fields:
             for field, value in indexed_fields.items():
                 # Quote value if needed
-                if ' ' in str(value) or any(c in str(value) for c in ['*', '?', '-', '/']):
+                if " " in str(value) or any(c in str(value) for c in ["*", "?", "-", "/"]):
                     components.append(f'{field}="{value}"')
                 else:
-                    components.append(f'{field}={value}')
+                    components.append(f"{field}={value}")
 
         # Join with AND or OR
         if not components:
-            return '*'
+            return "*"
 
-        separator = ' AND ' if use_and else ' OR '
+        separator = " AND " if use_and else " OR "
         return separator.join(components)
 
     @staticmethod
@@ -132,7 +132,7 @@ class ScopePattern:
         source: Optional[str] = None,
         source_name: Optional[str] = None,
         source_host: Optional[str] = None,
-        use_and: bool = True
+        use_and: bool = True,
     ) -> str:
         """Build a scope using built-in metadata fields (simplified API).
 
@@ -156,15 +156,15 @@ class ScopePattern:
         """
         metadata = {}
         if source_category:
-            metadata['_sourceCategory'] = source_category
+            metadata["_sourceCategory"] = source_category
         if collector:
-            metadata['_collector'] = collector
+            metadata["_collector"] = collector
         if source:
-            metadata['_source'] = source
+            metadata["_source"] = source
         if source_name:
-            metadata['_sourceName'] = source_name
+            metadata["_sourceName"] = source_name
         if source_host:
-            metadata['_sourceHost'] = source_host
+            metadata["_sourceHost"] = source_host
 
         return ScopePattern.build_scope(metadata=metadata, use_and=use_and)
 
@@ -193,7 +193,7 @@ class ScopePattern:
                     quote_char = char
                 elif char == quote_char:
                     in_quotes = False
-            elif char == '|' and not in_quotes:
+            elif char == "|" and not in_quotes:
                 return query[:i].strip()
 
         # No pipe found, entire query is scope
@@ -227,51 +227,66 @@ class ScopePattern:
             }
         """
         analysis = {
-            'has_partition': False,
-            'has_metadata': False,
-            'metadata_fields': [],
-            'has_keywords': False,
-            'is_broad': False,
-            'recommendations': []
+            "has_partition": False,
+            "has_metadata": False,
+            "metadata_fields": [],
+            "has_keywords": False,
+            "is_broad": False,
+            "recommendations": [],
         }
 
         scope_lower = scope.lower()
 
         # Check for partition/view
-        if '_index=' in scope_lower or '_view=' in scope_lower:
-            analysis['has_partition'] = True
+        if "_index=" in scope_lower or "_view=" in scope_lower:
+            analysis["has_partition"] = True
 
         # Check for metadata fields
         for field in ScopePattern.METADATA_FIELDS:
             if field.lower() in scope_lower:
-                analysis['has_metadata'] = True
-                analysis['metadata_fields'].append(field)
+                analysis["has_metadata"] = True
+                analysis["metadata_fields"].append(field)
 
         # Check for keywords (simplified - looks for bare words not part of field expressions)
         # This is a heuristic - actual parsing would be complex
-        tokens = re.split(r'\s+(?:AND|OR|NOT)\s+|\s+', scope)
+        tokens = re.split(r"\s+(?:AND|OR|NOT)\s+|\s+", scope)
         for token in tokens:
-            if token and not '=' in token and not token.startswith('_') and token not in ['AND', 'OR', 'NOT', '(', ')']:
-                analysis['has_keywords'] = True
+            if (
+                token
+                and "=" not in token
+                and not token.startswith("_")
+                and token not in ["AND", "OR", "NOT", "(", ")"]
+            ):
+                analysis["has_keywords"] = True
                 break
 
         # Check if scope is too broad
-        if scope.strip() in ['*', '']:
-            analysis['is_broad'] = True
-            analysis['recommendations'].append('Scope is "*" - this scans all partitions. Add filters to reduce scan volume.')
-        elif '_datatier=all' in scope_lower:
-            analysis['is_broad'] = True
-            analysis['recommendations'].append('Using _dataTier=all scans all tiers. Consider specifying tier or using metadata filters.')
+        if scope.strip() in ["*", ""]:
+            analysis["is_broad"] = True
+            analysis["recommendations"].append(
+                'Scope is "*" - this scans all partitions. Add filters to reduce scan volume.'
+            )
+        elif "_datatier=all" in scope_lower:
+            analysis["is_broad"] = True
+            analysis["recommendations"].append(
+                "Using _dataTier=all scans all tiers. Consider specifying tier or using metadata filters."
+            )
 
         # Provide recommendations
-        if not analysis['has_partition'] and not analysis['has_metadata']:
-            analysis['recommendations'].append('Add _sourceCategory or _index to enable partition routing and reduce scan volume.')
+        if not analysis["has_partition"] and not analysis["has_metadata"]:
+            analysis["recommendations"].append(
+                "Add _sourceCategory or _index to enable partition routing and reduce scan volume."
+            )
 
-        if not analysis['has_keywords'] and not analysis['is_broad']:
-            analysis['recommendations'].append('Consider adding keyword expressions for better selectivity and performance.')
+        if not analysis["has_keywords"] and not analysis["is_broad"]:
+            analysis["recommendations"].append(
+                "Consider adding keyword expressions for better selectivity and performance."
+            )
 
-        if analysis['has_metadata'] and '_sourceCategory' not in analysis['metadata_fields']:
-            analysis['recommendations'].append('Consider using _sourceCategory as it most commonly maps to partition routing.')
+        if analysis["has_metadata"] and "_sourceCategory" not in analysis["metadata_fields"]:
+            analysis["recommendations"].append(
+                "Consider using _sourceCategory as it most commonly maps to partition routing."
+            )
 
         return analysis
 
@@ -303,7 +318,7 @@ class TimeshiftPattern:
         days: int,
         periods: int,
         state_labels: Optional[dict] = None,
-        include_state: bool = True
+        include_state: bool = True,
     ) -> List[str]:
         """Generate timeshift comparison with null guards and percentage calculation.
 
@@ -336,25 +351,27 @@ class TimeshiftPattern:
 
         # Only add compare operator for first field
         if include_state:
-            operators.append(f'| compare timeshift {days}d {periods} avg')
+            operators.append(f"| compare timeshift {days}d {periods} avg")
 
         # Null guards with state detection (only for first field)
         if include_state:
-            operators.extend([
-                f'| if(isNull({field}), "{labels["gone"]}", "{labels["collecting"]}") as state',
-                f'| if(isNull({field}), 0, {field}) as {field}',
-                f'| if(isNull({avg_field}), "{labels["new"]}", state) as state',
-            ])
+            operators.extend(
+                [
+                    f'| if(isNull({field}), "{labels["gone"]}", "{labels["collecting"]}") as state',
+                    f"| if(isNull({field}), 0, {field}) as {field}",
+                    f'| if(isNull({avg_field}), "{labels["new"]}", state) as state',
+                ]
+            )
         else:
-            operators.append(f'| if(isNull({field}), 0, {field}) as {field}')
+            operators.append(f"| if(isNull({field}), 0, {field}) as {field}")
 
         # Null guard for averaged field
-        operators.append(f'| if(isNull({avg_field}), 0, {avg_field}) as {avg_field}')
+        operators.append(f"| if(isNull({avg_field}), 0, {avg_field}) as {avg_field}")
 
         # Null-safe percentage with division-by-zero handling
         operators.append(
-            f'| if({avg_field} == 0, if({field} == 0, 0, 100), '
-            f'(({field} - {avg_field}) / {avg_field}) * 100) as pct_change_{field}'
+            f"| if({avg_field} == 0, if({field} == 0, 0, 100), "
+            f"(({field} - {avg_field}) / {avg_field}) * 100) as pct_change_{field}"
         )
 
         return operators
@@ -379,7 +396,7 @@ class NullSafeOperations:
         result_field: str,
         null_result: str = "0",
         div_zero_result: str = "0",
-        multiply_by: Optional[float] = None
+        multiply_by: Optional[float] = None,
     ) -> str:
         """Division with null and zero guards.
 
@@ -403,8 +420,8 @@ class NullSafeOperations:
             division = f"({division}) * {multiply_by}"
 
         return (
-            f'| if(isNull({numerator}) or isNull({denominator}), {null_result}, '
-            f'if({denominator} == 0, {div_zero_result}, {division})) as {result_field}'
+            f"| if(isNull({numerator}) or isNull({denominator}), {null_result}, "
+            f"if({denominator} == 0, {div_zero_result}, {division})) as {result_field}"
         )
 
     @staticmethod
@@ -422,14 +439,10 @@ class NullSafeOperations:
             >>> NullSafeOperations.coalesce('bytes', '0')
             '| if(isNull(bytes), 0, bytes) as bytes'
         """
-        return f'| if(isNull({field}), {default_value}, {field}) as {field}'
+        return f"| if(isNull({field}), {default_value}, {field}) as {field}"
 
     @staticmethod
-    def percentage_change(
-        current: str,
-        baseline: str,
-        result_field: str = "pct_change"
-    ) -> str:
+    def percentage_change(current: str, baseline: str, result_field: str = "pct_change") -> str:
         """Calculate percentage change with null/zero safety.
 
         Logic:
@@ -451,8 +464,8 @@ class NullSafeOperations:
             '| if(gbytes_avg == 0, if(gbytes == 0, 0, 100), ((gbytes - gbytes_avg) / gbytes_avg) * 100) as pct_increase'
         """
         return (
-            f'| if({baseline} == 0, if({current} == 0, 0, 100), '
-            f'(({current} - {baseline}) / {baseline}) * 100) as {result_field}'
+            f"| if({baseline} == 0, if({current} == 0, 0, 100), "
+            f"(({current} - {baseline}) / {baseline}) * 100) as {result_field}"
         )
 
 
@@ -461,9 +474,7 @@ class AggregationPatterns:
 
     @staticmethod
     def volume_by_dimension(
-        dimension: str,
-        include_tier: bool = True,
-        additional_dimensions: Optional[List[str]] = None
+        dimension: str, include_tier: bool = True, additional_dimensions: Optional[List[str]] = None
     ) -> str:
         """Standard volume aggregation pattern.
 
@@ -481,20 +492,16 @@ class AggregationPatterns:
         """
         group_by = []
         if include_tier:
-            group_by.append('dataTier')
+            group_by.append("dataTier")
         group_by.append(dimension)
         if additional_dimensions:
             group_by.extend(additional_dimensions)
 
-        group_by_str = ', '.join(group_by)
-        return f'| sum(events) as events, sum(gbytes) as gbytes by {group_by_str}'
+        group_by_str = ", ".join(group_by)
+        return f"| sum(events) as events, sum(gbytes) as gbytes by {group_by_str}"
 
     @staticmethod
-    def top_n(
-        sort_field: str,
-        limit: int = 100,
-        direction: Literal["asc", "desc"] = "desc"
-    ) -> str:
+    def top_n(sort_field: str, limit: int = 100, direction: Literal["asc", "desc"] = "desc") -> str:
         """Top N results pattern.
 
         Args:
@@ -509,13 +516,11 @@ class AggregationPatterns:
             >>> AggregationPatterns.top_n('gbytes', limit=50)
             '| sort gbytes desc | limit 50'
         """
-        return f'| sort {sort_field} {direction} | limit {limit}'
+        return f"| sort {sort_field} {direction} | limit {limit}"
 
     @staticmethod
     def timeslice_aggregation(
-        interval: str,
-        fields: List[str],
-        group_by: Optional[List[str]] = None
+        interval: str, fields: List[str], group_by: Optional[List[str]] = None
     ) -> str:
         """Timeslice aggregation pattern.
 
@@ -531,13 +536,13 @@ class AggregationPatterns:
             >>> AggregationPatterns.timeslice_aggregation('1h', ['sum(bytes) as bytes'])
             '| timeslice 1h | sum(bytes) as bytes by _timeslice'
         """
-        fields_str = ', '.join(fields)
-        group_by_list = ['_timeslice']
+        fields_str = ", ".join(fields)
+        group_by_list = ["_timeslice"]
         if group_by:
             group_by_list.extend(group_by)
-        group_by_str = ', '.join(group_by_list)
+        group_by_str = ", ".join(group_by_list)
 
-        return f'| timeslice {interval} | {fields_str} by {group_by_str}'
+        return f"| timeslice {interval} | {fields_str} by {group_by_str}"
 
 
 class CreditCalculation:
@@ -552,19 +557,14 @@ class CreditCalculation:
     """
 
     # Standard tiered credit rates (credits per GB)
-    STANDARD_RATES = {
-        'Continuous': 20,
-        'Frequent': 9,
-        'Infrequent': 0.4,
-        'CSE': 25
-    }
+    STANDARD_RATES = {"Continuous": 20, "Frequent": 9, "Infrequent": 0.4, "CSE": 25}
 
     @staticmethod
     def add_credit_calculation(
-        data_field: str = 'gbytes',
-        tier_field: str = 'dataTier',
-        credit_field: str = 'credits',
-        rates: Optional[dict] = None
+        data_field: str = "gbytes",
+        tier_field: str = "dataTier",
+        credit_field: str = "credits",
+        rates: Optional[dict] = None,
     ) -> List[str]:
         """Add credit calculation based on data tier.
 
@@ -594,7 +594,7 @@ class CreditCalculation:
             f'| if({tier_field} = "CSE", {rates["CSE"]}, credit_rate) as credit_rate',
             f'| if({tier_field} = "Infrequent", {rates["Infrequent"]}, credit_rate) as credit_rate',
             f'| if({tier_field} = "Frequent", {rates["Frequent"]}, credit_rate) as credit_rate',
-            f'| {data_field} * credit_rate as {credit_field}'
+            f"| {data_field} * credit_rate as {credit_field}",
         ]
 
         return operators
@@ -631,25 +631,23 @@ class LogDiscoveryPattern:
 
     # Built-in metadata fields available in all logs
     BUILTIN_METADATA = [
-        '_sourceCategory',
-        '_collector',
-        '_source',
-        '_sourceName',
-        '_sourceHost',
-        '_messageTime',
-        '_receiptTime',
-        '_blockId',
-        '_raw'
+        "_sourceCategory",
+        "_collector",
+        "_source",
+        "_sourceName",
+        "_sourceHost",
+        "_messageTime",
+        "_receiptTime",
+        "_blockId",
+        "_raw",
     ]
 
     # Additional tier/partition metadata
-    TIER_METADATA = ['_dataTier', '_index', '_view']
+    TIER_METADATA = ["_dataTier", "_index", "_view"]
 
     @staticmethod
     def build_metadata_discovery_query(
-        search_pattern: str,
-        time_range: str = '-60m',
-        use_volume_index: bool = True
+        search_pattern: str, time_range: str = "-60m", use_volume_index: bool = True
     ) -> dict:
         """Build queries for Phase 1: Discovering metadata.
 
@@ -668,30 +666,32 @@ class LogDiscoveryPattern:
 
         # Query 1: Use data volume index to find matching source categories
         if use_volume_index:
-            queries['volume_query'] = (
-                f'_index=sumologic_volume _sourceCategory=sourcecategory_and_tier_volume '
+            queries["volume_query"] = (
+                f"_index=sumologic_volume _sourceCategory=sourcecategory_and_tier_volume "
                 f'| parse regex "(?<data>\\{{[^\\{{]+\\}})" multi '
                 f'| json field=data "field","dataTier","sizeInBytes","count" as sourceCategory, dataTier, bytes, events '
-                f'| where sourceCategory matches /{search_pattern}/i '
-                f'| sum(events) as events, sum(bytes) as bytes by dataTier, sourceCategory '
-                f'| sort events desc | limit 50'
+                f"| where sourceCategory matches /{search_pattern}/i "
+                f"| sum(events) as events, sum(bytes) as bytes by dataTier, sourceCategory "
+                f"| sort events desc | limit 50"
             )
-            queries['volume_query_description'] = (
+            queries["volume_query_description"] = (
                 f"Find source categories matching '{search_pattern}' (case-insensitive)"
             )
 
         # Query 2: Template for metadata discovery
-        queries['metadata_query_template'] = (
-            f'{{scope}} | count by _index, _view, _collector, _source, _sourceName, _sourceHost, _dataTier | sort _count desc | limit 100'
+        queries["metadata_query_template"] = (
+            "{scope} | count by _index, _view, _collector, _source, _sourceName, _sourceHost, _dataTier | sort _count desc | limit 100"
         )
-        queries['metadata_query_description'] = "Discover partitions and related metadata"
+        queries["metadata_query_description"] = "Discover partitions and related metadata"
 
         # Query 3: Search audit
-        queries['search_audit_query'] = (
-            f'_view=sumologic_search_usage_per_query | where query_text matches /{search_pattern}/i '
-            f'| fields query_text, query_user, total_events_returned | sort total_events_returned desc | limit 20'
+        queries["search_audit_query"] = (
+            f"_view=sumologic_search_usage_per_query | where query_text matches /{search_pattern}/i "
+            f"| fields query_text, query_user, total_events_returned | sort total_events_returned desc | limit 20"
         )
-        queries['search_audit_query_description'] = f"Find queries by other users mentioning '{search_pattern}'"
+        queries["search_audit_query_description"] = (
+            f"Find queries by other users mentioning '{search_pattern}'"
+        )
 
         return queries
 
@@ -700,7 +700,7 @@ class LogDiscoveryPattern:
         log_format: str,
         detected_fields: List[str],
         use_case: Optional[str] = None,
-        has_query_library: bool = True
+        has_query_library: bool = True,
     ) -> dict:
         """Build Phase 3: Use-case based query recommendations.
 
@@ -734,228 +734,233 @@ class LogDiscoveryPattern:
             }
         """
         recommendations = {
-            'log_format': log_format,
-            'detected_fields': detected_fields,
-            'use_case': use_case,
-            'has_query_library': has_query_library,
-            'query_library_searches': [],
-            'common_patterns': [],
-            'field_based_queries': [],
-            'setup_instructions': None
+            "log_format": log_format,
+            "detected_fields": detected_fields,
+            "use_case": use_case,
+            "has_query_library": has_query_library,
+            "query_library_searches": [],
+            "common_patterns": [],
+            "field_based_queries": [],
+            "setup_instructions": None,
         }
 
         # Phase 3A: Query library searches (if available)
         if has_query_library:
             # Build searches based on use case and log format
             if use_case:
-                recommendations['query_library_searches'].append({
-                    'tool': 'search_query_examples',
-                    'parameters': {
-                        'query': use_case,
-                        'match_mode': 'any',
-                        'max_results': 10
-                    },
-                    'description': f"Search query library for '{use_case}' use cases",
-                    'why': f"Find example queries related to {use_case} that you can adapt to your logs"
-                })
+                recommendations["query_library_searches"].append(
+                    {
+                        "tool": "search_query_examples",
+                        "parameters": {"query": use_case, "match_mode": "any", "max_results": 10},
+                        "description": f"Search query library for '{use_case}' use cases",
+                        "why": f"Find example queries related to {use_case} that you can adapt to your logs",
+                    }
+                )
 
             # Search by detected field names (common patterns)
             common_fields = {
-                'status_code': 'HTTP status code queries (4xx, 5xx errors)',
-                'response_time': 'Performance and latency queries',
-                'user_id': 'User activity and authentication queries',
-                'error': 'Error detection and alerting queries',
-                'host': 'Host/server monitoring queries',
-                'pod': 'Kubernetes pod queries',
-                'namespace': 'Kubernetes namespace queries',
-                'source_ip': 'Network security queries',
-                'cloudtrail': 'AWS CloudTrail security queries'
+                "status_code": "HTTP status code queries (4xx, 5xx errors)",
+                "response_time": "Performance and latency queries",
+                "user_id": "User activity and authentication queries",
+                "error": "Error detection and alerting queries",
+                "host": "Host/server monitoring queries",
+                "pod": "Kubernetes pod queries",
+                "namespace": "Kubernetes namespace queries",
+                "source_ip": "Network security queries",
+                "cloudtrail": "AWS CloudTrail security queries",
             }
 
             for field in detected_fields:
                 field_lower = field.lower()
                 for pattern, description in common_fields.items():
                     if pattern in field_lower:
-                        recommendations['query_library_searches'].append({
-                            'tool': 'search_query_examples',
-                            'parameters': {
-                                'keywords': field,
-                                'match_mode': 'any',
-                                'max_results': 5
-                            },
-                            'description': f"Search for queries using '{field}' field",
-                            'why': description
-                        })
+                        recommendations["query_library_searches"].append(
+                            {
+                                "tool": "search_query_examples",
+                                "parameters": {
+                                    "keywords": field,
+                                    "match_mode": "any",
+                                    "max_results": 5,
+                                },
+                                "description": f"Search for queries using '{field}' field",
+                                "why": description,
+                            }
+                        )
                         break
 
             # Search by log format
             format_searches = {
-                'json': {
-                    'query': 'json parse',
-                    'description': 'Find JSON parsing and auto-parse examples'
+                "json": {
+                    "query": "json parse",
+                    "description": "Find JSON parsing and auto-parse examples",
                 },
-                'syslog': {
-                    'query': 'syslog parse',
-                    'description': 'Find syslog parsing patterns'
+                "syslog": {"query": "syslog parse", "description": "Find syslog parsing patterns"},
+                "cloudtrail": {
+                    "app_name": "AWS",
+                    "keywords": "CloudTrail",
+                    "description": "Find AWS CloudTrail query examples",
                 },
-                'cloudtrail': {
-                    'app_name': 'AWS',
-                    'keywords': 'CloudTrail',
-                    'description': 'Find AWS CloudTrail query examples'
-                }
             }
 
             if log_format in format_searches:
                 search_params = format_searches[log_format].copy()
-                description = search_params.pop('description')
-                recommendations['query_library_searches'].append({
-                    'tool': 'search_query_examples',
-                    'parameters': {**search_params, 'max_results': 5},
-                    'description': description,
-                    'why': f'Learn how to query {log_format} formatted logs'
-                })
+                description = search_params.pop("description")
+                recommendations["query_library_searches"].append(
+                    {
+                        "tool": "search_query_examples",
+                        "parameters": {**search_params, "max_results": 5},
+                        "description": description,
+                        "why": f"Learn how to query {log_format} formatted logs",
+                    }
+                )
 
         else:
             # Provide setup instructions
-            recommendations['setup_instructions'] = {
-                'message': (
-                    'Query examples library not available. To enable 11,000+ example queries:'
+            recommendations["setup_instructions"] = {
+                "message": (
+                    "Query examples library not available. To enable 11,000+ example queries:"
                 ),
-                'steps': [
-                    '1. Download query examples from GitHub releases',
-                    '2. Extract sumologic_query_examples.json.gz to data/ directory',
-                    '3. Restart MCP server',
-                    '4. Use search_query_examples tool to find relevant queries'
+                "steps": [
+                    "1. Download query examples from GitHub releases",
+                    "2. Extract sumologic_query_examples.json.gz to data/ directory",
+                    "3. Restart MCP server",
+                    "4. Use search_query_examples tool to find relevant queries",
                 ],
-                'documentation': 'See README.md for detailed setup instructions',
-                'benefit': 'Access real-world query examples from 280+ Sumo Logic apps'
+                "documentation": "See README.md for detailed setup instructions",
+                "benefit": "Access real-world query examples from 280+ Sumo Logic apps",
             }
 
         # Phase 3B: Common query patterns (always available, no library needed)
-        
+
         # Base patterns by use case
         if use_case:
             use_case_patterns = {
-                'error': [
+                "error": [
                     {
-                        'pattern': '{scope} error OR exception OR fail | count by _sourceHost',
-                        'description': 'Count errors by host',
-                        'operators': ['count by']
+                        "pattern": "{scope} error OR exception OR fail | count by _sourceHost",
+                        "description": "Count errors by host",
+                        "operators": ["count by"],
                     },
                     {
-                        'pattern': '{scope} (error OR exception) | timeslice 1h | count by _timeslice',
-                        'description': 'Error trend over time',
-                        'operators': ['timeslice', 'count by']
+                        "pattern": "{scope} (error OR exception) | timeslice 1h | count by _timeslice",
+                        "description": "Error trend over time",
+                        "operators": ["timeslice", "count by"],
+                    },
+                ],
+                "performance": [
+                    {
+                        "pattern": '{scope} | parse "response_time=*ms" as response_time | avg(response_time), max(response_time), pct(response_time, 95)',
+                        "description": "Response time statistics (avg, max, p95)",
+                        "operators": ["parse", "avg", "max", "pct"],
                     }
                 ],
-                'performance': [
+                "security": [
                     {
-                        'pattern': '{scope} | parse "response_time=*ms" as response_time | avg(response_time), max(response_time), pct(response_time, 95)',
-                        'description': 'Response time statistics (avg, max, p95)',
-                        'operators': ['parse', 'avg', 'max', 'pct']
+                        "pattern": "{scope} (failed OR denied OR unauthorized) | count by user, _sourceHost",
+                        "description": "Failed authentication attempts by user and host",
+                        "operators": ["count by"],
                     }
                 ],
-                'security': [
-                    {
-                        'pattern': '{scope} (failed OR denied OR unauthorized) | count by user, _sourceHost',
-                        'description': 'Failed authentication attempts by user and host',
-                        'operators': ['count by']
-                    }
-                ]
             }
 
             if use_case.lower() in use_case_patterns:
-                recommendations['common_patterns'].extend(use_case_patterns[use_case.lower()])
+                recommendations["common_patterns"].extend(use_case_patterns[use_case.lower()])
 
         # Field-based query suggestions
         for field in detected_fields:
             field_lower = field.lower()
-            
-            # HTTP status codes
-            if 'status' in field_lower and 'code' in field_lower:
-                recommendations['field_based_queries'].append({
-                    'field': field,
-                    'queries': [
-                        {
-                            'pattern': f'{{scope}} | where {field} >= 400 | count by {field}, _sourceHost',
-                            'description': 'Count 4xx/5xx errors by status code and host',
-                            'use_case': 'error'
-                        },
-                        {
-                            'pattern': f'{{scope}} | where {field} >= 500 | timeslice 5m | count by _timeslice',
-                            'description': 'Track 5xx errors over time',
-                            'use_case': 'error'
-                        }
-                    ]
-                })
 
-            # Response time / latency
-            if any(term in field_lower for term in ['response', 'latency', 'duration', 'time']):
-                if field_lower not in ['_messagetime', '_receipttime']:
-                    recommendations['field_based_queries'].append({
-                        'field': field,
-                        'queries': [
+            # HTTP status codes
+            if "status" in field_lower and "code" in field_lower:
+                recommendations["field_based_queries"].append(
+                    {
+                        "field": field,
+                        "queries": [
                             {
-                                'pattern': f'{{scope}} | avg({field}), max({field}), pct({field}, 95) by _sourceHost',
-                                'description': 'Performance metrics: avg, max, p95',
-                                'use_case': 'performance'
+                                "pattern": f"{{scope}} | where {field} >= 400 | count by {field}, _sourceHost",
+                                "description": "Count 4xx/5xx errors by status code and host",
+                                "use_case": "error",
                             },
                             {
-                                'pattern': f'{{scope}} | where {field} > <threshold> | count by _sourceHost',
-                                'description': 'Find slow requests (replace <threshold>)',
-                                'use_case': 'performance'
-                            }
-                        ]
-                    })
+                                "pattern": f"{{scope}} | where {field} >= 500 | timeslice 5m | count by _timeslice",
+                                "description": "Track 5xx errors over time",
+                                "use_case": "error",
+                            },
+                        ],
+                    }
+                )
+
+            # Response time / latency
+            if any(term in field_lower for term in ["response", "latency", "duration", "time"]):
+                if field_lower not in ["_messagetime", "_receipttime"]:
+                    recommendations["field_based_queries"].append(
+                        {
+                            "field": field,
+                            "queries": [
+                                {
+                                    "pattern": f"{{scope}} | avg({field}), max({field}), pct({field}, 95) by _sourceHost",
+                                    "description": "Performance metrics: avg, max, p95",
+                                    "use_case": "performance",
+                                },
+                                {
+                                    "pattern": f"{{scope}} | where {field} > <threshold> | count by _sourceHost",
+                                    "description": "Find slow requests (replace <threshold>)",
+                                    "use_case": "performance",
+                                },
+                            ],
+                        }
+                    )
 
             # User fields
-            if 'user' in field_lower or 'account' in field_lower:
-                recommendations['field_based_queries'].append({
-                    'field': field,
-                    'queries': [
-                        {
-                            'pattern': f'{{scope}} | count by {field} | sort _count desc | limit 20',
-                            'description': 'Top users by activity',
-                            'use_case': 'audit'
-                        }
-                    ]
-                })
+            if "user" in field_lower or "account" in field_lower:
+                recommendations["field_based_queries"].append(
+                    {
+                        "field": field,
+                        "queries": [
+                            {
+                                "pattern": f"{{scope}} | count by {field} | sort _count desc | limit 20",
+                                "description": "Top users by activity",
+                                "use_case": "audit",
+                            }
+                        ],
+                    }
+                )
 
         # Generic patterns applicable to all logs
-        recommendations['common_patterns'].extend([
-            {
-                'pattern': '{scope} | count by _sourceHost',
-                'description': 'Message volume by host',
-                'operators': ['count by'],
-                'use_case': 'general'
-            },
-            {
-                'pattern': '{scope} | timeslice 1h | count by _timeslice',
-                'description': 'Message volume over time',
-                'operators': ['timeslice', 'count by'],
-                'use_case': 'general'
-            }
-        ])
+        recommendations["common_patterns"].extend(
+            [
+                {
+                    "pattern": "{scope} | count by _sourceHost",
+                    "description": "Message volume by host",
+                    "operators": ["count by"],
+                    "use_case": "general",
+                },
+                {
+                    "pattern": "{scope} | timeslice 1h | count by _timeslice",
+                    "description": "Message volume over time",
+                    "operators": ["timeslice", "count by"],
+                    "use_case": "general",
+                },
+            ]
+        )
 
         # Add note about {scope} placeholder
-        recommendations['note'] = (
-            'Replace {scope} in patterns with your actual search scope '
-            '(e.g., _sourceCategory=prod/app or _index=prod_logs)'
+        recommendations["note"] = (
+            "Replace {scope} in patterns with your actual search scope "
+            "(e.g., _sourceCategory=prod/app or _index=prod_logs)"
         )
 
         return recommendations
 
     @staticmethod
     def generate_complete_workflow(
-        initial_hint: str,
-        context: str = "service",
-        use_case: Optional[str] = None
+        initial_hint: str, context: str = "service", use_case: Optional[str] = None
     ) -> dict:
         """Generate complete 3-phase log discovery workflow.
 
         This extends the discovery workflow to include all three phases:
         - Phase 1: Metadata discovery
-        - Phase 2: Log structure analysis  
+        - Phase 2: Log structure analysis
         - Phase 3: Use-case based query building
 
         Args:
@@ -968,103 +973,108 @@ class LogDiscoveryPattern:
 
         Example:
             >>> LogDiscoveryPattern.generate_complete_workflow(
-            ...     'api-gateway', 
+            ...     'api-gateway',
             ...     'service',
             ...     use_case='error'
             ... )
         """
         workflow = {
-            'initial_hint': initial_hint,
-            'context': context,
-            'use_case': use_case,
-            'phases': {
-                'phase1': 'Metadata Discovery',
-                'phase2': 'Log Structure Analysis',
-                'phase3': 'Use-Case Query Building'
+            "initial_hint": initial_hint,
+            "context": context,
+            "use_case": use_case,
+            "phases": {
+                "phase1": "Metadata Discovery",
+                "phase2": "Log Structure Analysis",
+                "phase3": "Use-Case Query Building",
             },
-            'estimated_time_minutes': 15,
-            'steps': []
+            "estimated_time_minutes": 15,
+            "steps": [],
         }
 
         # Phase 1: Metadata Discovery
-        workflow['steps'].extend([
-            {
-                'phase': 1,
-                'step': 1,
-                'action': 'Find matching source categories',
-                'tool': 'analyze_data_volume or custom query',
-                'method': 'data_volume_search',
-                'pattern': f'*{initial_hint}*'
-            },
-            {
-                'phase': 1,
-                'step': 2,
-                'action': 'Discover partitions and metadata',
-                'tool': 'explore_log_metadata or custom query',
-                'method': 'metadata_exploration'
-            }
-        ])
+        workflow["steps"].extend(
+            [
+                {
+                    "phase": 1,
+                    "step": 1,
+                    "action": "Find matching source categories",
+                    "tool": "analyze_data_volume or custom query",
+                    "method": "data_volume_search",
+                    "pattern": f"*{initial_hint}*",
+                },
+                {
+                    "phase": 1,
+                    "step": 2,
+                    "action": "Discover partitions and metadata",
+                    "tool": "explore_log_metadata or custom query",
+                    "method": "metadata_exploration",
+                },
+            ]
+        )
 
         # Phase 2: Log Structure
-        workflow['steps'].extend([
-            {
-                'phase': 2,
-                'step': 3,
-                'action': 'Sample logs without auto-parse',
-                'tool': 'search_sumo_logs',
-                'method': 'log_sampling',
-                'note': 'Shows indexed fields only'
-            },
-            {
-                'phase': 2,
-                'step': 4,
-                'action': 'Sample logs with auto-parse',
-                'tool': 'search_sumo_logs',
-                'method': 'log_sampling',
-                'note': 'Shows all fields including JSON'
-            },
-            {
-                'phase': 2,
-                'step': 5,
-                'action': 'Detect log format',
-                'method': 'format_detection',
-                'note': 'Identify JSON, syslog, or custom format'
-            }
-        ])
+        workflow["steps"].extend(
+            [
+                {
+                    "phase": 2,
+                    "step": 3,
+                    "action": "Sample logs without auto-parse",
+                    "tool": "search_sumo_logs",
+                    "method": "log_sampling",
+                    "note": "Shows indexed fields only",
+                },
+                {
+                    "phase": 2,
+                    "step": 4,
+                    "action": "Sample logs with auto-parse",
+                    "tool": "search_sumo_logs",
+                    "method": "log_sampling",
+                    "note": "Shows all fields including JSON",
+                },
+                {
+                    "phase": 2,
+                    "step": 5,
+                    "action": "Detect log format",
+                    "method": "format_detection",
+                    "note": "Identify JSON, syslog, or custom format",
+                },
+            ]
+        )
 
         # Phase 3: Use-Case Query Building
-        workflow['steps'].extend([
-            {
-                'phase': 3,
-                'step': 6,
-                'action': 'Search query examples library',
-                'tool': 'search_query_examples',
-                'method': 'query_library_search',
-                'note': 'Find relevant examples from 11,000+ real queries'
-            },
-            {
-                'phase': 3,
-                'step': 7,
-                'action': 'Build queries based on use case and fields',
-                'method': 'query_construction',
-                'note': 'Combine scope, operators, and field filters'
-            }
-        ])
+        workflow["steps"].extend(
+            [
+                {
+                    "phase": 3,
+                    "step": 6,
+                    "action": "Search query examples library",
+                    "tool": "search_query_examples",
+                    "method": "query_library_search",
+                    "note": "Find relevant examples from 11,000+ real queries",
+                },
+                {
+                    "phase": 3,
+                    "step": 7,
+                    "action": "Build queries based on use case and fields",
+                    "method": "query_construction",
+                    "note": "Combine scope, operators, and field filters",
+                },
+            ]
+        )
 
-        workflow['tips'] = [
-            'Phase 1: Start with data volume index to find source categories',
-            'Phase 2: Compare fields with/without auto-parse to identify indexed fields',
-            'Phase 3: Use search_query_examples tool to find relevant patterns',
-            'Query library: Extract sumologic_query_examples.json.gz to enable 11,000+ examples',
-            'Build scope using ScopePattern.build_scope() for optimal performance'
+        workflow["tips"] = [
+            "Phase 1: Start with data volume index to find source categories",
+            "Phase 2: Compare fields with/without auto-parse to identify indexed fields",
+            "Phase 3: Use search_query_examples tool to find relevant patterns",
+            "Query library: Extract sumologic_query_examples.json.gz to enable 11,000+ examples",
+            "Build scope using ScopePattern.build_scope() for optimal performance",
         ]
 
         return workflow
 
     @staticmethod
     def recommend_apps(
-        discovered_metadata: dict,
-        detected_fields: Optional[List[str]] = None
+        discovered_metadata: dict, detected_fields: Optional[List[str]] = None
     ) -> dict:
         """Recommend Sumo Logic apps based on discovered logs.
 
@@ -1095,122 +1105,125 @@ class LogDiscoveryPattern:
             }
         """
         recommendations = {
-            'likely_apps': [],
-            'app_matches': [],
-            'check_tools': [],
-            'installation_links': {
-                'app_catalog': 'https://www.sumologic.com/app-catalog',
-                'integrations_docs': 'https://www.sumologic.com/help/docs/integrations/'
+            "likely_apps": [],
+            "app_matches": [],
+            "check_tools": [],
+            "installation_links": {
+                "app_catalog": "https://www.sumologic.com/app-catalog",
+                "integrations_docs": "https://www.sumologic.com/help/docs/integrations/",
             },
-            'next_steps': []
+            "next_steps": [],
         }
 
         # Build search pattern from metadata
-        search_terms = []
         metadata_str = str(discovered_metadata).lower()
 
         # AWS Services
         aws_services = {
-            'cloudtrail': {
-                'app': 'AWS CloudTrail',
-                'fields': ['eventName', 'eventSource', 'awsRegion', 'userIdentity'],
-                'catalog_search': 'AWS CloudTrail',
-                'use_cases': ['Security auditing', 'Compliance monitoring', 'User activity tracking']
+            "cloudtrail": {
+                "app": "AWS CloudTrail",
+                "fields": ["eventName", "eventSource", "awsRegion", "userIdentity"],
+                "catalog_search": "AWS CloudTrail",
+                "use_cases": [
+                    "Security auditing",
+                    "Compliance monitoring",
+                    "User activity tracking",
+                ],
             },
-            'cloudwatch': {
-                'app': 'AWS CloudWatch',
-                'fields': ['logGroup', 'logStream'],
-                'catalog_search': 'AWS CloudWatch',
-                'use_cases': ['Log aggregation', 'Metric monitoring']
+            "cloudwatch": {
+                "app": "AWS CloudWatch",
+                "fields": ["logGroup", "logStream"],
+                "catalog_search": "AWS CloudWatch",
+                "use_cases": ["Log aggregation", "Metric monitoring"],
             },
-            'elb': {
-                'app': 'AWS Elastic Load Balancer',
-                'fields': ['elb', 'target_ip', 'target_port'],
-                'catalog_search': 'AWS ELB',
-                'use_cases': ['Load balancer monitoring', 'Request analytics']
+            "elb": {
+                "app": "AWS Elastic Load Balancer",
+                "fields": ["elb", "target_ip", "target_port"],
+                "catalog_search": "AWS ELB",
+                "use_cases": ["Load balancer monitoring", "Request analytics"],
             },
-            'vpc': {
-                'app': 'AWS VPC Flow Logs',
-                'fields': ['srcaddr', 'dstaddr', 'srcport', 'dstport', 'protocol'],
-                'catalog_search': 'AWS VPC',
-                'use_cases': ['Network security', 'Traffic analysis']
+            "vpc": {
+                "app": "AWS VPC Flow Logs",
+                "fields": ["srcaddr", "dstaddr", "srcport", "dstport", "protocol"],
+                "catalog_search": "AWS VPC",
+                "use_cases": ["Network security", "Traffic analysis"],
             },
-            'lambda': {
-                'app': 'AWS Lambda',
-                'fields': ['requestId', 'duration', 'billed_duration'],
-                'catalog_search': 'AWS Lambda',
-                'use_cases': ['Serverless monitoring', 'Performance analysis']
-            }
+            "lambda": {
+                "app": "AWS Lambda",
+                "fields": ["requestId", "duration", "billed_duration"],
+                "catalog_search": "AWS Lambda",
+                "use_cases": ["Serverless monitoring", "Performance analysis"],
+            },
         }
 
         # Kubernetes
         k8s_indicators = {
-            'kubernetes': {
-                'app': 'Kubernetes',
-                'fields': ['pod', 'namespace', 'container', 'node'],
-                'catalog_search': 'Kubernetes',
-                'use_cases': ['Container orchestration', 'Pod monitoring', 'Cluster health']
+            "kubernetes": {
+                "app": "Kubernetes",
+                "fields": ["pod", "namespace", "container", "node"],
+                "catalog_search": "Kubernetes",
+                "use_cases": ["Container orchestration", "Pod monitoring", "Cluster health"],
             },
-            'k8s': {
-                'app': 'Kubernetes',
-                'fields': ['pod', 'namespace'],
-                'catalog_search': 'Kubernetes',
-                'use_cases': ['Container monitoring']
-            }
+            "k8s": {
+                "app": "Kubernetes",
+                "fields": ["pod", "namespace"],
+                "catalog_search": "Kubernetes",
+                "use_cases": ["Container monitoring"],
+            },
         }
 
         # Web Servers
         web_servers = {
-            'apache': {
-                'app': 'Apache',
-                'fields': ['status_code', 'method', 'request_uri', 'user_agent'],
-                'catalog_search': 'Apache',
-                'use_cases': ['Web server monitoring', 'Access log analysis']
+            "apache": {
+                "app": "Apache",
+                "fields": ["status_code", "method", "request_uri", "user_agent"],
+                "catalog_search": "Apache",
+                "use_cases": ["Web server monitoring", "Access log analysis"],
             },
-            'nginx': {
-                'app': 'Nginx',
-                'fields': ['status', 'request', 'http_user_agent'],
-                'catalog_search': 'Nginx',
-                'use_cases': ['Web server monitoring', 'Reverse proxy analytics']
+            "nginx": {
+                "app": "Nginx",
+                "fields": ["status", "request", "http_user_agent"],
+                "catalog_search": "Nginx",
+                "use_cases": ["Web server monitoring", "Reverse proxy analytics"],
             },
-            'iis': {
-                'app': 'Microsoft IIS',
-                'fields': ['cs-method', 'cs-uri-stem', 'sc-status'],
-                'catalog_search': 'IIS',
-                'use_cases': ['Windows web server monitoring']
-            }
+            "iis": {
+                "app": "Microsoft IIS",
+                "fields": ["cs-method", "cs-uri-stem", "sc-status"],
+                "catalog_search": "IIS",
+                "use_cases": ["Windows web server monitoring"],
+            },
         }
 
         # Databases
         databases = {
-            'mysql': {
-                'app': 'MySQL',
-                'fields': ['query_time', 'lock_time', 'rows_sent'],
-                'catalog_search': 'MySQL',
-                'use_cases': ['Database performance', 'Query analysis']
+            "mysql": {
+                "app": "MySQL",
+                "fields": ["query_time", "lock_time", "rows_sent"],
+                "catalog_search": "MySQL",
+                "use_cases": ["Database performance", "Query analysis"],
             },
-            'postgres': {
-                'app': 'PostgreSQL',
-                'fields': ['duration', 'statement'],
-                'catalog_search': 'PostgreSQL',
-                'use_cases': ['Database monitoring', 'Query performance']
-            }
+            "postgres": {
+                "app": "PostgreSQL",
+                "fields": ["duration", "statement"],
+                "catalog_search": "PostgreSQL",
+                "use_cases": ["Database monitoring", "Query performance"],
+            },
         }
 
         # Security
         security_apps = {
-            'palo alto': {
-                'app': 'Palo Alto Networks',
-                'fields': ['threat_id', 'category', 'severity'],
-                'catalog_search': 'Palo Alto',
-                'use_cases': ['Firewall monitoring', 'Threat detection']
+            "palo alto": {
+                "app": "Palo Alto Networks",
+                "fields": ["threat_id", "category", "severity"],
+                "catalog_search": "Palo Alto",
+                "use_cases": ["Firewall monitoring", "Threat detection"],
             },
-            'cisco': {
-                'app': 'Cisco Networks',
-                'fields': ['facility', 'severity', 'mnemonic'],
-                'catalog_search': 'Cisco',
-                'use_cases': ['Network device monitoring']
-            }
+            "cisco": {
+                "app": "Cisco Networks",
+                "fields": ["facility", "severity", "mnemonic"],
+                "catalog_search": "Cisco",
+                "use_cases": ["Network device monitoring"],
+            },
         }
 
         # Check all app categories
@@ -1228,7 +1241,7 @@ class LogDiscoveryPattern:
             # Check fields
             if detected_fields:
                 field_matches = []
-                for field in app_info.get('fields', []):
+                for field in app_info.get("fields", []):
                     if any(field.lower() in df.lower() for df in detected_fields):
                         field_matches.append(field)
 
@@ -1238,64 +1251,66 @@ class LogDiscoveryPattern:
 
             if matched:
                 app_match = {
-                    'app_name': app_info['app'],
-                    'confidence': 'high' if len(match_reasons) > 1 else 'medium',
-                    'match_reasons': match_reasons,
-                    'use_cases': app_info.get('use_cases', []),
-                    'catalog_search': app_info['catalog_search']
+                    "app_name": app_info["app"],
+                    "confidence": "high" if len(match_reasons) > 1 else "medium",
+                    "match_reasons": match_reasons,
+                    "use_cases": app_info.get("use_cases", []),
+                    "catalog_search": app_info["catalog_search"],
                 }
-                recommendations['likely_apps'].append(app_info['app'])
-                recommendations['app_matches'].append(app_match)
+                recommendations["likely_apps"].append(app_info["app"])
+                recommendations["app_matches"].append(app_match)
 
         # Add tools to check if apps are installed
-        if recommendations['likely_apps']:
-            recommendations['check_tools'] = [
+        if recommendations["likely_apps"]:
+            recommendations["check_tools"] = [
                 {
-                    'tool': 'list_installed_apps',
-                    'description': 'Quick check for installed apps (may require admin permissions)',
-                    'fallback': 'Use export_installed_apps if permission denied'
+                    "tool": "list_installed_apps",
+                    "description": "Quick check for installed apps (may require admin permissions)",
+                    "fallback": "Use export_installed_apps if permission denied",
                 },
                 {
-                    'tool': 'export_installed_apps',
-                    'description': 'Get full InstalledApps folder structure',
-                    'works_for': 'All users (no special permissions required)'
-                }
+                    "tool": "export_installed_apps",
+                    "description": "Get full InstalledApps folder structure",
+                    "works_for": "All users (no special permissions required)",
+                },
             ]
 
             # Add next steps
-            recommendations['next_steps'] = [
+            recommendations["next_steps"] = [
                 {
-                    'step': 1,
-                    'action': 'Check if apps are installed',
-                    'tools': ['list_installed_apps', 'export_installed_apps'],
-                    'why': 'Discover if recommended apps are already available'
+                    "step": 1,
+                    "action": "Check if apps are installed",
+                    "tools": ["list_installed_apps", "export_installed_apps"],
+                    "why": "Discover if recommended apps are already available",
                 },
                 {
-                    'step': 2,
-                    'action': 'If apps are installed',
-                    'tools': ['export_installed_apps'],
-                    'why': 'Navigate to pre-built dashboards and searches for instant value'
+                    "step": 2,
+                    "action": "If apps are installed",
+                    "tools": ["export_installed_apps"],
+                    "why": "Navigate to pre-built dashboards and searches for instant value",
                 },
                 {
-                    'step': 3,
-                    'action': 'If apps are NOT installed',
-                    'recommendation': (
-                        'Search app catalog for recommended apps:\n'
+                    "step": 3,
+                    "action": "If apps are NOT installed",
+                    "recommendation": (
+                        "Search app catalog for recommended apps:\n"
                         f"- App Catalog: {recommendations['installation_links']['app_catalog']}\n"
                         f"- Search keywords: {', '.join([m['catalog_search'] for m in recommendations['app_matches']])}\n"
-                        '- Contact admin to install missing apps'
-                    )
-                }
+                        "- Contact admin to install missing apps"
+                    ),
+                },
             ]
         else:
-            recommendations['next_steps'] = [{
-                'message': 'No strong app matches found based on metadata/fields',
-                'suggestion': (
-                    'Try:\n'
-                    '1. Search app catalog by technology: https://www.sumologic.com/app-catalog\n'
-                    '2. Browse integrations docs: https://www.sumologic.com/help/docs/integrations/\n'
-                    '3. Use search_query_examples tool to find relevant query patterns'
-                )
-            }]
+            recommendations["next_steps"] = [
+                {
+                    "message": "No strong app matches found based on metadata/fields",
+                    "suggestion": (
+                        "Try:\n"
+                        "1. Search app catalog by technology: https://www.sumologic.com/app-catalog\n"
+                        "2. Browse integrations docs: https://www.sumologic.com/help/docs/integrations/\n"
+                        "3. Use search_query_examples tool to find relevant query patterns"
+                    ),
+                }
+            ]
 
         return recommendations

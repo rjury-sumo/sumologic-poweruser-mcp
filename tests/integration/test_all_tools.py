@@ -2,20 +2,21 @@
 """Test all MCP tools for bugs."""
 import asyncio
 import json
+
 from sumologic_mcp_server.sumologic_mcp_server import (
-    search_sumo_logs,
     create_sumo_search_job,
-    get_sumo_search_job_status,
-    get_sumo_search_job_results,
     get_sumo_collectors,
+    get_sumo_dashboards,
+    get_sumo_partitions,
+    get_sumo_roles_v2,
+    get_sumo_search_job_results,
+    get_sumo_search_job_status,
     get_sumo_sources,
     get_sumo_users,
-    get_sumo_dashboards,
-    query_sumo_metrics,
-    get_sumo_roles_v2,
-    search_sumo_monitors,
-    get_sumo_partitions,
     list_sumo_instances,
+    query_sumo_metrics,
+    search_sumo_logs,
+    search_sumo_monitors,
 )
 
 

@@ -9,10 +9,12 @@ Sumo Logic uses an async job pattern for content exports:
 Based on the implementation from Hajime VSCode extension:
 /Users/rjury/Documents/sumo2024/Hajime/src/api/content.ts
 """
-import asyncio
-from typing import Callable, Awaitable, Dict, Any
 
-from .exceptions import APIError, TimeoutError as SumoTimeoutError
+import asyncio
+from typing import Any, Awaitable, Callable, Dict
+
+from .exceptions import APIError
+from .exceptions import TimeoutError as SumoTimeoutError
 
 
 async def poll_export_job(
@@ -21,7 +23,7 @@ async def poll_export_job(
     get_status_func: Callable[[str, str], Awaitable[Dict[str, Any]]],
     get_result_func: Callable[[str, str], Awaitable[Dict[str, Any]]],
     max_wait_seconds: int = 300,
-    poll_interval_seconds: int = 2
+    poll_interval_seconds: int = 2,
 ) -> Dict[str, Any]:
     """
     Poll async export job until completion.
@@ -52,50 +54,39 @@ async def poll_export_job(
             status_response = await get_status_func(content_id, job_id)
 
             # Extract status from response
-            status = status_response.get('status')
+            status = status_response.get("status")
 
-            if status == 'Success':
+            if status == "Success":
                 # Job completed successfully, get result
                 result = await get_result_func(content_id, job_id)
                 return result
 
-            elif status == 'Failed':
+            elif status == "Failed":
                 # Job failed
                 error_msg = (
-                    status_response.get('error') or
-                    status_response.get('statusMessage') or
-                    'Export job failed'
+                    status_response.get("error")
+                    or status_response.get("statusMessage")
+                    or "Export job failed"
                 )
-                raise APIError(
-                    f"Export job {job_id} failed: {error_msg}",
-                    status_code=500
-                )
+                raise APIError(f"Export job {job_id} failed: {error_msg}", status_code=500)
 
-            elif status == 'InProgress':
+            elif status == "InProgress":
                 # Continue polling
                 continue
 
             else:
                 # Unknown status
-                raise APIError(
-                    f"Unknown export job status: {status}",
-                    status_code=500
-                )
+                raise APIError(f"Unknown export job status: {status}", status_code=500)
 
         except APIError:
             # Re-raise API errors
             raise
         except Exception as e:
             # Wrap other exceptions
-            raise APIError(
-                f"Error polling export job: {str(e)}",
-                status_code=500
-            )
+            raise APIError(f"Error polling export job: {str(e)}", status_code=500)
 
     # Timeout - job didn't complete in time
-    raise SumoTimeoutError(
-        f"Export job {job_id} timed out after {max_wait_seconds} seconds"
-    )
+    raise SumoTimeoutError(f"Export job {job_id} timed out after {max_wait_seconds} seconds")
 
 
 async def poll_folder_export_job(
@@ -104,7 +95,7 @@ async def poll_folder_export_job(
     get_status_func: Callable[[str], Awaitable[Dict[str, Any]]],
     get_result_func: Callable[[str], Awaitable[Dict[str, Any]]],
     max_wait_seconds: int = 300,
-    poll_interval_seconds: int = 2
+    poll_interval_seconds: int = 2,
 ) -> Dict[str, Any]:
     """
     Poll async folder export job (Global, Admin Recommended) until completion.
@@ -138,34 +129,32 @@ async def poll_folder_export_job(
             status_response = await get_status_func(job_id)
 
             # Extract status from response
-            status = status_response.get('status')
+            status = status_response.get("status")
 
-            if status == 'Success':
+            if status == "Success":
                 # Job completed successfully, get result
                 result = await get_result_func(job_id)
                 return result
 
-            elif status == 'Failed':
+            elif status == "Failed":
                 # Job failed
                 error_msg = (
-                    status_response.get('error') or
-                    status_response.get('statusMessage') or
-                    f'{folder_type} export job failed'
+                    status_response.get("error")
+                    or status_response.get("statusMessage")
+                    or f"{folder_type} export job failed"
                 )
                 raise APIError(
-                    f"{folder_type} export job {job_id} failed: {error_msg}",
-                    status_code=500
+                    f"{folder_type} export job {job_id} failed: {error_msg}", status_code=500
                 )
 
-            elif status == 'InProgress':
+            elif status == "InProgress":
                 # Continue polling
                 continue
 
             else:
                 # Unknown status
                 raise APIError(
-                    f"Unknown {folder_type} export job status: {status}",
-                    status_code=500
+                    f"Unknown {folder_type} export job status: {status}", status_code=500
                 )
 
         except APIError:
@@ -173,10 +162,7 @@ async def poll_folder_export_job(
             raise
         except Exception as e:
             # Wrap other exceptions
-            raise APIError(
-                f"Error polling {folder_type} export job: {str(e)}",
-                status_code=500
-            )
+            raise APIError(f"Error polling {folder_type} export job: {str(e)}", status_code=500)
 
     # Timeout - job didn't complete in time
     raise SumoTimeoutError(

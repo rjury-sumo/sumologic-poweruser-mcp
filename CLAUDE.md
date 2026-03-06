@@ -307,6 +307,126 @@ by_receipt_time = True
 by_receipt_time = True
 ```
 
+## Code Quality Standards
+
+### Linting and Formatting
+
+**Run these checks before committing:**
+
+```bash
+# Format code with Black (required - CI will fail if not formatted)
+uv run black src/ tests/
+
+# Check and fix linting issues with Ruff
+uv run ruff check src/ tests/ --fix
+
+# Security scan with Bandit
+uv run bandit -r src/
+```
+
+### Ruff Configuration
+
+Project uses Ruff for linting with these important rules:
+
+**Enabled checks:**
+- `E/W` - pycodestyle (PEP 8 compliance)
+- `F` - pyflakes (unused imports, undefined names)
+- `I` - isort (import sorting)
+- `B` - flake8-bugbear (common bugs)
+- `C4` - flake8-comprehensions (list/dict comprehension improvements)
+- `UP` - pyupgrade (Python version upgrades)
+
+**Intentionally ignored:**
+- `E501` - Line too long (handled by Black)
+- `B008` - Function calls in argument defaults (required for FastMCP Field())
+- `B007` - Loop control variable not used (common in polling loops)
+- `B904` - Exception chaining with `from` (intentionally omitted for API errors)
+
+**Test-specific allowances:**
+- `B017` - Allow `pytest.raises(Exception)` in tests
+- `C416` - Allow list comprehensions in tests
+
+### Exception Handling Best Practices
+
+**DO:** Use specific exception types
+```python
+try:
+    await client.delete_search_job(job_id)
+except Exception:  # noqa: S110
+    pass  # Best effort cleanup
+```
+
+**DON'T:** Use bare except clauses
+```python
+# WRONG - Bandit security warning B110, Ruff E722
+try:
+    await client.delete_search_job(job_id)
+except:  # ❌ Catches SystemExit, KeyboardInterrupt, etc.
+    pass
+```
+
+**DO:** Use exception chaining when re-raising
+```python
+try:
+    result = parse_config(data)
+except ValueError as e:
+    raise ValidationError("Invalid config") from e
+```
+
+**Exception to B904 rule:**
+When catching and re-raising API errors, we intentionally don't chain exceptions to avoid exposing internal error details to clients. This is documented with `# noqa: B904` or globally ignored in `pyproject.toml`.
+
+### Loop Variables Best Practices
+
+**DO:** Use `_` for unused loop variables when appropriate
+```python
+# If attempt number doesn't matter
+for _ in range(max_attempts):
+    if await check_status():
+        break
+    await asyncio.sleep(poll_interval)
+```
+
+**ACCEPTABLE:** Don't use loop variable in polling loops (B007)
+```python
+# Polling loop where we just need N attempts
+for attempt in range(max_attempts):  # noqa: B007
+    status = await client.get_job_status(job_id)
+    if status == "COMPLETE":
+        break
+    await asyncio.sleep(5)
+```
+
+The project globally ignores B007 because polling loops are common in async API clients.
+
+### Security: Bandit Compliance
+
+Bandit scans for security issues. Address these common warnings:
+
+**B110: Try/Except/Pass**
+```python
+# BAD - Silent failures hide problems
+try:
+    dangerous_operation()
+except:
+    pass
+
+# GOOD - Specific exception, with noqa if intentional
+try:
+    await client.delete_search_job(job_id)
+except Exception:  # noqa: S110
+    pass  # Best effort cleanup - job deletion failure is acceptable
+```
+
+**B608: SQL Injection**
+- Not applicable - this project uses REST APIs, not SQL
+
+**General security rules:**
+- Never hardcode credentials
+- Always validate user input
+- Use rate limiting
+- Log security-relevant events
+
 ## Anti-Patterns to Avoid
 
 ### ❌ DO NOT DO THESE THINGS
@@ -477,10 +597,18 @@ docs: update mcp-tools-reference.md for new URL tools
 - Add subdomain configuration examples
 ```
 
-## Security Checklist
+## Pre-Commit Checklist
 
 Before committing any code:
 
+**Code Quality:**
+- [ ] Code formatted with `uv run black src/ tests/`
+- [ ] Linting passes with `uv run ruff check src/ tests/`
+- [ ] No bare `except:` clauses (use `except Exception:` with `# noqa: S110`)
+- [ ] Security scan passes with `uv run bandit -r src/`
+- [ ] All tests pass with `uv run pytest`
+
+**Security:**
 - [ ] All inputs are validated using `validation.py`
 - [ ] No hardcoded credentials or tokens
 - [ ] Rate limiting applied with `get_rate_limiter()`

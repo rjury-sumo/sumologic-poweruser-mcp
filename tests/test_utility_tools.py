@@ -1,8 +1,9 @@
 """Tests for utility tools."""
 
-import pytest
 import json
-from pathlib import Path
+
+import pytest
+
 from sumologic_mcp_server.sumologic_mcp_server import get_skill
 
 
@@ -67,7 +68,7 @@ class TestGetSkill:
                 # If success, should be markdown
                 assert len(result) > 50
                 # Most skills should have these sections
-                assert ("##" in result or "#" in result)
+                assert "##" in result or "#" in result
 
     @pytest.mark.asyncio
     async def test_get_skill_path_resolution(self):

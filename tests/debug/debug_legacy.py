@@ -3,7 +3,9 @@
 
 import asyncio
 import json
+
 from src.sumologic_mcp_server.sumologic_mcp_server import run_search_audit_query
+
 
 async def main():
     print("Testing LEGACY parameters (should work)...")

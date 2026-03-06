@@ -28,24 +28,25 @@ import httpx
 from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 
-from .config import get_config, SumoInstanceConfig
+from .config import SumoInstanceConfig, get_config
 from .exceptions import (
     APIError,
     AuthenticationError,
     InstanceNotFoundError,
     SumoMCPError,
-    TimeoutError as SumoTimeoutError,
     ValidationError,
+)
+from .exceptions import (
+    TimeoutError as SumoTimeoutError,
 )
 from .rate_limiter import get_rate_limiter
 from .validation import (
+    CollectorValidation,
+    MonitorSearchValidation,
     validate_instance_name,
     validate_pagination,
     validate_query_input,
     validate_time_range,
-    CollectorValidation,
-    ContentTypeValidation,
-    MonitorSearchValidation,
 )
 
 
@@ -59,12 +60,13 @@ def _resolve_field_value(value: Any) -> Any:
     from pydantic.fields import FieldInfo
 
     if isinstance(value, FieldInfo):
-        return value.default if hasattr(value, 'default') else None
+        return value.default if hasattr(value, "default") else None
     return value
+
 
 # Logging will be configured on first access
 logger = logging.getLogger(__name__)
-audit_logger = logging.getLogger('audit')
+audit_logger = logging.getLogger("audit")
 
 # Initialize the MCP server
 mcp = FastMCP("Sumo Logic")
@@ -80,12 +82,12 @@ def _ensure_config_initialized():
         config = get_config()
         logging.basicConfig(
             level=getattr(logging, config.server_config.log_level),
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         )
 
         if config.server_config.enable_audit_log:
-            audit_handler = logging.FileHandler('sumo_mcp_audit.log')
-            audit_handler.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
+            audit_handler = logging.FileHandler("sumo_mcp_audit.log")
+            audit_handler.setFormatter(logging.Formatter("%(asctime)s - %(message)s"))
             audit_logger.addHandler(audit_handler)
             audit_logger.setLevel(logging.INFO)
 
@@ -116,18 +118,20 @@ class SumoLogicClient:
         self.session = httpx.AsyncClient(
             auth=(instance_config.access_id, instance_config.access_key),
             headers={"Content-Type": "application/json"},
-            timeout=30.0
+            timeout=30.0,
         )
 
     async def close(self):
         """Close the HTTP session."""
         await self.session.aclose()
 
-    async def _request(self, method: str, path: str, api_version: str = "v1", **kwargs) -> Dict[str, Any]:
+    async def _request(
+        self, method: str, path: str, api_version: str = "v1", **kwargs
+    ) -> Dict[str, Any]:
         """Make an authenticated request to the Sumo Logic API."""
         # Ensure path starts with /
-        if not path.startswith('/'):
-            path = '/' + path
+        if not path.startswith("/"):
+            path = "/" + path
 
         # Build full URL with API version
         api_path = f"/api/{api_version}{path}"
@@ -157,26 +161,27 @@ class SumoLogicClient:
                 raise AuthenticationError(
                     f"Authentication failed for instance '{self.instance_name}'. "
                     "Please check your credentials.",
-                    details=f"status_code={status_code}"
+                    details=f"status_code={status_code}",
                 )
             elif status_code == 403:
                 logger.error(f"Authorization failed for {self.instance_name}: {path}")
                 raise AuthenticationError(
-                    f"Access denied. Your credentials may not have permission for this operation.",
-                    details=f"path={path}"
+                    "Access denied. Your credentials may not have permission for this operation.",
+                    details=f"path={path}",
                 )
             elif status_code == 429:
                 logger.warning(f"Rate limited by Sumo Logic API: {self.instance_name}")
                 raise APIError(
-                    "Sumo Logic API rate limit exceeded. Please try again later.",
-                    status_code=429
+                    "Sumo Logic API rate limit exceeded. Please try again later.", status_code=429
                 )
             else:
-                logger.error(f"HTTP error {status_code} for {self.instance_name}: {e.response.text}")
+                logger.error(
+                    f"HTTP error {status_code} for {self.instance_name}: {e.response.text}"
+                )
                 raise APIError(
                     f"Sumo Logic API request failed with status {status_code}",
                     status_code=status_code,
-                    details="Check server logs for details"
+                    details="Check server logs for details",
                 )
 
         except httpx.TimeoutException as e:
@@ -189,7 +194,7 @@ class SumoLogicClient:
             logger.error(f"Request failed for {self.instance_name}: {str(e)}")
             raise APIError(
                 "Unexpected error communicating with Sumo Logic API",
-                details="Check server logs for details"
+                details="Check server logs for details",
             )
 
     async def search_logs(
@@ -199,7 +204,7 @@ class SumoLogicClient:
         to_time: str,
         timezone_str: str = "UTC",
         by_receipt_time: bool = False,
-        max_attempts: Optional[int] = None
+        max_attempts: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Create a search job and return results.
 
@@ -235,14 +240,16 @@ class SumoLogicClient:
             "from": from_time_parsed,
             "to": to_time_parsed,
             "timeZone": timezone_str,
-            "byReceiptTime": by_receipt_time
+            "byReceiptTime": by_receipt_time,
         }
 
         # Only add requiresRawMessages if not default (to be compatible with older API versions)
         if not requires_raw_messages:
             search_data["requiresRawMessages"] = False
 
-        job_response = await self._request("POST", "/search/jobs", api_version="v1", json=search_data)
+        job_response = await self._request(
+            "POST", "/search/jobs", api_version="v1", json=search_data
+        )
         job_id = job_response["id"]
 
         # Poll for completion
@@ -259,7 +266,7 @@ class SumoLogicClient:
                         "GET",
                         f"/search/jobs/{job_id}/records",
                         api_version="v1",
-                        params={"offset": 0, "limit": max_limit}
+                        params={"offset": 0, "limit": max_limit},
                     )
                     results_key = "records"
                 else:
@@ -267,7 +274,7 @@ class SumoLogicClient:
                         "GET",
                         f"/search/jobs/{job_id}/messages",
                         api_version="v1",
-                        params={"offset": 0, "limit": max_limit}
+                        params={"offset": 0, "limit": max_limit},
                     )
                     results_key = "messages"
 
@@ -277,22 +284,17 @@ class SumoLogicClient:
                     "query_type": query_type,
                     "message_count": status_response.get("messageCount", 0),
                     "record_count": status_response.get("recordCount", 0),
-                    "results": results_response.get(results_key, [])
+                    "results": results_response.get(results_key, []),
                 }
             elif state in ["CANCELLED", "FORCE PAUSED"]:
                 raise APIError(f"Search job {job_id} was {state.lower()}")
 
             await asyncio.sleep(5)  # Wait 5 seconds before checking again
 
-        raise SumoTimeoutError(
-            f"Search job {job_id} timed out after {max_attempts * 5} seconds"
-        )
+        raise SumoTimeoutError(f"Search job {job_id} timed out after {max_attempts * 5} seconds")
 
     async def get_search_job_records(
-        self,
-        job_id: str,
-        offset: int = 0,
-        limit: int = 10000
+        self, job_id: str, offset: int = 0, limit: int = 10000
     ) -> Dict[str, Any]:
         """Get aggregate records from a completed search job.
 
@@ -306,17 +308,11 @@ class SumoLogicClient:
         """
         params = {"offset": offset, "limit": limit}
         return await self._request(
-            "GET",
-            f"/search/jobs/{job_id}/records",
-            api_version="v1",
-            params=params
+            "GET", f"/search/jobs/{job_id}/records", api_version="v1", params=params
         )
 
     async def get_search_job_messages(
-        self,
-        job_id: str,
-        offset: int = 0,
-        limit: int = 10000
+        self, job_id: str, offset: int = 0, limit: int = 10000
     ) -> Dict[str, Any]:
         """Get raw log messages from a completed search job.
 
@@ -330,10 +326,7 @@ class SumoLogicClient:
         """
         params = {"offset": offset, "limit": limit}
         return await self._request(
-            "GET",
-            f"/search/jobs/{job_id}/messages",
-            api_version="v1",
-            params=params
+            "GET", f"/search/jobs/{job_id}/messages", api_version="v1", params=params
         )
 
     async def get_search_job_status(self, job_id: str) -> Dict[str, Any]:
@@ -353,7 +346,7 @@ class SumoLogicClient:
         from_time: str,
         to_time: str,
         timezone_str: str = "UTC",
-        by_receipt_time: bool = False
+        by_receipt_time: bool = False,
     ) -> Dict[str, Any]:
         """Create a search job without waiting for results.
 
@@ -383,7 +376,7 @@ class SumoLogicClient:
             "from": from_time_parsed,
             "to": to_time_parsed,
             "timeZone": timezone_str,
-            "byReceiptTime": by_receipt_time
+            "byReceiptTime": by_receipt_time,
         }
 
         # Only add requiresRawMessages if not default
@@ -416,7 +409,7 @@ class SumoLogicClient:
         limit: int = 100,
         offset: int = 0,
         mode: str = "allViewableByUser",
-        token: Optional[str] = None
+        token: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Get list of dashboards.
@@ -445,14 +438,20 @@ class SumoLogicClient:
         """Query metrics."""
         metrics_data = {
             "query": [{"query": query, "rowId": "A"}],
-            "startTime": int(datetime.fromisoformat(from_time.replace('Z', '+00:00')).timestamp() * 1000),
-            "endTime": int(datetime.fromisoformat(to_time.replace('Z', '+00:00')).timestamp() * 1000),
+            "startTime": int(
+                datetime.fromisoformat(from_time.replace("Z", "+00:00")).timestamp() * 1000
+            ),
+            "endTime": int(
+                datetime.fromisoformat(to_time.replace("Z", "+00:00")).timestamp() * 1000
+            ),
             "requestId": f"mcp-{datetime.now().isoformat()}",
-            "maxDataPoints": 800
+            "maxDataPoints": 800,
         }
         return await self._request("POST", "/metrics/queries", api_version="v1", json=metrics_data)
 
-    async def get_content_v2(self, content_type: str = "Dashboard", limit: int = 100, offset: int = 0) -> Dict[str, Any]:
+    async def get_content_v2(
+        self, content_type: str = "Dashboard", limit: int = 100, offset: int = 0
+    ) -> Dict[str, Any]:
         """Get content using the v2 content API."""
         params = {"type": content_type, "limit": limit, "offset": offset}
         return await self._request("GET", "/content", api_version="v2", params=params)
@@ -462,7 +461,9 @@ class SumoLogicClient:
         params = {"limit": limit, "offset": offset}
         return await self._request("GET", "/roles", api_version="v2", params=params)
 
-    async def search_monitors(self, query: str, limit: int = 100, offset: int = 0) -> Dict[str, Any]:
+    async def search_monitors(
+        self, query: str, limit: int = 100, offset: int = 0
+    ) -> Dict[str, Any]:
         """Search for monitors."""
         params = {"query": query, "limit": limit, "token": offset}
         return await self._request("GET", "/monitors/search", api_version="v1", params=params)
@@ -472,7 +473,9 @@ class SumoLogicClient:
         params = {"limit": limit, "offset": offset}
         return await self._request("GET", "/partitions", api_version="v1", params=params)
 
-    async def list_scheduled_views(self, limit: int = 100, token: Optional[str] = None) -> Dict[str, Any]:
+    async def list_scheduled_views(
+        self, limit: int = 100, token: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Get list of scheduled views with pagination."""
         params = {"limit": limit}
         if token:
@@ -485,7 +488,9 @@ class SumoLogicClient:
         """Get list of custom fields defined in the organization."""
         return await self._request("GET", "/fields", api_version="v1")
 
-    async def list_field_extraction_rules(self, limit: int = 100, offset: int = 0) -> Dict[str, Any]:
+    async def list_field_extraction_rules(
+        self, limit: int = 100, offset: int = 0
+    ) -> Dict[str, Any]:
         """Get list of field extraction rules."""
         params = {"limit": limit, "offset": offset}
         return await self._request("GET", "/extractionRules", api_version="v1", params=params)
@@ -499,12 +504,18 @@ class SumoLogicClient:
     async def get_personal_folder(self, include_children: bool = True) -> Dict[str, Any]:
         """Get user's personal folder."""
         params = {} if include_children else {"includeChildren": "false"}
-        return await self._request("GET", "/content/folders/personal", api_version="v2", params=params)
+        return await self._request(
+            "GET", "/content/folders/personal", api_version="v2", params=params
+        )
 
-    async def get_folder_by_id(self, folder_id: str, include_children: bool = True) -> Dict[str, Any]:
+    async def get_folder_by_id(
+        self, folder_id: str, include_children: bool = True
+    ) -> Dict[str, Any]:
         """Get folder by ID."""
         params = {} if include_children else {"includeChildren": "false"}
-        return await self._request("GET", f"/content/folders/{folder_id}", api_version="v2", params=params)
+        return await self._request(
+            "GET", f"/content/folders/{folder_id}", api_version="v2", params=params
+        )
 
     async def get_content_by_path(self, content_path: str) -> Dict[str, Any]:
         """Get content item by path."""
@@ -515,57 +526,83 @@ class SumoLogicClient:
         """Get content path by ID."""
         return await self._request("GET", f"/content/{content_id}/path", api_version="v2")
 
-    async def begin_content_export(self, content_id: str, is_admin_mode: bool = False) -> Dict[str, Any]:
+    async def begin_content_export(
+        self, content_id: str, is_admin_mode: bool = False
+    ) -> Dict[str, Any]:
         """Begin async content export."""
         params = {"isAdminMode": str(is_admin_mode).lower()} if is_admin_mode else {}
-        return await self._request("POST", f"/content/{content_id}/export", api_version="v2", params=params)
+        return await self._request(
+            "POST", f"/content/{content_id}/export", api_version="v2", params=params
+        )
 
     async def get_content_export_status(self, content_id: str, job_id: str) -> Dict[str, Any]:
         """Get content export job status."""
-        return await self._request("GET", f"/content/{content_id}/export/{job_id}/status", api_version="v2")
+        return await self._request(
+            "GET", f"/content/{content_id}/export/{job_id}/status", api_version="v2"
+        )
 
     async def get_content_export_result(self, content_id: str, job_id: str) -> Dict[str, Any]:
         """Get content export job result."""
-        return await self._request("GET", f"/content/{content_id}/export/{job_id}/result", api_version="v2")
+        return await self._request(
+            "GET", f"/content/{content_id}/export/{job_id}/result", api_version="v2"
+        )
 
     async def begin_global_folder_export(self, is_admin_mode: bool = False) -> Dict[str, Any]:
         """Begin async Global folder export."""
         params = {"isAdminMode": str(is_admin_mode).lower()} if is_admin_mode else {}
-        return await self._request("GET", "/content/folders/global", api_version="v2", params=params)
+        return await self._request(
+            "GET", "/content/folders/global", api_version="v2", params=params
+        )
 
     async def get_global_folder_export_status(self, job_id: str) -> Dict[str, Any]:
         """Get Global folder export job status."""
-        return await self._request("GET", f"/content/folders/global/{job_id}/status", api_version="v2")
+        return await self._request(
+            "GET", f"/content/folders/global/{job_id}/status", api_version="v2"
+        )
 
     async def get_global_folder_export_result(self, job_id: str) -> Dict[str, Any]:
         """Get Global folder export job result."""
-        return await self._request("GET", f"/content/folders/global/{job_id}/result", api_version="v2")
+        return await self._request(
+            "GET", f"/content/folders/global/{job_id}/result", api_version="v2"
+        )
 
     async def begin_admin_recommended_export(self, is_admin_mode: bool = False) -> Dict[str, Any]:
         """Begin async Admin Recommended folder export."""
         params = {"isAdminMode": str(is_admin_mode).lower()} if is_admin_mode else {}
-        return await self._request("GET", "/content/folders/adminRecommended", api_version="v2", params=params)
+        return await self._request(
+            "GET", "/content/folders/adminRecommended", api_version="v2", params=params
+        )
 
     async def get_admin_recommended_export_status(self, job_id: str) -> Dict[str, Any]:
         """Get Admin Recommended folder export job status."""
-        return await self._request("GET", f"/content/folders/adminRecommended/{job_id}/status", api_version="v2")
+        return await self._request(
+            "GET", f"/content/folders/adminRecommended/{job_id}/status", api_version="v2"
+        )
 
     async def get_admin_recommended_export_result(self, job_id: str) -> Dict[str, Any]:
         """Get Admin Recommended folder export job result."""
-        return await self._request("GET", f"/content/folders/adminRecommended/{job_id}/result", api_version="v2")
+        return await self._request(
+            "GET", f"/content/folders/adminRecommended/{job_id}/result", api_version="v2"
+        )
 
     async def begin_installed_apps_export(self, is_admin_mode: bool = False) -> Dict[str, Any]:
         """Begin async Installed Apps folder export."""
         params = {"isAdminMode": str(is_admin_mode).lower()} if is_admin_mode else {}
-        return await self._request("GET", "/content/folders/installedApps", api_version="v2", params=params)
+        return await self._request(
+            "GET", "/content/folders/installedApps", api_version="v2", params=params
+        )
 
     async def get_installed_apps_export_status(self, job_id: str) -> Dict[str, Any]:
         """Get Installed Apps folder export job status."""
-        return await self._request("GET", f"/content/folders/installedApps/{job_id}/status", api_version="v2")
+        return await self._request(
+            "GET", f"/content/folders/installedApps/{job_id}/status", api_version="v2"
+        )
 
     async def get_installed_apps_export_result(self, job_id: str) -> Dict[str, Any]:
         """Get Installed Apps folder export job result."""
-        return await self._request("GET", f"/content/folders/installedApps/{job_id}/result", api_version="v2")
+        return await self._request(
+            "GET", f"/content/folders/installedApps/{job_id}/result", api_version="v2"
+        )
 
     async def list_apps(self) -> Dict[str, Any]:
         """List all installed apps (requires admin permissions in most orgs)."""
@@ -588,7 +625,7 @@ class SumoLogicClient:
         end_date: str,
         group_by: str = "day",
         report_type: str = "standard",
-        include_deployment_charge: bool = False
+        include_deployment_charge: bool = False,
     ) -> Dict[str, Any]:
         """Start async usage report export job."""
         data = {
@@ -596,13 +633,15 @@ class SumoLogicClient:
             "reportType": report_type,
             "includeDeploymentCharge": include_deployment_charge,
             "startDate": start_date,
-            "endDate": end_date
+            "endDate": end_date,
         }
         return await self._request("POST", "/account/usage/report", api_version="v1", json=data)
 
     async def get_usage_export_status(self, job_id: str) -> Dict[str, Any]:
         """Get usage export job status."""
-        return await self._request("GET", f"/account/usage/report/{job_id}/status", api_version="v1")
+        return await self._request(
+            "GET", f"/account/usage/report/{job_id}/status", api_version="v1"
+        )
 
     async def get_usage_export_result(self, job_id: str) -> Dict[str, Any]:
         """Get usage export result (download URL when job is complete)."""
@@ -613,12 +652,7 @@ class SumoLogicClient:
             return {"status": status.get("status", "Unknown"), "job_id": job_id}
 
     async def get_estimated_log_search_usage(
-        self,
-        query: str,
-        from_time: int,
-        to_time: int,
-        time_zone: str = "UTC",
-        by_view: bool = True
+        self, query: str, from_time: int, to_time: int, time_zone: str = "UTC", by_view: bool = True
     ) -> Dict[str, Any]:
         """
         Get estimated data volume that would be scanned for a log search query.
@@ -637,16 +671,10 @@ class SumoLogicClient:
             "queryString": query,
             "timeRange": {
                 "type": "BeginBoundedTimeRange",
-                "from": {
-                    "type": "EpochTimeRangeBoundary",
-                    "epochMillis": from_time
-                },
-                "to": {
-                    "type": "EpochTimeRangeBoundary",
-                    "epochMillis": to_time
-                }
+                "from": {"type": "EpochTimeRangeBoundary", "epochMillis": from_time},
+                "to": {"type": "EpochTimeRangeBoundary", "epochMillis": to_time},
             },
-            "timezone": time_zone
+            "timezone": time_zone,
         }
 
         endpoint = "/logSearches/estimatedUsageByView" if by_view else "/logSearches/estimatedUsage"
@@ -657,7 +685,7 @@ class SumoLogicClient:
 clients: Dict[str, SumoLogicClient] = {}
 
 
-async def get_sumo_client(instance: str = 'default') -> SumoLogicClient:
+async def get_sumo_client(instance: str = "default") -> SumoLogicClient:
     """Get or create a Sumo Logic client for the specified instance."""
     _ensure_config_initialized()
     config = get_config()
@@ -671,7 +699,7 @@ async def get_sumo_client(instance: str = 'default') -> SumoLogicClient:
         except ValueError as e:
             raise InstanceNotFoundError(
                 f"Instance '{instance}' not configured. Available: {', '.join(config.list_instances())}",
-                details=str(e)
+                details=str(e),
             )
 
     return clients[instance]
@@ -686,23 +714,30 @@ def handle_tool_error(e: Exception, tool_name: str) -> str:
         return json.dumps(error_dict, indent=2)
     else:
         logger.error(f"Unexpected error in {tool_name}: {str(e)}", exc_info=True)
-        return json.dumps({
-            "error": "An unexpected error occurred",
-            "details": "Check server logs for more information"
-        }, indent=2)
+        return json.dumps(
+            {
+                "error": "An unexpected error occurred",
+                "details": "Check server logs for more information",
+            },
+            indent=2,
+        )
 
 
 # MCP Tools
 
+
 @mcp.tool()
 async def search_sumo_logs(
     query: str = Field(description="Sumo Logic search query"),
-    hours_back: int = Field(default=1, description="Number of hours to search back from now (ignored if from_time/to_time provided)"),
+    hours_back: int = Field(
+        default=1,
+        description="Number of hours to search back from now (ignored if from_time/to_time provided)",
+    ),
     from_time: Optional[str] = None,
     to_time: Optional[str] = None,
     time_zone: str = "UTC",
     by_receipt_time: bool = False,
-    instance: str = Field(default='default', description="Sumo Logic instance name")
+    instance: str = Field(default="default", description="Sumo Logic instance name"),
 ) -> str:
     """
     Search Sumo Logic logs using a query. Automatically detects query type and returns appropriate results.
@@ -748,13 +783,7 @@ async def search_sumo_logs(
             from_str = from_time_dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
             to_str = to_time_dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
-        results = await client.search_logs(
-            query,
-            from_str,
-            to_str,
-            time_zone,
-            by_receipt_time
-        )
+        results = await client.search_logs(query, from_str, to_str, time_zone, by_receipt_time)
 
         return json.dumps(results, indent=2)
 
@@ -769,7 +798,7 @@ async def create_sumo_search_job(
     to_time: str = Field(description="End time: ISO8601, epoch ms, or relative like 'now'"),
     time_zone: str = "UTC",
     by_receipt_time: bool = False,
-    instance: str = Field(default='default', description="Sumo Logic instance name")
+    instance: str = Field(default="default", description="Sumo Logic instance name"),
 ) -> str:
     """
     Create a search job and return immediately with job ID. Use get_sumo_search_job_status to check progress
@@ -791,11 +820,7 @@ async def create_sumo_search_job(
 
         client = await get_sumo_client(instance)
         job_info = await client.create_search_job(
-            query,
-            from_time,
-            to_time,
-            time_zone,
-            by_receipt_time
+            query, from_time, to_time, time_zone, by_receipt_time
         )
 
         return json.dumps(job_info, indent=2)
@@ -807,7 +832,7 @@ async def create_sumo_search_job(
 @mcp.tool()
 async def get_sumo_search_job_status(
     job_id: str = Field(description="Search job ID"),
-    instance: str = Field(default='default', description="Sumo Logic instance name")
+    instance: str = Field(default="default", description="Sumo Logic instance name"),
 ) -> str:
     """
     Get the status of a search job.
@@ -841,7 +866,7 @@ async def get_sumo_search_job_results(
     result_type: str = "auto",
     offset: int = 0,
     limit: int = 1000,
-    instance: str = Field(default='default', description="Sumo Logic instance name")
+    instance: str = Field(default="default", description="Sumo Logic instance name"),
 ) -> str:
     """
     Get results from a completed search job. Use 'auto' to automatically detect result type,
@@ -867,7 +892,6 @@ async def get_sumo_search_job_results(
             # Check job status to determine type
             status = await client.get_search_job_status(job_id)
             record_count = status.get("recordCount", 0)
-            message_count = status.get("messageCount", 0)
 
             # If recordCount > 0, it's an aggregate query
             if record_count > 0:
@@ -890,11 +914,19 @@ async def get_sumo_search_job_results(
 @mcp.tool()
 async def get_sumo_collectors(
     limit: int = Field(default=100, description="Maximum number of results"),
-    offset: int = Field(default=0, description="Pagination offset for retrieving results beyond the limit"),
-    filter_name: Optional[str] = Field(default=None, description="Filter collectors by name (substring match, case-insensitive)"),
-    filter_alive: Optional[bool] = Field(default=None, description="Filter by alive status (true=active, false=inactive)"),
-    search_term: Optional[str] = Field(default=None, description="Search across name, description, hostName fields"),
-    instance: str = Field(default='default', description="Sumo Logic instance name")
+    offset: int = Field(
+        default=0, description="Pagination offset for retrieving results beyond the limit"
+    ),
+    filter_name: Optional[str] = Field(
+        default=None, description="Filter collectors by name (substring match, case-insensitive)"
+    ),
+    filter_alive: Optional[bool] = Field(
+        default=None, description="Filter by alive status (true=active, false=inactive)"
+    ),
+    search_term: Optional[str] = Field(
+        default=None, description="Search across name, description, hostName fields"
+    ),
+    instance: str = Field(default="default", description="Sumo Logic instance name"),
 ) -> str:
     """
     Get list of Sumo Logic collectors with pagination and optional client-side filtering.
@@ -943,22 +975,18 @@ async def get_sumo_collectors(
         if has_filter_name or has_filter_alive or has_search_term:
             if has_filter_name:
                 collectors = filter_response(
-                    collectors,
-                    field='name',
-                    value=filter_name,
-                    case_sensitive=False
+                    collectors, field="name", value=filter_name, case_sensitive=False
                 )
             elif has_filter_alive:
                 collectors = filter_response(
-                    collectors,
-                    custom_filter=lambda c: c.get('alive', False) == filter_alive
+                    collectors, custom_filter=lambda c: c.get("alive", False) == filter_alive
                 )
             elif has_search_term:
                 collectors = filter_response(
                     collectors,
                     search_term=search_term,
-                    search_fields=['name', 'description', 'hostName'],
-                    case_sensitive=False
+                    search_fields=["name", "description", "hostName"],
+                    case_sensitive=False,
                 )
 
         return json.dumps(collectors, indent=2)
@@ -969,7 +997,7 @@ async def get_sumo_collectors(
 @mcp.tool()
 async def get_sumo_sources(
     collector_id: int = Field(description="Collector ID to get sources for"),
-    instance: str = Field(default='default', description="Sumo Logic instance name")
+    instance: str = Field(default="default", description="Sumo Logic instance name"),
 ) -> str:
     """
     Get sources for a specific Sumo Logic collector.
@@ -1032,7 +1060,7 @@ async def get_sumo_sources(
 @mcp.tool()
 async def get_sumo_users(
     limit: int = Field(default=100, description="Maximum number of results"),
-    instance: str = Field(default='default', description="Sumo Logic instance name")
+    instance: str = Field(default="default", description="Sumo Logic instance name"),
 ) -> str:
     """
     Get list of Sumo Logic users in the organization.
@@ -1090,10 +1118,11 @@ async def get_sumo_users(
 
 # Content Library Tools (replace old get_sumo_folders)
 
+
 @mcp.tool()
 async def get_personal_folder(
     include_children: bool = True,
-    instance: str = Field(default='default', description="Sumo Logic instance name")
+    instance: str = Field(default="default", description="Sumo Logic instance name"),
 ) -> str:
     """
     Get user's personal folder with optional children.
@@ -1121,7 +1150,7 @@ async def get_personal_folder(
 async def get_folder_by_id(
     folder_id: str = Field(description="Hex folder ID (16 characters)"),
     include_children: bool = True,
-    instance: str = Field(default='default', description="Sumo Logic instance name")
+    instance: str = Field(default="default", description="Sumo Logic instance name"),
 ) -> str:
     """
     Get a specific folder by ID with optional children.
@@ -1148,8 +1177,10 @@ async def get_folder_by_id(
 
 @mcp.tool()
 async def get_content_by_path(
-    content_path: str = Field(description="Full library path (e.g., /Library/Users/user@email.com/MyFolder)"),
-    instance: str = Field(default='default', description="Sumo Logic instance name")
+    content_path: str = Field(
+        description="Full library path (e.g., /Library/Users/user@email.com/MyFolder)"
+    ),
+    instance: str = Field(default="default", description="Sumo Logic instance name"),
 ) -> str:
     """
     Get content item by its library path.
@@ -1176,7 +1207,7 @@ async def get_content_by_path(
 @mcp.tool()
 async def get_content_path_by_id(
     content_id: str = Field(description="Hex content ID"),
-    instance: str = Field(default='default', description="Sumo Logic instance name")
+    instance: str = Field(default="default", description="Sumo Logic instance name"),
 ) -> str:
     """
     Get the full library path for a content ID.
@@ -1206,7 +1237,7 @@ async def export_content(
     content_id: str = Field(description="Hex content ID to export"),
     is_admin_mode: bool = False,
     max_wait_seconds: int = 300,
-    instance: str = Field(default='default', description="Sumo Logic instance name")
+    instance: str = Field(default="default", description="Sumo Logic instance name"),
 ) -> str:
     """
     Export full content structure (dashboards, searches, etc.) with async job handling.
@@ -1235,7 +1266,7 @@ async def export_content(
 
         # Start export job
         job_response = await client.begin_content_export(content_id, is_admin_mode)
-        job_id = job_response['id']
+        job_id = job_response["id"]
 
         # Poll for completion
         result = await poll_export_job(
@@ -1243,7 +1274,7 @@ async def export_content(
             content_id=content_id,
             get_status_func=lambda cid, jid: client.get_content_export_status(cid, jid),
             get_result_func=lambda cid, jid: client.get_content_export_result(cid, jid),
-            max_wait_seconds=max_wait_seconds
+            max_wait_seconds=max_wait_seconds,
         )
 
         return json.dumps(result, indent=2)
@@ -1256,8 +1287,10 @@ async def export_content(
 async def export_global_folder(
     is_admin_mode: bool = False,
     max_wait_seconds: int = 300,
-    max_items: Optional[int] = Field(default=None, description="Maximum number of items to return (truncates large folders)"),
-    instance: str = Field(default='default', description="Sumo Logic instance name")
+    max_items: Optional[int] = Field(
+        default=None, description="Maximum number of items to return (truncates large folders)"
+    ),
+    instance: str = Field(default="default", description="Sumo Logic instance name"),
 ) -> str:
     """
     Export Global folder contents (async) with optional truncation for large folders.
@@ -1289,7 +1322,7 @@ async def export_global_folder(
 
         # Start export job
         job_response = await client.begin_global_folder_export(is_admin_mode)
-        job_id = job_response['id']
+        job_id = job_response["id"]
 
         # Poll for completion
         result = await poll_folder_export_job(
@@ -1297,7 +1330,7 @@ async def export_global_folder(
             folder_type="Global folder",
             get_status_func=lambda jid: client.get_global_folder_export_status(jid),
             get_result_func=lambda jid: client.get_global_folder_export_result(jid),
-            max_wait_seconds=max_wait_seconds
+            max_wait_seconds=max_wait_seconds,
         )
 
         # Truncate if requested
@@ -1316,8 +1349,10 @@ async def export_global_folder(
 async def export_admin_recommended_folder(
     is_admin_mode: bool = False,
     max_wait_seconds: int = 300,
-    max_items: Optional[int] = Field(default=None, description="Maximum number of items to return (truncates large folders)"),
-    instance: str = Field(default='default', description="Sumo Logic instance name")
+    max_items: Optional[int] = Field(
+        default=None, description="Maximum number of items to return (truncates large folders)"
+    ),
+    instance: str = Field(default="default", description="Sumo Logic instance name"),
 ) -> str:
     """
     Export Admin Recommended folder (async) with optional truncation for large folders.
@@ -1347,7 +1382,7 @@ async def export_admin_recommended_folder(
 
         # Start export job
         job_response = await client.begin_admin_recommended_export(is_admin_mode)
-        job_id = job_response['id']
+        job_id = job_response["id"]
 
         # Poll for completion
         result = await poll_folder_export_job(
@@ -1355,7 +1390,7 @@ async def export_admin_recommended_folder(
             folder_type="Admin Recommended folder",
             get_status_func=lambda jid: client.get_admin_recommended_export_status(jid),
             get_result_func=lambda jid: client.get_admin_recommended_export_result(jid),
-            max_wait_seconds=max_wait_seconds
+            max_wait_seconds=max_wait_seconds,
         )
 
         # Truncate if requested
@@ -1374,7 +1409,7 @@ async def export_admin_recommended_folder(
 async def export_installed_apps(
     is_admin_mode: bool = False,
     max_wait_seconds: int = 300,
-    instance: str = Field(default='default', description="Sumo Logic instance name")
+    instance: str = Field(default="default", description="Sumo Logic instance name"),
 ) -> str:
     """
     Export Installed Apps folder to discover pre-built apps available in your Sumo Logic instance.
@@ -1433,7 +1468,7 @@ async def export_installed_apps(
 
         # Start export job
         job_response = await client.begin_installed_apps_export(is_admin_mode)
-        job_id = job_response['id']
+        job_id = job_response["id"]
 
         # Poll for completion
         result = await poll_folder_export_job(
@@ -1441,7 +1476,7 @@ async def export_installed_apps(
             folder_type="Installed Apps folder",
             get_status_func=lambda jid: client.get_installed_apps_export_status(jid),
             get_result_func=lambda jid: client.get_installed_apps_export_result(jid),
-            max_wait_seconds=max_wait_seconds
+            max_wait_seconds=max_wait_seconds,
         )
 
         return json.dumps(result, indent=2)
@@ -1452,9 +1487,11 @@ async def export_installed_apps(
 
 @mcp.tool()
 async def list_installed_apps(
-    filter_name: Optional[str] = Field(default=None, description="Filter apps by name (substring match, case-insensitive)"),
+    filter_name: Optional[str] = Field(
+        default=None, description="Filter apps by name (substring match, case-insensitive)"
+    ),
     search_term: Optional[str] = Field(default=None, description="Search app names"),
-    instance: str = Field(default='default', description="Sumo Logic instance name")
+    instance: str = Field(default="default", description="Sumo Logic instance name"),
 ) -> str:
     """
     List all installed Sumo Logic apps with optional filtering (lightweight alternative to export_installed_apps).
@@ -1531,17 +1568,11 @@ async def list_installed_apps(
         if has_filter_name or has_search_term:
             if has_filter_name:
                 result = filter_response(
-                    result,
-                    field='appName',
-                    value=filter_name,
-                    case_sensitive=False
+                    result, field="appName", value=filter_name, case_sensitive=False
                 )
             elif has_search_term:
                 result = filter_response(
-                    result,
-                    search_term=search_term,
-                    search_fields=['appName'],
-                    case_sensitive=False
+                    result, search_term=search_term, search_fields=["appName"], case_sensitive=False
                 )
 
         return json.dumps(result, indent=2)
@@ -1553,12 +1584,23 @@ async def list_installed_apps(
 @mcp.tool()
 async def get_sumo_dashboards(
     limit: int = Field(default=100, description="Maximum number of results (1-100)"),
-    mode: str = Field(default="allViewableByUser", description="Filter mode: 'allViewableByUser' or 'createdByUser'"),
-    token: Optional[str] = Field(default=None, description="Pagination token from previous response's 'next' field"),
-    filter_name: Optional[str] = Field(default=None, description="Filter dashboards by title (substring match, case-insensitive)"),
-    filter_description: Optional[str] = Field(default=None, description="Filter dashboards by description (substring match)"),
-    search_term: Optional[str] = Field(default=None, description="Search across title and description fields"),
-    instance: str = Field(default='default', description="Sumo Logic instance name")
+    mode: str = Field(
+        default="allViewableByUser",
+        description="Filter mode: 'allViewableByUser' or 'createdByUser'",
+    ),
+    token: Optional[str] = Field(
+        default=None, description="Pagination token from previous response's 'next' field"
+    ),
+    filter_name: Optional[str] = Field(
+        default=None, description="Filter dashboards by title (substring match, case-insensitive)"
+    ),
+    filter_description: Optional[str] = Field(
+        default=None, description="Filter dashboards by description (substring match)"
+    ),
+    search_term: Optional[str] = Field(
+        default=None, description="Search across title and description fields"
+    ),
+    instance: str = Field(default="default", description="Sumo Logic instance name"),
 ) -> str:
     """
     Get list of Sumo Logic dashboards with pagination and filtering.
@@ -1640,11 +1682,7 @@ async def get_sumo_dashboards(
             )
 
         client = await get_sumo_client(instance)
-        dashboards = await client.get_dashboards(
-            limit=limit,
-            mode=mode,
-            token=token
-        )
+        dashboards = await client.get_dashboards(limit=limit, mode=mode, token=token)
 
         # Check for None explicitly to handle both MCP calls and direct Python calls
         has_filter_name = filter_name is not None and filter_name != ""
@@ -1654,24 +1692,18 @@ async def get_sumo_dashboards(
         if has_filter_name or has_filter_desc or has_search_term:
             if has_filter_name:
                 dashboards = filter_response(
-                    dashboards,
-                    field='title',
-                    value=filter_name,
-                    case_sensitive=False
+                    dashboards, field="title", value=filter_name, case_sensitive=False
                 )
             elif has_filter_desc:
                 dashboards = filter_response(
-                    dashboards,
-                    field='description',
-                    value=filter_description,
-                    case_sensitive=False
+                    dashboards, field="description", value=filter_description, case_sensitive=False
                 )
             elif has_search_term:
                 dashboards = filter_response(
                     dashboards,
                     search_term=search_term,
-                    search_fields=['title', 'description'],
-                    case_sensitive=False
+                    search_fields=["title", "description"],
+                    case_sensitive=False,
                 )
 
         return json.dumps(dashboards, indent=2)
@@ -1683,7 +1715,7 @@ async def get_sumo_dashboards(
 async def query_sumo_metrics(
     query: str = Field(description="Metrics query (e.g., metric=CPU_User | avg by host)"),
     hours_back: int = Field(default=1, description="Number of hours to query back from now"),
-    instance: str = Field(default='default', description="Sumo Logic instance name")
+    instance: str = Field(default="default", description="Sumo Logic instance name"),
 ) -> str:
     """
     Query Sumo Logic metrics.
@@ -1725,7 +1757,7 @@ async def query_sumo_metrics(
 @mcp.tool()
 async def get_sumo_roles_v2(
     limit: int = Field(default=100, description="Maximum number of results"),
-    instance: str = Field(default='default', description="Sumo Logic instance name")
+    instance: str = Field(default="default", description="Sumo Logic instance name"),
 ) -> str:
     """Get list of roles using the v2 Roles API."""
     try:
@@ -1749,7 +1781,7 @@ async def search_sumo_monitors(
     query: str = Field(description="Search query for monitors"),
     limit: int = Field(default=100, description="Maximum number of results to return"),
     offset: int = Field(default=0, description="Pagination offset"),
-    instance: str = Field(default='default', description="Sumo Logic instance name")
+    instance: str = Field(default="default", description="Sumo Logic instance name"),
 ) -> str:
     """
     Search for monitors and monitor folders using flexible query syntax.
@@ -1813,7 +1845,7 @@ async def search_sumo_monitors(
 @mcp.tool()
 async def get_sumo_partitions(
     limit: int = Field(default=100, description="Maximum number of results"),
-    instance: str = Field(default='default', description="Sumo Logic instance name")
+    instance: str = Field(default="default", description="Sumo Logic instance name"),
 ) -> str:
     """
     Get list of Sumo Logic partitions.
@@ -1876,8 +1908,10 @@ async def get_sumo_partitions(
 @mcp.tool()
 async def list_scheduled_views(
     limit: int = Field(default=100, description="Maximum number of results (1-1000)"),
-    token: str = Field(default=None, description="Pagination token from previous response's 'next' field"),
-    instance: str = Field(default='default', description="Sumo Logic instance name")
+    token: str = Field(
+        default=None, description="Pagination token from previous response's 'next' field"
+    ),
+    instance: str = Field(default="default", description="Sumo Logic instance name"),
 ) -> str:
     """
     Get list of scheduled views with pagination.
@@ -2013,7 +2047,7 @@ async def list_scheduled_views(
 
 @mcp.tool()
 async def list_custom_fields(
-    instance: str = Field(default='default', description="Sumo Logic instance name")
+    instance: str = Field(default="default", description="Sumo Logic instance name")
 ) -> str:
     """
     Get list of custom fields defined in the organization.
@@ -2046,7 +2080,7 @@ async def list_custom_fields(
 @mcp.tool()
 async def list_field_extraction_rules(
     limit: int = Field(default=100, description="Maximum number of results"),
-    instance: str = Field(default='default', description="Sumo Logic instance name")
+    instance: str = Field(default="default", description="Sumo Logic instance name"),
 ) -> str:
     """
     Get list of field extraction rules (FERs) defined in the organization.
@@ -2084,7 +2118,7 @@ async def list_field_extraction_rules(
 @mcp.tool()
 async def get_field_extraction_rule(
     rule_id: str = Field(description="Field extraction rule ID"),
-    instance: str = Field(default='default', description="Sumo Logic instance name")
+    instance: str = Field(default="default", description="Sumo Logic instance name"),
 ) -> str:
     """
     Get a specific field extraction rule by ID.
@@ -2129,15 +2163,13 @@ async def list_sumo_instances() -> str:
         _ensure_config_initialized()
         config = get_config()
         instances = config.list_instances()
-        return json.dumps({
-            "instances": instances,
-            "count": len(instances)
-        }, indent=2)
+        return json.dumps({"instances": instances, "count": len(instances)}, indent=2)
     except Exception as e:
         return handle_tool_error(e, "list_sumo_instances")
 
 
 # Search Audit Tool
+
 
 @mcp.tool()
 async def run_search_audit_query(
@@ -2151,7 +2183,7 @@ async def run_search_audit_query(
     scope_filters: Optional[list[str]] = None,
     where_filters: Optional[list[str]] = None,
     include_raw_data: bool = False,
-    instance: str = Field(default='default', description="Sumo Logic instance name")
+    instance: str = Field(default="default", description="Sumo Logic instance name"),
 ) -> str:
     """
     Run a search audit query to analyze search usage and performance.
@@ -2268,8 +2300,14 @@ async def run_search_audit_query(
                 return []
 
             allowed_fields = {
-                "user_name", "query_type", "content_name", "query",
-                "analytics_tier", "status_message", "session_id", "remote_ip"
+                "user_name",
+                "query_type",
+                "content_name",
+                "query",
+                "analytics_tier",
+                "status_message",
+                "session_id",
+                "remote_ip",
             }
 
             validated = []
@@ -2279,9 +2317,9 @@ async def run_search_audit_query(
                     continue
 
                 # Check for injection attempts
-                if '\n' in f or '\r' in f:
+                if "\n" in f or "\r" in f:
                     raise ValidationError("Scope filters cannot contain newlines")
-                if '| delete' in f.lower() or '| create' in f.lower() or '| save' in f.lower():
+                if "| delete" in f.lower() or "| create" in f.lower() or "| save" in f.lower():
                     raise ValidationError("Scope filters cannot contain write operators")
 
                 # Must contain = sign
@@ -2316,11 +2354,11 @@ async def run_search_audit_query(
                     continue
 
                 # Check for injection attempts
-                if '| delete' in f.lower() or '| create' in f.lower() or '| save' in f.lower():
+                if "| delete" in f.lower() or "| create" in f.lower() or "| save" in f.lower():
                     raise ValidationError("Where filters cannot contain write operators")
 
                 # Should not start with | or where
-                if f.startswith('|') or f.lower().startswith('where '):
+                if f.startswith("|") or f.lower().startswith("where "):
                     raise ValidationError(
                         f"Where filter '{f}' should not start with '|' or 'where'. "
                         "Provide only the expression (e.g., 'execution_duration_ms > 30000')"
@@ -2336,7 +2374,9 @@ async def run_search_audit_query(
         # Build scope line
         if validated_scope_filters:
             # Use new scope_filters (they override legacy parameters)
-            scope_line = "_view=sumologic_search_usage_per_query " + " ".join(validated_scope_filters)
+            scope_line = "_view=sumologic_search_usage_per_query " + " ".join(
+                validated_scope_filters
+            )
         else:
             # Use legacy parameters for backward compatibility
             scope_line = f"""_view=sumologic_search_usage_per_query
@@ -2358,7 +2398,8 @@ query={query_filter}"""
             query_parts.append(where_clauses_str)
 
         # Add the rest of the pipeline (field extractions and aggregations)
-        query_parts.append(f"""
+        query_parts.append(
+            f"""
 | ((query_end_time - query_start_time ) /1000 / 60 ) as time_range_m
 | json field=scanned_bytes_breakdown "Infrequent" as inf_bytes nodrop
 | json field=scanned_bytes_breakdown "Flex" as flex_bytes nodrop
@@ -2373,20 +2414,18 @@ query={query_filter}"""
 | time_range_m/60 as time_range_h
 | count as searches, sum(scan_gbytes) as scan_gb, sum(inf_scan_gb) as inf_scan_gb, sum(flex_scan_gb) as flex_scan_gb, sum(retrieved_message_count) as results, avg(scanned_partition_count) as avg_partitions,
  avg(time_range_h) as avg_range_h, sum(runtime_minutes) as sum_runtime_minutes, avg(runtime_minutes) as avg_runtime_minutes by user_name, query, query_type, content_name, content_identifier | sort query asc
-| where query matches /(?i){query_regex}/""")
+| where query matches /(?i){query_regex}/"""
+        )
 
         # Combine all query parts
         query = "\n".join(query_parts)
 
         # Create search job
         job_response = await client.create_search_job(
-            query=query,
-            from_time=from_time,
-            to_time=to_time,
-            timezone_str="UTC"
+            query=query, from_time=from_time, to_time=to_time, timezone_str="UTC"
         )
 
-        job_id = job_response['id']
+        job_id = job_response["id"]
 
         # Poll for completion with timeout
         max_attempts = 300  # 5 minutes
@@ -2394,21 +2433,21 @@ query={query_filter}"""
             await asyncio.sleep(1)
 
             status = await client.get_search_job_status(job_id)
-            state = status['state']
+            state = status["state"]
 
-            if state == 'DONE GATHERING RESULTS':
+            if state == "DONE GATHERING RESULTS":
                 break
-            elif state == 'CANCELLED':
+            elif state == "CANCELLED":
                 raise APIError("Search job was cancelled")
 
         # Get records (aggregated results)
         records_response = await client.get_search_job_records(job_id, limit=10000)
-        records = records_response.get('records', [])
+        records = records_response.get("records", [])
 
         # Delete the job
         try:
             await client.delete_search_job(job_id)
-        except:
+        except Exception:  # noqa: S110
             pass  # Best effort cleanup
 
         # Helper to safely convert to int
@@ -2436,40 +2475,48 @@ query={query_filter}"""
                 "query_filter": query_filter,
                 "query_regex": query_regex,
                 "scope_filters": validated_scope_filters if validated_scope_filters else None,
-                "where_filters": validated_where_filters if validated_where_filters else None
+                "where_filters": validated_where_filters if validated_where_filters else None,
             },
             "summary": {
                 "total_records": len(records),
-                "total_searches": sum(safe_int(r.get('map', {}).get('searches', 0)) for r in records),
-                "total_scan_gb": sum(safe_float(r.get('map', {}).get('scan_gb', 0)) for r in records),
-                "total_inf_scan_gb": sum(safe_float(r.get('map', {}).get('inf_scan_gb', 0)) for r in records),
-                "total_flex_scan_gb": sum(safe_float(r.get('map', {}).get('flex_scan_gb', 0)) for r in records),
+                "total_searches": sum(
+                    safe_int(r.get("map", {}).get("searches", 0)) for r in records
+                ),
+                "total_scan_gb": sum(
+                    safe_float(r.get("map", {}).get("scan_gb", 0)) for r in records
+                ),
+                "total_inf_scan_gb": sum(
+                    safe_float(r.get("map", {}).get("inf_scan_gb", 0)) for r in records
+                ),
+                "total_flex_scan_gb": sum(
+                    safe_float(r.get("map", {}).get("flex_scan_gb", 0)) for r in records
+                ),
             },
-            "records": []
+            "records": [],
         }
 
         # Process records
         for record in records:
-            record_map = record.get('map', {})
+            record_map = record.get("map", {})
             processed_record = {
-                "user_name": record_map.get('user_name'),
-                "query_type": record_map.get('query_type'),
-                "content_name": record_map.get('content_name'),
-                "content_identifier": record_map.get('content_identifier'),
-                "query": record_map.get('query'),
-                "searches": safe_int(record_map.get('searches', 0)),
-                "scan_gb": safe_float(record_map.get('scan_gb', 0)),
-                "inf_scan_gb": safe_float(record_map.get('inf_scan_gb', 0)),
-                "flex_scan_gb": safe_float(record_map.get('flex_scan_gb', 0)),
-                "results": safe_int(record_map.get('results', 0)),
-                "avg_partitions": safe_float(record_map.get('avg_partitions', 0)),
-                "avg_range_h": safe_float(record_map.get('avg_range_h', 0)),
-                "sum_runtime_minutes": safe_float(record_map.get('sum_runtime_minutes', 0)),
-                "avg_runtime_minutes": safe_float(record_map.get('avg_runtime_minutes', 0)),
+                "user_name": record_map.get("user_name"),
+                "query_type": record_map.get("query_type"),
+                "content_name": record_map.get("content_name"),
+                "content_identifier": record_map.get("content_identifier"),
+                "query": record_map.get("query"),
+                "searches": safe_int(record_map.get("searches", 0)),
+                "scan_gb": safe_float(record_map.get("scan_gb", 0)),
+                "inf_scan_gb": safe_float(record_map.get("inf_scan_gb", 0)),
+                "flex_scan_gb": safe_float(record_map.get("flex_scan_gb", 0)),
+                "results": safe_int(record_map.get("results", 0)),
+                "avg_partitions": safe_float(record_map.get("avg_partitions", 0)),
+                "avg_range_h": safe_float(record_map.get("avg_range_h", 0)),
+                "sum_runtime_minutes": safe_float(record_map.get("sum_runtime_minutes", 0)),
+                "avg_runtime_minutes": safe_float(record_map.get("avg_runtime_minutes", 0)),
             }
 
             if include_raw_data:
-                processed_record['_raw'] = record
+                processed_record["_raw"] = record
 
             result["records"].append(processed_record)
 
@@ -2494,7 +2541,7 @@ async def analyze_search_scan_cost(
     min_scan_gb: float = 0.0,
     sort_by: str = "scan_credits",
     limit: int = 100,
-    instance: str = 'default'
+    instance: str = "default",
 ) -> str:
     """
     Analyze search scan costs with detailed tier/metering breakdown for Infrequent and Flex customers.
@@ -2612,14 +2659,16 @@ async def analyze_search_scan_cost(
                     breakdown_type = "tier"
                     detected_org_type = "Tiered"
 
-            except Exception as e:
+            except Exception:
                 # If account status check fails, default to metering (safer for Flex orgs)
                 breakdown_type = "metering"
                 detected_org_type = "Unknown (defaulted to metering)"
 
         # Validate breakdown_type after auto-detection
         if breakdown_type not in ["tier", "metering"]:
-            raise ValueError(f"Invalid breakdown_type after auto-detection: {breakdown_type}. Must be 'auto', 'tier', or 'metering'")
+            raise ValueError(
+                f"Invalid breakdown_type after auto-detection: {breakdown_type}. Must be 'auto', 'tier', or 'metering'"
+            )
 
         # Build JSON field parsing based on breakdown type
         if breakdown_type == "tier":
@@ -2656,7 +2705,9 @@ async def analyze_search_scan_cost(
 
             tier_aggregations = "sum(scan_flex) as scan_flex, sum(scan_continuous) as scan_continuous, sum(scan_frequent) as scan_frequent, sum(scan_infrequent) as scan_infrequent, sum(scan_flex_security) as scan_flex_security, sum(scan_security) as scan_security, sum(scan_tracing) as scan_tracing, sum(billable_scan_bytes) as billable_scan_bytes, sum(non_billable_scan_bytes) as non_billable_scan_bytes"
         else:
-            raise ValueError(f"Invalid breakdown_type: {breakdown_type}. Must be 'tier' or 'metering'")
+            raise ValueError(
+                f"Invalid breakdown_type: {breakdown_type}. Must be 'tier' or 'metering'"
+            )
 
         # Build scope parsing if enabled
         scope_parsing = ""
@@ -2679,7 +2730,9 @@ async def analyze_search_scan_cost(
         elif group_by == "content":
             group_fields = ["content_name", "query_type"]
         else:
-            raise ValueError(f"Invalid group_by: {group_by}. Must be one of: user, user_query, user_scope_query, user_content, content")
+            raise ValueError(
+                f"Invalid group_by: {group_by}. Must be one of: user, user_query, user_scope_query, user_content, content"
+            )
 
         group_by_clause = ", ".join(group_fields)
 
@@ -2705,13 +2758,10 @@ analytics_tier={analytics_tier_filter}
 
         # Create search job
         job_response = await client.create_search_job(
-            query=query,
-            from_time=from_time,
-            to_time=to_time,
-            timezone_str="UTC"
+            query=query, from_time=from_time, to_time=to_time, timezone_str="UTC"
         )
 
-        job_id = job_response['id']
+        job_id = job_response["id"]
 
         # Poll for completion with timeout
         max_attempts = 300  # 5 minutes
@@ -2719,22 +2769,22 @@ analytics_tier={analytics_tier_filter}
             await asyncio.sleep(1)
 
             status = await client.get_search_job_status(job_id)
-            state = status['state']
+            state = status["state"]
 
-            if state == 'DONE GATHERING RESULTS':
+            if state == "DONE GATHERING RESULTS":
                 break
-            elif state == 'CANCELLED':
+            elif state == "CANCELLED":
                 raise APIError("Search job was cancelled")
 
         # Get records
         records_response = await client.get_search_job_records(job_id, limit=limit)
-        records = records_response.get('records', [])
+        records = records_response.get("records", [])
 
         # Delete the job
         try:
             await client.delete_search_job(job_id)
-        except:
-            pass
+        except Exception:  # noqa: S110
+            pass  # Best effort cleanup
 
         # Helper to safely convert values
         def safe_float(value, default=0.0):
@@ -2762,14 +2812,16 @@ analytics_tier={analytics_tier_filter}
                 "breakdown_type_requested": original_breakdown_type,
                 "group_by": group_by,
                 "scan_credit_rate": scan_credit_rate,
-                "min_scan_gb": min_scan_gb
+                "min_scan_gb": min_scan_gb,
             },
             "summary": {
                 "total_records": len(records),
-                "total_queries": sum(safe_int(r.get('map', {}).get('queries', 0)) for r in records),
-                "total_scan_gb": round(sum(safe_float(r.get('map', {}).get('total_scan_gb', 0)) for r in records), 2),
+                "total_queries": sum(safe_int(r.get("map", {}).get("queries", 0)) for r in records),
+                "total_scan_gb": round(
+                    sum(safe_float(r.get("map", {}).get("total_scan_gb", 0)) for r in records), 2
+                ),
             },
-            "records": []
+            "records": [],
         }
 
         # Add organization type detection info if auto-detected
@@ -2780,12 +2832,20 @@ analytics_tier={analytics_tier_filter}
         # Add metering-specific summary if applicable (Flex)
         if breakdown_type == "metering":
             total_billable_gb = round(
-                sum(safe_float(r.get('map', {}).get('billable_scan_bytes', 0)) / (1024**3) for r in records), 2
+                sum(
+                    safe_float(r.get("map", {}).get("billable_scan_bytes", 0)) / (1024**3)
+                    for r in records
+                ),
+                2,
             )
             result["summary"]["total_billable_scan_gb"] = total_billable_gb
             result["summary"]["total_billable_scan_tb"] = round(total_billable_gb / 1024, 4)
             result["summary"]["total_non_billable_scan_gb"] = round(
-                sum(safe_float(r.get('map', {}).get('non_billable_scan_bytes', 0)) / (1024**3) for r in records), 2
+                sum(
+                    safe_float(r.get("map", {}).get("non_billable_scan_bytes", 0)) / (1024**3)
+                    for r in records
+                ),
+                2,
             )
             result["summary"]["flex_billing_note"] = (
                 "Credits NOT calculated for Flex metering - rates are highly contract-specific. "
@@ -2794,7 +2854,7 @@ analytics_tier={analytics_tier_filter}
         else:
             # Only add credits for tier breakdown (Infrequent tier)
             result["summary"]["total_scan_credits"] = round(
-                sum(safe_float(r.get('map', {}).get('scan_credits', 0)) for r in records), 2
+                sum(safe_float(r.get("map", {}).get("scan_credits", 0)) for r in records), 2
             )
 
         # Detect potential Flex org using 'tier' breakdown incorrectly
@@ -2814,46 +2874,70 @@ analytics_tier={analytics_tier_filter}
                     ),
                     "recommendation": "Use breakdown_type='metering' or 'auto' for Flex organizations",
                     "queries_analyzed": total_queries,
-                    "scan_gb_found": total_scan_gb
+                    "scan_gb_found": total_scan_gb,
                 }
                 result["warning"] = warning
 
         # Process records
         for record in records:
-            record_map = record.get('map', {})
+            record_map = record.get("map", {})
 
             processed_record = {
-                "queries": safe_int(record_map.get('queries', 0)),
-                "total_scan_gb": round(safe_float(record_map.get('total_scan_gb', 0)), 2),
+                "queries": safe_int(record_map.get("queries", 0)),
+                "total_scan_gb": round(safe_float(record_map.get("total_scan_gb", 0)), 2),
             }
 
             # Add grouping fields
             for field in group_fields:
-                processed_record[field] = record_map.get(field, '')
+                processed_record[field] = record_map.get(field, "")
 
             # Add tier breakdown (includes credits for Infrequent tier)
             if breakdown_type == "tier":
-                processed_record["scan_credits"] = round(safe_float(record_map.get('scan_credits', 0)), 2)
-                processed_record["credits_per_query"] = round(safe_float(record_map.get('credits_per_query', 0)), 4)
+                processed_record["scan_credits"] = round(
+                    safe_float(record_map.get("scan_credits", 0)), 2
+                )
+                processed_record["credits_per_query"] = round(
+                    safe_float(record_map.get("credits_per_query", 0)), 4
+                )
                 processed_record["tier_breakdown_gb"] = {
-                    "continuous": round(safe_float(record_map.get('scan_continuous', 0)) / (1024**3), 2),
-                    "frequent": round(safe_float(record_map.get('scan_frequent', 0)) / (1024**3), 2),
-                    "infrequent": round(safe_float(record_map.get('scan_infrequent', 0)) / (1024**3), 2),
+                    "continuous": round(
+                        safe_float(record_map.get("scan_continuous", 0)) / (1024**3), 2
+                    ),
+                    "frequent": round(
+                        safe_float(record_map.get("scan_frequent", 0)) / (1024**3), 2
+                    ),
+                    "infrequent": round(
+                        safe_float(record_map.get("scan_infrequent", 0)) / (1024**3), 2
+                    ),
                 }
             elif breakdown_type == "metering":
                 # Flex metering - NO credits, add TB values
-                billable_gb = round(safe_float(record_map.get('billable_scan_bytes', 0)) / (1024**3), 2)
+                billable_gb = round(
+                    safe_float(record_map.get("billable_scan_bytes", 0)) / (1024**3), 2
+                )
                 processed_record["billable_scan_gb"] = billable_gb
                 processed_record["billable_scan_tb"] = round(billable_gb / 1024, 4)
-                processed_record["non_billable_scan_gb"] = round(safe_float(record_map.get('non_billable_scan_bytes', 0)) / (1024**3), 2)
+                processed_record["non_billable_scan_gb"] = round(
+                    safe_float(record_map.get("non_billable_scan_bytes", 0)) / (1024**3), 2
+                )
                 processed_record["metering_breakdown_gb"] = {
-                    "flex": round(safe_float(record_map.get('scan_flex', 0)) / (1024**3), 2),
-                    "continuous": round(safe_float(record_map.get('scan_continuous', 0)) / (1024**3), 2),
-                    "frequent": round(safe_float(record_map.get('scan_frequent', 0)) / (1024**3), 2),
-                    "infrequent": round(safe_float(record_map.get('scan_infrequent', 0)) / (1024**3), 2),
-                    "flex_security": round(safe_float(record_map.get('scan_flex_security', 0)) / (1024**3), 2),
-                    "security": round(safe_float(record_map.get('scan_security', 0)) / (1024**3), 2),
-                    "tracing": round(safe_float(record_map.get('scan_tracing', 0)) / (1024**3), 2),
+                    "flex": round(safe_float(record_map.get("scan_flex", 0)) / (1024**3), 2),
+                    "continuous": round(
+                        safe_float(record_map.get("scan_continuous", 0)) / (1024**3), 2
+                    ),
+                    "frequent": round(
+                        safe_float(record_map.get("scan_frequent", 0)) / (1024**3), 2
+                    ),
+                    "infrequent": round(
+                        safe_float(record_map.get("scan_infrequent", 0)) / (1024**3), 2
+                    ),
+                    "flex_security": round(
+                        safe_float(record_map.get("scan_flex_security", 0)) / (1024**3), 2
+                    ),
+                    "security": round(
+                        safe_float(record_map.get("scan_security", 0)) / (1024**3), 2
+                    ),
+                    "tracing": round(safe_float(record_map.get("scan_tracing", 0)) / (1024**3), 2),
                 }
 
             result["records"].append(processed_record)
@@ -2866,9 +2950,10 @@ analytics_tier={analytics_tier_filter}
 
 # Content ID Utility Tools
 
+
 @mcp.tool()
 async def convert_content_id_hex_to_decimal(
-    hex_id: str = Field(description="Hex content ID (e.g., 00000000005E5403)")
+    hex_id: str = Field(description="Hex content ID (e.g., 00000000005E5403)"),
 ) -> str:
     """
     Convert hex content ID to decimal format for web UI URLs.
@@ -2879,15 +2964,18 @@ async def convert_content_id_hex_to_decimal(
     Example: 00000000005E5403 → 6181891
     """
     try:
-        from .content_id_utils import hex_to_decimal, format_content_id
+        from .content_id_utils import format_content_id, hex_to_decimal
 
         decimal_id = hex_to_decimal(hex_id)
 
-        return json.dumps({
-            "hex_id": hex_id.upper(),
-            "decimal_id": decimal_id,
-            "formatted": format_content_id(hex_id)
-        }, indent=2)
+        return json.dumps(
+            {
+                "hex_id": hex_id.upper(),
+                "decimal_id": decimal_id,
+                "formatted": format_content_id(hex_id),
+            },
+            indent=2,
+        )
 
     except Exception as e:
         return handle_tool_error(e, "convert_content_id_hex_to_decimal")
@@ -2895,7 +2983,7 @@ async def convert_content_id_hex_to_decimal(
 
 @mcp.tool()
 async def convert_content_id_decimal_to_hex(
-    decimal_id: str = Field(description="Decimal content ID (e.g., 6181891)")
+    decimal_id: str = Field(description="Decimal content ID (e.g., 6181891)"),
 ) -> str:
     """
     Convert decimal content ID to hex format for API calls.
@@ -2910,11 +2998,10 @@ async def convert_content_id_decimal_to_hex(
 
         hex_id = decimal_to_hex(decimal_id)
 
-        return json.dumps({
-            "hex_id": hex_id,
-            "decimal_id": decimal_id,
-            "formatted": format_content_id(hex_id)
-        }, indent=2)
+        return json.dumps(
+            {"hex_id": hex_id, "decimal_id": decimal_id, "formatted": format_content_id(hex_id)},
+            indent=2,
+        )
 
     except Exception as e:
         return handle_tool_error(e, "convert_content_id_decimal_to_hex")
@@ -2923,8 +3010,11 @@ async def convert_content_id_decimal_to_hex(
 @mcp.tool()
 async def get_content_web_url(
     content_id: str = Field(description="Content ID (hex or decimal)"),
-    content_type: Optional[str] = Field(default=None, description="Optional: Content type (Dashboard, Search, Folder, etc.) to optimize URL generation"),
-    instance: str = Field(default='default', description="Sumo Logic instance name")
+    content_type: Optional[str] = Field(
+        default=None,
+        description="Optional: Content type (Dashboard, Search, Folder, etc.) to optimize URL generation",
+    ),
+    instance: str = Field(default="default", description="Sumo Logic instance name"),
 ) -> str:
     """
     Generate web UI URL for a content item.
@@ -2942,7 +3032,7 @@ async def get_content_web_url(
     """
     try:
         from .content_id_utils import hex_to_decimal, normalize_to_hex
-        from .url_builder import build_library_url, build_dashboard_url
+        from .url_builder import build_dashboard_url, build_library_url
 
         _ensure_config_initialized()
         config = get_config()
@@ -2963,7 +3053,7 @@ async def get_content_web_url(
         is_dashboard = False
         dashboard_id = None
 
-        if content_type and content_type.lower() == 'dashboard':
+        if content_type and content_type.lower() == "dashboard":
             is_dashboard = True
         else:
             # Try to fetch content details to determine type
@@ -2972,7 +3062,7 @@ async def get_content_web_url(
                 path_result = await client.get_content_path(hex_id)
 
                 # Check if contentType indicates this is a dashboard
-                if path_result.get('contentType') == 'Dashboard':
+                if path_result.get("contentType") == "Dashboard":
                     is_dashboard = True
             except Exception as e:
                 # If we can't fetch content details, assume it's library content
@@ -2987,15 +3077,13 @@ async def get_content_web_url(
                 # Try to get dashboard details - dashboards have an 'id' field that's different from content ID
                 # We'll use export to get the full dashboard details
                 from .async_export_helper import poll_export_job
+
                 export_result = await poll_export_job(
-                    client,
-                    hex_id,
-                    is_admin_mode=False,
-                    max_wait_seconds=30
+                    client, hex_id, is_admin_mode=False, max_wait_seconds=30
                 )
 
                 # Extract dashboard ID from export result
-                dashboard_id = export_result.get('id')
+                dashboard_id = export_result.get("id")
                 if dashboard_id:
                     url = build_dashboard_url(instance_config.endpoint, dashboard_id, subdomain)
                 else:
@@ -3010,13 +3098,16 @@ async def get_content_web_url(
             # Use library URL for all other content types
             url = build_library_url(instance_config.endpoint, decimal_id, subdomain)
 
-        return json.dumps({
-            "url": url,
-            "hex_id": hex_id,
-            "decimal_id": decimal_id,
-            "content_type": "Dashboard" if is_dashboard else "Library Content",
-            "instance": instance
-        }, indent=2)
+        return json.dumps(
+            {
+                "url": url,
+                "hex_id": hex_id,
+                "decimal_id": decimal_id,
+                "content_type": "Dashboard" if is_dashboard else "Library Content",
+                "instance": instance,
+            },
+            indent=2,
+        )
 
     except Exception as e:
         return handle_tool_error(e, "get_content_web_url")
@@ -3025,9 +3116,14 @@ async def get_content_web_url(
 @mcp.tool()
 async def build_search_web_url(
     query: str = Field(description="Sumo Logic search query to open in the web UI"),
-    start_time: Optional[str] = Field(default=None, description="Start time (e.g., '-1h', '-24h', '2024-01-01T00:00:00', ISO format)"),
-    end_time: Optional[str] = Field(default=None, description="End time (e.g., '-1s', 'now', '2024-01-01T23:59:59', ISO format)"),
-    instance: str = Field(default='default', description="Sumo Logic instance name")
+    start_time: Optional[str] = Field(
+        default=None,
+        description="Start time (e.g., '-1h', '-24h', '2024-01-01T00:00:00', ISO format)",
+    ),
+    end_time: Optional[str] = Field(
+        default=None, description="End time (e.g., '-1s', 'now', '2024-01-01T23:59:59', ISO format)"
+    ),
+    instance: str = Field(default="default", description="Sumo Logic instance name"),
 ) -> str:
     """
     Build a web UI URL to open a log search query.
@@ -3060,18 +3156,21 @@ async def build_search_web_url(
         url = build_search_url(
             instance_config.endpoint,
             query,
-            start_time=start_time or '-1h',
-            end_time=end_time or '-1s',
-            subdomain=subdomain
+            start_time=start_time or "-1h",
+            end_time=end_time or "-1s",
+            subdomain=subdomain,
         )
 
-        return json.dumps({
-            "url": url,
-            "query": query,
-            "start_time": start_time or '-1h',
-            "end_time": end_time or '-1s',
-            "instance": instance
-        }, indent=2)
+        return json.dumps(
+            {
+                "url": url,
+                "query": query,
+                "start_time": start_time or "-1h",
+                "end_time": end_time or "-1s",
+                "instance": instance,
+            },
+            indent=2,
+        )
 
     except Exception as e:
         return handle_tool_error(e, "build_search_web_url")
@@ -3079,9 +3178,10 @@ async def build_search_web_url(
 
 # Account Management Tools
 
+
 @mcp.tool()
 async def get_account_status(
-    instance: str = Field(default='default', description="Sumo Logic instance name")
+    instance: str = Field(default="default", description="Sumo Logic instance name")
 ) -> str:
     """
     Get account status including subscription, plan type, and usage information.
@@ -3117,7 +3217,7 @@ async def get_account_status(
 @mcp.tool()
 async def get_usage_forecast(
     number_of_days: int = Field(description="Number of days to forecast (e.g., 7, 30, 90)"),
-    instance: str = Field(default='default', description="Sumo Logic instance name")
+    instance: str = Field(default="default", description="Sumo Logic instance name"),
 ) -> str:
     """
     Get usage forecast for specified number of days.
@@ -3166,7 +3266,7 @@ async def export_usage_report(
     include_deployment_charge: bool = False,
     max_wait_seconds: int = 300,
     poll_interval_seconds: int = 5,
-    instance: str = 'default'
+    instance: str = "default",
 ) -> str:
     """
     Export detailed usage report for a date range (async operation).
@@ -3221,7 +3321,7 @@ async def export_usage_report(
             end_date=end_date,
             group_by=group_by,
             report_type=report_type,
-            include_deployment_charge=include_deployment_charge
+            include_deployment_charge=include_deployment_charge,
         )
 
         job_id = start_result.get("jobId")
@@ -3244,7 +3344,7 @@ async def export_usage_report(
             get_status_func=get_status,
             get_result_func=get_result,
             max_wait_seconds=max_wait_seconds,
-            poll_interval_seconds=poll_interval_seconds
+            poll_interval_seconds=poll_interval_seconds,
         )
 
         # Extract download URL (field is reportDownloadURL)
@@ -3259,7 +3359,7 @@ async def export_usage_report(
             "group_by": group_by,
             "report_type": report_type,
             "note": "Download URL is valid for 10 minutes. Download the CSV immediately.",
-            "instance": instance
+            "instance": instance,
         }
 
         return json.dumps(result, indent=2)
@@ -3275,7 +3375,7 @@ async def get_estimated_log_search_usage(
     to_time: str = "now",
     time_zone: str = "UTC",
     by_view: bool = True,
-    instance: str = 'default'
+    instance: str = "default",
 ) -> str:
     """
     Get estimated data volume that would be scanned for a log search query.
@@ -3330,7 +3430,7 @@ async def get_estimated_log_search_usage(
             from_time=from_epoch,
             to_time=to_epoch,
             time_zone=time_zone,
-            by_view=by_view
+            by_view=by_view,
         )
 
         # Enhance response with formatted information
@@ -3380,7 +3480,7 @@ def parse_time_to_epoch(time_value: str) -> int:
         return int(datetime.now(timezone.utc).timestamp() * 1000)
 
     # Handle relative time formats like "-1h", "-30m", "-2d", "-1w"
-    relative_pattern = r'^([+-]?)(\d+)([smhdw])$'
+    relative_pattern = r"^([+-]?)(\d+)([smhdw])$"
     match = re.match(relative_pattern, time_str.lower())
 
     if match:
@@ -3388,17 +3488,11 @@ def parse_time_to_epoch(time_value: str) -> int:
         amount = int(amount)
 
         # Default to negative if no sign specified (going back in time)
-        if sign != '+':
+        if sign != "+":
             amount = -amount
 
         # Convert unit to timedelta
-        unit_map = {
-            's': 'seconds',
-            'm': 'minutes',
-            'h': 'hours',
-            'd': 'days',
-            'w': 'weeks'
-        }
+        unit_map = {"s": "seconds", "m": "minutes", "h": "hours", "d": "days", "w": "weeks"}
 
         if unit in unit_map:
             delta_kwargs = {unit_map[unit]: amount}
@@ -3408,11 +3502,11 @@ def parse_time_to_epoch(time_value: str) -> int:
     # Try to parse as ISO format
     try:
         for fmt in [
-            '%Y-%m-%dT%H:%M:%SZ',
-            '%Y-%m-%dT%H:%M:%S.%fZ',
-            '%Y-%m-%dT%H:%M:%S',
-            '%Y-%m-%d %H:%M:%S',
-            '%Y-%m-%d'
+            "%Y-%m-%dT%H:%M:%SZ",
+            "%Y-%m-%dT%H:%M:%S.%fZ",
+            "%Y-%m-%dT%H:%M:%S",
+            "%Y-%m-%d %H:%M:%S",
+            "%Y-%m-%d",
         ]:
             try:
                 dt = datetime.strptime(time_str, fmt)
@@ -3435,7 +3529,7 @@ def format_bytes(bytes_value: int) -> str:
     if bytes_value == 0:
         return "0 B"
 
-    units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
+    units = ["B", "KB", "MB", "GB", "TB", "PB"]
     value = float(bytes_value)
     unit_index = 0
 
@@ -3455,7 +3549,7 @@ async def explore_log_metadata(
     metadata_fields: str = "_view,_sourceCategory",
     sort_by: str = "_sourceCategory",
     max_results: int = 1000,
-    instance: str = 'default'
+    instance: str = "default",
 ) -> str:
     """
     Explore log metadata values for a given scope to help build efficient queries.
@@ -3526,7 +3620,9 @@ async def explore_log_metadata(
 
         # Validate sort_by is in fields
         if sort_by not in fields:
-            raise ValidationError(f"sort_by field '{sort_by}' must be one of the metadata fields: {metadata_fields}")
+            raise ValidationError(
+                f"sort_by field '{sort_by}' must be one of the metadata fields: {metadata_fields}"
+            )
 
         # Build the query
         # Format: <scope> | count by field1,field2,... | sort field asc | limit N
@@ -3554,7 +3650,7 @@ async def explore_log_metadata(
             from_time=from_epoch,
             to_time=to_epoch,
             timezone_str=time_zone,
-            by_receipt_time=False
+            by_receipt_time=False,
         )
 
         search_id = job_result.get("id")
@@ -3577,34 +3673,27 @@ async def explore_log_metadata(
                 # Get results
                 await limiter.acquire("explore_log_metadata_results")
                 results = await client.get_search_job_records(
-                    job_id=search_id,
-                    limit=max_results,
-                    offset=0
+                    job_id=search_id, limit=max_results, offset=0
                 )
 
                 # Format response
                 records = results.get("records", [])
                 total_records = len(records)
                 total_messages = sum(
-                    int(record.get("map", {}).get("_count", 0))
-                    for record in records
+                    int(record.get("map", {}).get("_count", 0)) for record in records
                 )
 
                 # Build formatted output
                 output = {
                     "scope": scope,
                     "metadata_fields": fields,
-                    "time_range": {
-                        "from": from_time,
-                        "to": to_time,
-                        "timezone": time_zone
-                    },
+                    "time_range": {"from": from_time, "to": to_time, "timezone": time_zone},
                     "summary": {
                         "unique_combinations": total_records,
                         "total_messages": total_messages,
-                        "truncated": total_records >= max_results
+                        "truncated": total_records >= max_results,
                     },
-                    "metadata": []
+                    "metadata": [],
                 }
 
                 # Extract and format metadata
@@ -3615,9 +3704,7 @@ async def explore_log_metadata(
                     if len(output["metadata"]) == 0 and record_map:
                         logger.debug(f"First record keys: {list(record_map.keys())}")
 
-                    metadata_entry = {
-                        "count": int(record_map.get("_count", 0))
-                    }
+                    metadata_entry = {"count": int(record_map.get("_count", 0))}
 
                     # Add each metadata field - handle case insensitivity
                     # Sumo returns fields in lowercase typically
@@ -3660,14 +3747,18 @@ async def explore_log_metadata(
 
 @mcp.tool()
 async def analyze_log_volume(
-    scope: str = Field(description="Search scope expression (e.g., '_index=prod_app_logs', '_sourceCategory=*cloudtrail*')"),
-    aggregate_by: list[str] = Field(description="List of fields to aggregate by (e.g., ['_sourceCategory'], ['eventname', 'eventsource'])"),
+    scope: str = Field(
+        description="Search scope expression (e.g., '_index=prod_app_logs', '_sourceCategory=*cloudtrail*')"
+    ),
+    aggregate_by: list[str] = Field(
+        description="List of fields to aggregate by (e.g., ['_sourceCategory'], ['eventname', 'eventsource'])"
+    ),
     from_time: str = "-24h",
     to_time: str = "now",
     additional_fields: Optional[list[str]] = None,
     top_n: int = 100,
     include_percentage: bool = True,
-    instance: str = Field(default='default', description="Sumo Logic instance name")
+    instance: str = Field(default="default", description="Sumo Logic instance name"),
 ) -> str:
     """
     Analyze raw log volume using the _size field to understand ingestion drivers.
@@ -3762,13 +3853,10 @@ async def analyze_log_volume(
 
         # Create search job
         job_response = await client.create_search_job(
-            query=query,
-            from_time=from_time,
-            to_time=to_time,
-            timezone_str="UTC"
+            query=query, from_time=from_time, to_time=to_time, timezone_str="UTC"
         )
 
-        job_id = job_response['id']
+        job_id = job_response["id"]
 
         # Poll for completion
         max_attempts = 300  # 5 minutes
@@ -3776,27 +3864,27 @@ async def analyze_log_volume(
             await asyncio.sleep(1)
 
             status = await client.get_search_job_status(job_id)
-            state = status['state']
+            state = status["state"]
 
-            if state == 'DONE GATHERING RESULTS':
+            if state == "DONE GATHERING RESULTS":
                 break
-            elif state == 'CANCELLED':
+            elif state == "CANCELLED":
                 raise APIError("Search job was cancelled")
 
         # Get records
         records_response = await client.get_search_job_records(job_id, limit=top_n)
-        records = records_response.get('records', [])
+        records = records_response.get("records", [])
 
         # Delete the job
         try:
             await client.delete_search_job(job_id)
-        except:
-            pass
+        except Exception:  # noqa: S110
+            pass  # Best effort cleanup
 
         # Calculate total if percentage requested
         total_bytes = 0
         if include_percentage:
-            total_bytes = sum(float(r.get('map', {}).get('bytes', 0)) for r in records)
+            total_bytes = sum(float(r.get("map", {}).get("bytes", 0)) for r in records)
 
         # Format results
         result = {
@@ -3806,19 +3894,21 @@ async def analyze_log_volume(
                 "from_time": from_time,
                 "to_time": to_time,
                 "additional_fields": additional_fields,
-                "top_n": top_n
+                "top_n": top_n,
             },
             "summary": {
                 "total_records": len(records),
                 "total_bytes": int(total_bytes),
                 "total_gb": round(total_bytes / 1024 / 1024 / 1024, 2) if total_bytes > 0 else 0,
-                "total_tb": round(total_bytes / 1024 / 1024 / 1024 / 1024, 3) if total_bytes > 0 else 0
+                "total_tb": (
+                    round(total_bytes / 1024 / 1024 / 1024 / 1024, 3) if total_bytes > 0 else 0
+                ),
             },
-            "results": []
+            "results": [],
         }
 
         for record in records:
-            record_map = record.get('map', {})
+            record_map = record.get("map", {})
 
             result_entry = {}
 
@@ -3827,11 +3917,11 @@ async def analyze_log_volume(
                 result_entry[field] = record_map.get(field, "")
 
             # Add volume metrics
-            bytes_val = float(record_map.get('bytes', 0))
+            bytes_val = float(record_map.get("bytes", 0))
             result_entry["bytes"] = int(bytes_val)
-            result_entry["mb"] = round(float(record_map.get('mb', 0)), 2)
-            result_entry["gb"] = round(float(record_map.get('gb', 0)), 3)
-            result_entry["tb"] = round(float(record_map.get('tb', 0)), 4)
+            result_entry["mb"] = round(float(record_map.get("mb", 0)), 2)
+            result_entry["gb"] = round(float(record_map.get("gb", 0)), 3)
+            result_entry["tb"] = round(float(record_map.get("tb", 0)), 4)
 
             if include_percentage and total_bytes > 0:
                 result_entry["percentage"] = round((bytes_val / total_bytes) * 100, 2)
@@ -3852,14 +3942,16 @@ async def analyze_log_volume(
 
 @mcp.tool()
 async def profile_log_schema(
-    scope: str = Field(description="Search scope expression (e.g., '_sourceCategory=*cloudtrail*')"),
+    scope: str = Field(
+        description="Search scope expression (e.g., '_sourceCategory=*cloudtrail*')"
+    ),
     from_time: str = "-1h",
     to_time: str = "now",
     mode: str = "summary",
     min_cardinality: int = 0,
     max_cardinality: int = 1000000,
     suggest_candidates: bool = True,
-    instance: str = Field(default='default', description="Sumo Logic instance name")
+    instance: str = Field(default="default", description="Sumo Logic instance name"),
 ) -> str:
     """
     Profile log schema using the facets operator to discover available fields and their characteristics.
@@ -3947,13 +4039,10 @@ async def profile_log_schema(
 
         # Create search job
         job_response = await client.create_search_job(
-            query=query,
-            from_time=from_time,
-            to_time=to_time,
-            timezone_str="UTC"
+            query=query, from_time=from_time, to_time=to_time, timezone_str="UTC"
         )
 
-        job_id = job_response['id']
+        job_id = job_response["id"]
 
         # Poll for completion
         max_attempts = 300
@@ -3961,22 +4050,22 @@ async def profile_log_schema(
             await asyncio.sleep(1)
 
             status = await client.get_search_job_status(job_id)
-            state = status['state']
+            state = status["state"]
 
-            if state == 'DONE GATHERING RESULTS':
+            if state == "DONE GATHERING RESULTS":
                 break
-            elif state == 'CANCELLED':
+            elif state == "CANCELLED":
                 raise APIError("Search job was cancelled")
 
         # Get records
         records_response = await client.get_search_job_records(job_id, limit=10000)
-        records = records_response.get('records', [])
+        records = records_response.get("records", [])
 
         # Delete the job
         try:
             await client.delete_search_job(job_id)
-        except:
-            pass
+        except Exception:  # noqa: S110
+            pass  # Best effort cleanup
 
         # Format results based on mode
         result = {
@@ -3986,11 +4075,9 @@ async def profile_log_schema(
                 "to_time": to_time,
                 "mode": mode,
                 "min_cardinality": min_cardinality,
-                "max_cardinality": max_cardinality
+                "max_cardinality": max_cardinality,
             },
-            "summary": {
-                "total_fields": len(records)
-            }
+            "summary": {"total_fields": len(records)},
         }
 
         if mode == "summary":
@@ -3998,11 +4085,13 @@ async def profile_log_schema(
             suggested_fields = []
 
             for record in records:
-                record_map = record.get('map', {})
+                record_map = record.get("map", {})
 
-                field_name = record_map.get('_fieldname', record_map.get('_fieldName', ''))
-                field_type = record_map.get('_fieldtype', record_map.get('_fieldType', ''))
-                cardinality = int(record_map.get('_fieldcardinality', record_map.get('_fieldCardinality', 0)))
+                field_name = record_map.get("_fieldname", record_map.get("_fieldName", ""))
+                field_type = record_map.get("_fieldtype", record_map.get("_fieldType", ""))
+                cardinality = int(
+                    record_map.get("_fieldcardinality", record_map.get("_fieldCardinality", 0))
+                )
 
                 # Apply cardinality filters
                 if cardinality < min_cardinality or cardinality > max_cardinality:
@@ -4011,7 +4100,7 @@ async def profile_log_schema(
                 field_info = {
                     "fieldName": field_name,
                     "fieldType": field_type,
-                    "cardinality": cardinality
+                    "cardinality": cardinality,
                 }
 
                 # Determine if this is a good candidate for volume analysis
@@ -4019,7 +4108,7 @@ async def profile_log_schema(
                 if suggest_candidates:
                     # Good candidates: medium cardinality (2-1000), not system fields
                     # System fields start with _ (except a few exceptions like _raw which we want to exclude)
-                    is_system_field = field_name.startswith('_')
+                    is_system_field = field_name.startswith("_")
                     if not is_system_field and 2 <= cardinality <= 1000:
                         is_suggested = True
                         suggested_fields.append(field_name)
@@ -4041,7 +4130,7 @@ async def profile_log_schema(
         else:  # full mode
             result["facets"] = []
             for record in records:
-                result["facets"].append(record.get('map', {}))
+                result["facets"].append(record.get("map", {}))
 
         return json.dumps(result, indent=2)
 
@@ -4062,7 +4151,7 @@ async def analyze_data_volume(
     sort_by: str = "gbytes",
     limit: int = 100,
     filter_pattern: str = "*",
-    instance: str = 'default'
+    instance: str = "default",
 ) -> str:
     """
     Analyze data volume ingestion from the Sumo Logic Data Volume Index.
@@ -4126,7 +4215,7 @@ async def analyze_data_volume(
         With timeshift: Compares current vs 21d average (3 x 7d)
     """
     try:
-        from .query_patterns import TimeshiftPattern, AggregationPatterns, CreditCalculation
+        from .query_patterns import AggregationPatterns, CreditCalculation, TimeshiftPattern
 
         _ensure_config_initialized()
         config = get_config()
@@ -4139,7 +4228,7 @@ async def analyze_data_volume(
             "source": "source_and_tier_volume",
             "sourceHost": "sourcehost_and_tier_volume",
             "sourceName": "sourcename_and_tier_volume",
-            "view": "view_and_tier_volume"
+            "view": "view_and_tier_volume",
         }
 
         if dimension not in dimension_map:
@@ -4157,21 +4246,21 @@ async def analyze_data_volume(
             "source": "source",
             "sourceHost": "sourceHost",
             "sourceName": "sourceName",
-            "view": "view"
+            "view": "view",
         }
         field_name = field_map[dimension]
 
         # Build the query
         query_parts = [
-            f'_index=sumologic_volume _sourceCategory={source_category}',
+            f"_index=sumologic_volume _sourceCategory={source_category}",
             '| parse regex "(?<data>\\{[^\\{]+\\})" multi',
             f'| json field=data "field","dataTier","sizeInBytes","count" as {field_name}, dataTier, bytes, events',
-            '| bytes/1Gi as gbytes'
+            "| bytes/1Gi as gbytes",
         ]
 
         # Add filter if specified
         if filter_pattern != "*":
-            query_parts.append(f'| where {field_name} matches /{filter_pattern}/')
+            query_parts.append(f"| where {field_name} matches /{filter_pattern}/")
 
         # Aggregation
         query_parts.append(AggregationPatterns.volume_by_dimension(field_name, include_tier=True))
@@ -4184,19 +4273,23 @@ async def analyze_data_volume(
         if include_timeshift:
             # Add timeshift for gbytes (includes compare operator and state field)
             query_parts.extend(
-                TimeshiftPattern.compare_with_timeshift('gbytes', timeshift_days, timeshift_periods, include_state=True)
+                TimeshiftPattern.compare_with_timeshift(
+                    "gbytes", timeshift_days, timeshift_periods, include_state=True
+                )
             )
 
             # Add timeshift for credits if requested (no compare operator, no state field)
             if include_credits:
                 query_parts.extend(
-                    TimeshiftPattern.compare_with_timeshift('credits', timeshift_days, timeshift_periods, include_state=False)
+                    TimeshiftPattern.compare_with_timeshift(
+                        "credits", timeshift_days, timeshift_periods, include_state=False
+                    )
                 )
 
         # Sorting
-        query_parts.append(AggregationPatterns.top_n(sort_by, limit=limit, direction='desc'))
+        query_parts.append(AggregationPatterns.top_n(sort_by, limit=limit, direction="desc"))
 
-        query = '\n'.join(query_parts)
+        query = "\n".join(query_parts)
 
         # Execute the query
         client = await get_sumo_client(instance)
@@ -4218,7 +4311,7 @@ async def analyze_data_volume(
             from_time=str(from_epoch),
             to_time=str(to_epoch),
             timezone_str=time_zone,
-            by_receipt_time=False
+            by_receipt_time=False,
         )
 
         # Format the response
@@ -4226,28 +4319,28 @@ async def analyze_data_volume(
 
         output = {
             "dimension": dimension,
-            "time_range": {
-                "from": from_time,
-                "to": to_time,
-                "timezone": time_zone
-            },
+            "time_range": {"from": from_time, "to": to_time, "timezone": time_zone},
             "query_options": {
                 "include_credits": include_credits,
                 "include_timeshift": include_timeshift,
-                "timeshift_config": {
-                    "days": timeshift_days,
-                    "periods": timeshift_periods,
-                    "total_days": timeshift_days * timeshift_periods
-                } if include_timeshift else None,
+                "timeshift_config": (
+                    {
+                        "days": timeshift_days,
+                        "periods": timeshift_periods,
+                        "total_days": timeshift_days * timeshift_periods,
+                    }
+                    if include_timeshift
+                    else None
+                ),
                 "sort_by": sort_by,
                 "limit": limit,
-                "filter_pattern": filter_pattern
+                "filter_pattern": filter_pattern,
             },
             "summary": {
                 "total_records": len(records),
-                "query_type": results.get("query_type", "records")
+                "query_type": results.get("query_type", "records"),
             },
-            "data": []
+            "data": [],
         }
 
         # Extract data from records
@@ -4282,7 +4375,7 @@ async def analyze_data_volume_grouped(
     other_threshold_pct: float = 0.1,
     sort_by: str = "credits",
     limit: int = 100,
-    instance: str = 'default'
+    instance: str = "default",
 ) -> str:
     """
     Advanced data volume analysis with cardinality reduction for large-scale environments.
@@ -4390,7 +4483,7 @@ async def analyze_data_volume_grouped(
             "source": "source",
             "sourceHost": "sourcehost",
             "sourceName": "sourcename",
-            "view": "view"
+            "view": "view",
         }
 
         if dimension not in dimension_map:
@@ -4446,7 +4539,7 @@ async def analyze_data_volume_grouped(
             from_time=str(from_epoch),
             to_time=str(to_epoch),
             timezone_str=time_zone,
-            by_receipt_time=False
+            by_receipt_time=False,
         )
 
         # Format the response
@@ -4454,25 +4547,21 @@ async def analyze_data_volume_grouped(
 
         output = {
             "dimension": dimension,
-            "time_range": {
-                "from": from_time,
-                "to": to_time,
-                "timezone": time_zone
-            },
+            "time_range": {"from": from_time, "to": to_time, "timezone": time_zone},
             "query_options": {
                 "value_filter": value_filter,
                 "tier_filter": tier_filter,
                 "max_chars": max_chars,
                 "other_threshold_pct": other_threshold_pct,
                 "sort_by": sort_by,
-                "limit": limit
+                "limit": limit,
             },
             "summary": {
                 "total_records": len(records),
                 "query_type": results.get("query_type", "records"),
-                "note": "Values < {:.1f}% of total GB are grouped as 'other'".format(other_threshold_pct)
+                "note": f"Values < {other_threshold_pct:.1f}% of total GB are grouped as 'other'",
             },
-            "data": []
+            "data": [],
         }
 
         # Extract data from records
@@ -4497,11 +4586,12 @@ async def analyze_data_volume_grouped(
 
 # MCP Resources
 
+
 @mcp.resource("sumo://logs/recent-errors")
 async def recent_errors() -> str:
     """Get recent error logs from the last hour from default instance."""
     try:
-        client = await get_sumo_client('default')
+        client = await get_sumo_client("default")
 
         to_time = datetime.now(timezone.utc)
         from_time = to_time - timedelta(hours=1)
@@ -4520,7 +4610,7 @@ async def recent_errors() -> str:
 async def collectors_config() -> str:
     """Get current collector configuration from default instance."""
     try:
-        client = await get_sumo_client('default')
+        client = await get_sumo_client("default")
         collectors = await client.get_collectors()
         return json.dumps(collectors, indent=2)
     except Exception as e:
@@ -4553,20 +4643,24 @@ async def query_examples() -> str:
         if not query_db_path.exists() and query_db_path_gz.exists():
             import gzip
             import shutil
-            with gzip.open(query_db_path_gz, 'rb') as f_in:
-                with open(query_db_path, 'wb') as f_out:
+
+            with gzip.open(query_db_path_gz, "rb") as f_in:
+                with open(query_db_path, "wb") as f_out:
                     shutil.copyfileobj(f_in, f_out)
             logger.info(f"Decompressed {query_db_path_gz} to {query_db_path}")
 
         if not query_db_path.exists():
-            return json.dumps({
-                "error": "Query examples database not found",
-                "expected_path": str(query_db_path),
-                "suggestion": "Ensure logs_searches.json or logs_searches.json.gz is in the repo root directory"
-            }, indent=2)
+            return json.dumps(
+                {
+                    "error": "Query examples database not found",
+                    "expected_path": str(query_db_path),
+                    "suggestion": "Ensure logs_searches.json or logs_searches.json.gz is in the repo root directory",
+                },
+                indent=2,
+            )
 
         # Load and return a sample
-        with open(query_db_path, 'r') as f:
+        with open(query_db_path) as f:
             all_queries = json.load(f)
 
         # Get a diverse sample - take every Nth query to get variety
@@ -4575,35 +4669,59 @@ async def query_examples() -> str:
         sample = all_queries[::step][:sample_size]
 
         # Get list of unique apps for reference
-        all_apps = sorted(list(set([q.get('app', '') for q in all_queries if q.get('app')])))
+        all_apps = sorted(list(set([q.get("app", "") for q in all_queries if q.get("app")])))
 
-        return json.dumps({
-            "info": "This is a sample of query examples. Use search_query_examples tool for filtered searches.",
-            "total_available": len(all_queries),
-            "sample_size": len(sample),
-            "available_apps": all_apps[:50],  # First 50 apps
-            "total_apps": len(all_apps),
-            "examples": sample
-        }, indent=2)
+        return json.dumps(
+            {
+                "info": "This is a sample of query examples. Use search_query_examples tool for filtered searches.",
+                "total_available": len(all_queries),
+                "sample_size": len(sample),
+                "available_apps": all_apps[:50],  # First 50 apps
+                "total_apps": len(all_apps),
+                "examples": sample,
+            },
+            indent=2,
+        )
 
     except Exception as e:
-        return json.dumps({
-            "error": str(e),
-            "suggestion": "Use the search_query_examples tool for searching examples"
-        }, indent=2)
+        return json.dumps(
+            {
+                "error": str(e),
+                "suggestion": "Use the search_query_examples tool for searching examples",
+            },
+            indent=2,
+        )
 
 
 # Query Examples Tool (companion to resource above)
 
+
 @mcp.tool()
 async def search_query_examples(
-    query: Optional[str] = Field(default=None, description="Free-text search across all fields (app name, use case, query name, query text). Best for natural queries like 'apache 4xx errors' or 'kubernetes pod scheduling'"),
-    app_name: Optional[str] = Field(default=None, description="Narrow to specific app (e.g., 'Apache', 'AWS', 'Kubernetes'). Also matches 'httpd', 'k8s' aliases"),
-    use_case: Optional[str] = Field(default=None, description="Narrow to use case (e.g., 'security', 'performance', 'latency', 'error')"),
-    keywords: Optional[str] = Field(default=None, description="Search query text for operators/patterns (e.g., 'count by', 'timeslice', 'where status_code')"),
-    query_type: Optional[str] = Field(default=None, description="Filter by type: 'Logs' or 'Metrics'"),
-    match_mode: str = Field(default="any", description="Match mode: 'any' (score by relevance, default), 'all' (strict AND), 'fuzzy' (relaxed matching)"),
-    max_results: int = Field(default=10, description="Maximum number of examples to return (1-50)")
+    query: Optional[str] = Field(
+        default=None,
+        description="Free-text search across all fields (app name, use case, query name, query text). Best for natural queries like 'apache 4xx errors' or 'kubernetes pod scheduling'",
+    ),
+    app_name: Optional[str] = Field(
+        default=None,
+        description="Narrow to specific app (e.g., 'Apache', 'AWS', 'Kubernetes'). Also matches 'httpd', 'k8s' aliases",
+    ),
+    use_case: Optional[str] = Field(
+        default=None,
+        description="Narrow to use case (e.g., 'security', 'performance', 'latency', 'error')",
+    ),
+    keywords: Optional[str] = Field(
+        default=None,
+        description="Search query text for operators/patterns (e.g., 'count by', 'timeslice', 'where status_code')",
+    ),
+    query_type: Optional[str] = Field(
+        default=None, description="Filter by type: 'Logs' or 'Metrics'"
+    ),
+    match_mode: str = Field(
+        default="any",
+        description="Match mode: 'any' (score by relevance, default), 'all' (strict AND), 'fuzzy' (relaxed matching)",
+    ),
+    max_results: int = Field(default=10, description="Maximum number of examples to return (1-50)"),
 ) -> str:
     """
     Search 11,000+ real Sumo Logic queries from published apps using intelligent scoring.
@@ -4631,8 +4749,8 @@ async def search_query_examples(
     Returns ranked results with match metadata showing which fields matched.
     """
     try:
-        from pathlib import Path
         import re
+        from pathlib import Path
 
         # Validate max_results
         max_results = max(1, min(max_results, 50))
@@ -4645,36 +4763,40 @@ async def search_query_examples(
         if not query_db_path.exists() and query_db_path_gz.exists():
             import gzip
             import shutil
-            with gzip.open(query_db_path_gz, 'rb') as f_in:
-                with open(query_db_path, 'wb') as f_out:
+
+            with gzip.open(query_db_path_gz, "rb") as f_in:
+                with open(query_db_path, "wb") as f_out:
                     shutil.copyfileobj(f_in, f_out)
             logger.info(f"Decompressed {query_db_path_gz} to {query_db_path}")
 
         if not query_db_path.exists():
-            return json.dumps({
-                "error": "Query examples database not found",
-                "expected_path": str(query_db_path),
-                "suggestion": "Ensure logs_searches.json or logs_searches.json.gz is in the repo root directory"
-            }, indent=2)
+            return json.dumps(
+                {
+                    "error": "Query examples database not found",
+                    "expected_path": str(query_db_path),
+                    "suggestion": "Ensure logs_searches.json or logs_searches.json.gz is in the repo root directory",
+                },
+                indent=2,
+            )
 
         # Load queries
-        with open(query_db_path, 'r') as f:
+        with open(query_db_path) as f:
             all_queries = json.load(f)
 
         # Technology/app aliases
         aliases = {
-            'k8s': 'kubernetes',
-            'httpd': 'apache',
-            'apache2': 'apache',
-            'eks': 'kubernetes',
-            'gke': 'kubernetes',
-            'aks': 'kubernetes',
-            'ec2': 'aws',
-            's3': 'aws',
-            'lambda': 'aws',
-            'vm': 'azure',
-            'latency': 'response time',
-            'timetaken': 'response time',
+            "k8s": "kubernetes",
+            "httpd": "apache",
+            "apache2": "apache",
+            "eks": "kubernetes",
+            "gke": "kubernetes",
+            "aks": "kubernetes",
+            "ec2": "aws",
+            "s3": "aws",
+            "lambda": "aws",
+            "vm": "azure",
+            "latency": "response time",
+            "timetaken": "response time",
         }
 
         # Helper: expand aliases
@@ -4692,7 +4814,7 @@ async def search_query_examples(
             if not text or not isinstance(text, str):
                 return []
             # Split on whitespace and common separators, filter empty
-            tokens = re.split(r'[\s,;|]+', text.lower())
+            tokens = re.split(r"[\s,;|]+", text.lower())
             return [t for t in tokens if t and len(t) > 1]
 
         # Score a query against search criteria
@@ -4705,41 +4827,41 @@ async def search_query_examples(
                 query_tokens = tokenize(expand_aliases(query))
                 for token in query_tokens:
                     # Search in app name
-                    if token in expand_aliases(q.get('app', '')):
+                    if token in expand_aliases(q.get("app", "")):
                         score += 3
                         matched_fields.append(f"app:{token}")
                     # Search in use case
-                    if token in expand_aliases(q.get('use_case', '')):
+                    if token in expand_aliases(q.get("use_case", "")):
                         score += 2
                         matched_fields.append(f"use_case:{token}")
                     # Search in search name
-                    if token in expand_aliases(q.get('search_name', '')):
+                    if token in expand_aliases(q.get("search_name", "")):
                         score += 2
                         matched_fields.append(f"name:{token}")
                     # Search in query text
-                    if token in expand_aliases(q.get('search', '')):
+                    if token in expand_aliases(q.get("search", "")):
                         score += 1
                         matched_fields.append(f"query:{token}")
 
             # App name filter (with aliases)
             if app_name and isinstance(app_name, str):
                 expanded_app = expand_aliases(app_name)
-                if expanded_app in expand_aliases(q.get('app', '')):
+                if expanded_app in expand_aliases(q.get("app", "")):
                     score += 5
-                    matched_fields.append(f"app_filter")
+                    matched_fields.append("app_filter")
 
             # Use case filter
             if use_case and isinstance(use_case, str):
                 use_case_tokens = tokenize(use_case)
                 for token in use_case_tokens:
-                    if token in q.get('use_case', '').lower():
+                    if token in q.get("use_case", "").lower():
                         score += 3
                         matched_fields.append(f"use_case_filter:{token}")
 
             # Keywords - tokenized search in query text
             if keywords and isinstance(keywords, str):
                 keyword_tokens = tokenize(keywords)
-                query_text = q.get('search', '').lower()
+                query_text = q.get("search", "").lower()
                 for token in keyword_tokens:
                     if token in query_text:
                         score += 2
@@ -4747,7 +4869,7 @@ async def search_query_examples(
 
             # Query type - exact match
             if query_type and isinstance(query_type, str):
-                if query_type.lower() == q.get('type', '').lower():
+                if query_type.lower() == q.get("type", "").lower():
                     score += 1
                     matched_fields.append(f"type:{query_type}")
 
@@ -4759,8 +4881,8 @@ async def search_query_examples(
             score, matched_fields = score_query(q)
             if score > 0:  # Only include if any match
                 result = q.copy()
-                result['_score'] = score
-                result['_matched_on'] = matched_fields
+                result["_score"] = score
+                result["_matched_on"] = matched_fields
                 scored_results.append(result)
 
         # Handle match modes
@@ -4772,15 +4894,19 @@ async def search_query_examples(
 
         if match_mode_str == "all":
             # Strict AND - only keep results that matched all specified filters
-            filter_count = sum([
-                1 if query and isinstance(query, str) else 0,
-                1 if app_name and isinstance(app_name, str) else 0,
-                1 if use_case and isinstance(use_case, str) else 0,
-                1 if keywords and isinstance(keywords, str) else 0,
-                1 if query_type and isinstance(query_type, str) else 0
-            ])
+            filter_count = sum(
+                [
+                    1 if query and isinstance(query, str) else 0,
+                    1 if app_name and isinstance(app_name, str) else 0,
+                    1 if use_case and isinstance(use_case, str) else 0,
+                    1 if keywords and isinstance(keywords, str) else 0,
+                    1 if query_type and isinstance(query_type, str) else 0,
+                ]
+            )
             if filter_count > 0:
-                scored_results = [r for r in scored_results if len(set(r['_matched_on'])) >= filter_count]
+                scored_results = [
+                    r for r in scored_results if len(set(r["_matched_on"])) >= filter_count
+                ]
 
         elif match_mode_str == "fuzzy" and len(scored_results) == 0:
             # Auto-fallback: relax most restrictive filter
@@ -4795,22 +4921,22 @@ async def search_query_examples(
                     if query and isinstance(query, str):
                         query_tokens = tokenize(expand_aliases(query))
                         for token in query_tokens:
-                            if token in expand_aliases(q.get('app', '')):
+                            if token in expand_aliases(q.get("app", "")):
                                 score_retry += 3
                                 matched_retry.append(f"app:{token}")
                     if app_name and isinstance(app_name, str):
-                        if expand_aliases(app_name) in expand_aliases(q.get('app', '')):
+                        if expand_aliases(app_name) in expand_aliases(q.get("app", "")):
                             score_retry += 5
-                            matched_retry.append(f"app_filter")
+                            matched_retry.append("app_filter")
                     if score_retry > 0:
                         result = q.copy()
-                        result['_score'] = score_retry
-                        result['_matched_on'] = matched_retry
+                        result["_score"] = score_retry
+                        result["_matched_on"] = matched_retry
                         scored_results_retry.append(result)
                 scored_results = scored_results_retry
 
         # Sort by score descending
-        scored_results.sort(key=lambda x: x['_score'], reverse=True)
+        scored_results.sort(key=lambda x: x["_score"], reverse=True)
 
         # Limit results
         results = scored_results[:max_results]
@@ -4830,16 +4956,18 @@ async def search_query_examples(
                     "app_name": to_str(app_name),
                     "use_case": to_str(use_case),
                     "keywords": to_str(keywords),
-                    "query_type": to_str(query_type)
-                }
+                    "query_type": to_str(query_type),
+                },
             },
-            "results": results
+            "results": results,
         }
 
         # Add relaxation info if fallback occurred
         if relaxed_filters:
             response["summary"]["relaxed_filters"] = relaxed_filters
-            response["summary"]["note"] = f"Zero results found. Automatically relaxed filters: {', '.join(relaxed_filters)}"
+            response["summary"][
+                "note"
+            ] = f"Zero results found. Automatically relaxed filters: {', '.join(relaxed_filters)}"
 
         # Add helpful suggestions if no results
         if len(scored_results) == 0:
@@ -4848,10 +4976,12 @@ async def search_query_examples(
                 "Use broader search terms in 'query' parameter",
                 "Try match_mode='fuzzy' for auto-fallback",
                 "Search by app name only first to see what's available",
-                "Use query_type='Logs' or 'Metrics' to narrow by type"
+                "Use query_type='Logs' or 'Metrics' to narrow by type",
             ]
             # Get sample app names
-            sample_apps = sorted(list(set([q.get('app', '') for q in all_queries if q.get('app')])))[:20]
+            sample_apps = sorted(
+                list(set([q.get("app", "") for q in all_queries if q.get("app")]))
+            )[:20]
             response["available_apps_sample"] = sample_apps
 
         return json.dumps(response, indent=2)
@@ -4863,9 +4993,10 @@ async def search_query_examples(
 
 # MCP Prompts (keeping original prompts)
 
+
 @mcp.prompt()
 async def analyze_logs_prompt(
-    error_type: str = Field(description="Type of error to analyze")
+    error_type: str = Field(description="Type of error to analyze"),
 ) -> str:
     """Generate a prompt for analyzing specific types of logs in Sumo Logic."""
     return f"""
@@ -4929,19 +5060,39 @@ Present your findings in a clear, actionable format.
 # Audit Index Search Tools
 # ============================================================================
 
+
 @mcp.tool()
 async def search_legacy_audit(
-    action: Optional[str] = Field(default=None, description="Action filter (e.g., 'login', 'create', 'update')"),
-    status: Optional[str] = Field(default=None, description="Status filter (e.g., 'SUCCESS', 'FAILURE')"),
-    source_category: Optional[str] = Field(default=None, description="Source category filter (e.g., 'user_activity', 'scheduled_search')"),
+    action: Optional[str] = Field(
+        default=None, description="Action filter (e.g., 'login', 'create', 'update')"
+    ),
+    status: Optional[str] = Field(
+        default=None, description="Status filter (e.g., 'SUCCESS', 'FAILURE')"
+    ),
+    source_category: Optional[str] = Field(
+        default=None,
+        description="Source category filter (e.g., 'user_activity', 'scheduled_search')",
+    ),
     keywords: Optional[str] = Field(default=None, description="Additional keyword search terms"),
-    use_case: Optional[str] = Field(default=None, description="Pre-built use case: 'logins', 'scheduled_search_triggers', 'user_activity', 'content_changes'"),
-    aggregate_by: Optional[str] = Field(default=None, description="Comma-separated fields to aggregate by (e.g., 'action,status')"),
-    hours_back: int = Field(default=24, description="Number of hours to search back from now (ignored if from_time/to_time provided)"),
-    from_time: Optional[str] = Field(default=None, description="Start time: ISO8601, epoch ms, or relative like '-1h'"),
-    to_time: Optional[str] = Field(default=None, description="End time: ISO8601, epoch ms, or relative like 'now'"),
+    use_case: Optional[str] = Field(
+        default=None,
+        description="Pre-built use case: 'logins', 'scheduled_search_triggers', 'user_activity', 'content_changes'",
+    ),
+    aggregate_by: Optional[str] = Field(
+        default=None, description="Comma-separated fields to aggregate by (e.g., 'action,status')"
+    ),
+    hours_back: int = Field(
+        default=24,
+        description="Number of hours to search back from now (ignored if from_time/to_time provided)",
+    ),
+    from_time: Optional[str] = Field(
+        default=None, description="Start time: ISO8601, epoch ms, or relative like '-1h'"
+    ),
+    to_time: Optional[str] = Field(
+        default=None, description="End time: ISO8601, epoch ms, or relative like 'now'"
+    ),
     limit: int = Field(default=100, description="Maximum number of results to return"),
-    instance: str = Field(default='default', description="Sumo Logic instance name")
+    instance: str = Field(default="default", description="Sumo Logic instance name"),
 ) -> str:
     """
     Search the legacy Sumo Logic audit index (_index=sumologic_audit).
@@ -5001,11 +5152,12 @@ async def search_legacy_audit(
             use_case_info = get_audit_use_case_query(use_case)
             if not use_case_info:
                 from .audit_helpers import list_audit_use_cases
+
                 available = list_audit_use_cases()
-                return json.dumps({
-                    "error": f"Unknown use case: {use_case}",
-                    "available_use_cases": available
-                }, indent=2)
+                return json.dumps(
+                    {"error": f"Unknown use case: {use_case}", "available_use_cases": available},
+                    indent=2,
+                )
 
             # Use the pre-built query as a base, but allow overrides
             query = use_case_info["query_pattern"]
@@ -5027,7 +5179,7 @@ async def search_legacy_audit(
                 source_category=source_category,
                 keywords=keywords,
                 aggregate_by=agg_list,
-                limit=limit
+                limit=limit,
             )
 
         # Execute search using existing search_sumo_logs tool
@@ -5044,13 +5196,7 @@ async def search_legacy_audit(
             from_str = from_time_dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
             to_str = to_time_dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
-        results = await client.search_logs(
-            query,
-            from_str,
-            to_str,
-            "UTC",
-            False
-        )
+        results = await client.search_logs(query, from_str, to_str, "UTC", False)
 
         return json.dumps(results, indent=2)
 
@@ -5060,17 +5206,38 @@ async def search_legacy_audit(
 
 @mcp.tool()
 async def search_audit_events(
-    event_name: Optional[str] = Field(default=None, description="Event name filter (e.g., 'UserLoginSuccess', 'ContentUpdated', 'InsightCreated')"),
-    source_category: Optional[str] = Field(default=None, description="Source category filter (e.g., 'userSessions', 'content', 'cseInsight')"),
-    operator_email: Optional[str] = Field(default=None, description="Filter by operator email address"),
+    event_name: Optional[str] = Field(
+        default=None,
+        description="Event name filter (e.g., 'UserLoginSuccess', 'ContentUpdated', 'InsightCreated')",
+    ),
+    source_category: Optional[str] = Field(
+        default=None,
+        description="Source category filter (e.g., 'userSessions', 'content', 'cseInsight')",
+    ),
+    operator_email: Optional[str] = Field(
+        default=None, description="Filter by operator email address"
+    ),
     keywords: Optional[str] = Field(default=None, description="Additional keyword search terms"),
-    extract_fields: Optional[str] = Field(default=None, description="Comma-separated JSON fields to extract (default: eventName,eventTime,operator.email,operator.id,operator.sourceIp)"),
-    aggregate_by: Optional[str] = Field(default=None, description="Comma-separated fields to aggregate by (e.g., 'eventName,operator_email')"),
-    hours_back: int = Field(default=24, description="Number of hours to search back from now (ignored if from_time/to_time provided)"),
-    from_time: Optional[str] = Field(default=None, description="Start time: ISO8601, epoch ms, or relative like '-1h'"),
-    to_time: Optional[str] = Field(default=None, description="End time: ISO8601, epoch ms, or relative like 'now'"),
+    extract_fields: Optional[str] = Field(
+        default=None,
+        description="Comma-separated JSON fields to extract (default: eventName,eventTime,operator.email,operator.id,operator.sourceIp)",
+    ),
+    aggregate_by: Optional[str] = Field(
+        default=None,
+        description="Comma-separated fields to aggregate by (e.g., 'eventName,operator_email')",
+    ),
+    hours_back: int = Field(
+        default=24,
+        description="Number of hours to search back from now (ignored if from_time/to_time provided)",
+    ),
+    from_time: Optional[str] = Field(
+        default=None, description="Start time: ISO8601, epoch ms, or relative like '-1h'"
+    ),
+    to_time: Optional[str] = Field(
+        default=None, description="End time: ISO8601, epoch ms, or relative like 'now'"
+    ),
     limit: int = Field(default=100, description="Maximum number of results to return"),
-    instance: str = Field(default='default', description="Sumo Logic instance name")
+    instance: str = Field(default="default", description="Sumo Logic instance name"),
 ) -> str:
     """
     Search the enterprise audit events index (_index=sumologic_audit_events).
@@ -5157,7 +5324,7 @@ async def search_audit_events(
             parse_json=True,
             extract_fields=extract_list,
             aggregate_by=agg_list,
-            limit=limit
+            limit=limit,
         )
 
         # Execute search
@@ -5174,13 +5341,7 @@ async def search_audit_events(
             from_str = from_time_dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
             to_str = to_time_dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
-        results = await client.search_logs(
-            query,
-            from_str,
-            to_str,
-            "UTC",
-            False
-        )
+        results = await client.search_logs(query, from_str, to_str, "UTC", False)
 
         return json.dumps(results, indent=2)
 
@@ -5190,17 +5351,36 @@ async def search_audit_events(
 
 @mcp.tool()
 async def search_system_events(
-    use_case: Optional[str] = Field(default=None, description="Pre-built use case: 'collector_source_health', 'monitor_alerts', or 'monitor_alert_timeline'"),
-    event_name: Optional[str] = Field(default=None, description="Event name filter (e.g., system-specific events)"),
-    source_category: Optional[str] = Field(default=None, description="Source category filter for system events"),
+    use_case: Optional[str] = Field(
+        default=None,
+        description="Pre-built use case: 'collector_source_health', 'monitor_alerts', or 'monitor_alert_timeline'",
+    ),
+    event_name: Optional[str] = Field(
+        default=None, description="Event name filter (e.g., system-specific events)"
+    ),
+    source_category: Optional[str] = Field(
+        default=None, description="Source category filter for system events"
+    ),
     keywords: Optional[str] = Field(default=None, description="Additional keyword search terms"),
-    extract_fields: Optional[str] = Field(default=None, description="Comma-separated JSON fields to extract (default: eventName,eventTime,operator.email,operator.id,operator.sourceIp)"),
-    aggregate_by: Optional[str] = Field(default=None, description="Comma-separated fields to aggregate by"),
-    hours_back: int = Field(default=24, description="Number of hours to search back from now (ignored if from_time/to_time provided)"),
-    from_time: Optional[str] = Field(default=None, description="Start time: ISO8601, epoch ms, or relative like '-1h'"),
-    to_time: Optional[str] = Field(default=None, description="End time: ISO8601, epoch ms, or relative like 'now'"),
+    extract_fields: Optional[str] = Field(
+        default=None,
+        description="Comma-separated JSON fields to extract (default: eventName,eventTime,operator.email,operator.id,operator.sourceIp)",
+    ),
+    aggregate_by: Optional[str] = Field(
+        default=None, description="Comma-separated fields to aggregate by"
+    ),
+    hours_back: int = Field(
+        default=24,
+        description="Number of hours to search back from now (ignored if from_time/to_time provided)",
+    ),
+    from_time: Optional[str] = Field(
+        default=None, description="Start time: ISO8601, epoch ms, or relative like '-1h'"
+    ),
+    to_time: Optional[str] = Field(
+        default=None, description="End time: ISO8601, epoch ms, or relative like 'now'"
+    ),
     limit: int = Field(default=100, description="Maximum number of results to return"),
-    instance: str = Field(default='default', description="Sumo Logic instance name")
+    instance: str = Field(default="default", description="Sumo Logic instance name"),
 ) -> str:
     """
     Search the enterprise system events index (_index=sumologic_system_events).
@@ -5273,10 +5453,17 @@ async def search_system_events(
         if use_case:
             use_case_info = get_system_event_use_case(use_case)
             if not use_case_info:
-                return json.dumps({
-                    "error": f"Unknown use case: {use_case}",
-                    "available_use_cases": ["collector_source_health", "monitor_alerts", "monitor_alert_timeline"]
-                }, indent=2)
+                return json.dumps(
+                    {
+                        "error": f"Unknown use case: {use_case}",
+                        "available_use_cases": [
+                            "collector_source_health",
+                            "monitor_alerts",
+                            "monitor_alert_timeline",
+                        ],
+                    },
+                    indent=2,
+                )
 
             # Use the pre-built query
             query = use_case_info["query_pattern"]
@@ -5299,7 +5486,7 @@ async def search_system_events(
                 parse_json=True,
                 extract_fields=extract_list,
                 aggregate_by=agg_list,
-                limit=limit
+                limit=limit,
             )
 
         # Execute search
@@ -5316,13 +5503,7 @@ async def search_system_events(
             from_str = from_time_dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
             to_str = to_time_dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
-        results = await client.search_logs(
-            query,
-            from_str,
-            to_str,
-            "UTC",
-            False
-        )
+        results = await client.search_logs(query, from_str, to_str, "UTC", False)
 
         return json.dumps(results, indent=2)
 
@@ -5334,9 +5515,12 @@ async def search_system_events(
 # UTILITY TOOLS
 # ============================================================================
 
+
 @mcp.tool()
 async def get_skill(
-    skill_name: str = Field(description="Skill filename without .md extension (e.g., 'search-write-queries', 'discovery-logs-without-metadata')")
+    skill_name: str = Field(
+        description="Skill filename without .md extension (e.g., 'search-write-queries', 'discovery-logs-without-metadata')"
+    ),
 ) -> str:
     """
     Get a skill definition from the skills library.
@@ -5390,8 +5574,7 @@ async def get_skill(
             available_skills = []
             if skills_dir.exists():
                 available_skills = [
-                    f.stem for f in skills_dir.glob("*.md")
-                    if f.name != "README.md"
+                    f.stem for f in skills_dir.glob("*.md") if f.name != "README.md"
                 ]
                 available_skills.sort()
 
@@ -5399,12 +5582,12 @@ async def get_skill(
                 "error": f"Skill not found: {skill_name}",
                 "skills_directory": str(skills_dir),
                 "available_skills": available_skills,
-                "hint": "Use skill filename without .md extension (e.g., 'search-write-queries')"
+                "hint": "Use skill filename without .md extension (e.g., 'search-write-queries')",
             }
             return json.dumps(error_response, indent=2)
 
         # Read and return skill content
-        skill_content = skill_file.read_text(encoding='utf-8')
+        skill_content = skill_file.read_text(encoding="utf-8")
 
         return skill_content
 
@@ -5457,7 +5640,7 @@ def main():
         raise
     finally:
         # Clean up
-        if 'loop' in locals():
+        if "loop" in locals():
             loop.run_until_complete(cleanup())
             loop.close()
 

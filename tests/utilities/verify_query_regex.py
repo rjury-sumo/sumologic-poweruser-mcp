@@ -2,12 +2,12 @@
 """Verify that query_regex is properly interpolated."""
 
 import asyncio
+
 from src.sumologic_mcp_server.sumologic_mcp_server import run_search_audit_query
+
 
 async def main():
     # Enable file writing to see the query
-    import logging
-    from src.sumologic_mcp_server import sumologic_mcp_server
 
     # Patch to write query to file
     original_create = None

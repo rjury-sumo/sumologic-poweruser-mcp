@@ -2,6 +2,7 @@
 """Test analyze_search_scan_cost tool."""
 import asyncio
 import json
+
 from sumologic_mcp_server.sumologic_mcp_server import analyze_search_scan_cost
 
 
@@ -27,13 +28,13 @@ async def main():
         )
 
         result_data = json.loads(result)
-        print(f"\nQuery Parameters:")
+        print("\nQuery Parameters:")
         print(json.dumps(result_data["query_parameters"], indent=2))
 
-        print(f"\nSummary:")
+        print("\nSummary:")
         print(json.dumps(result_data["summary"], indent=2))
 
-        print(f"\nTop 5 Users by Scan Cost:")
+        print("\nTop 5 Users by Scan Cost:")
         for i, record in enumerate(result_data["records"][:5], 1):
             print(f"{i}. {record['user_name']}:")
             print(f"   - Queries: {record['queries']}")
@@ -67,10 +68,10 @@ async def main():
         )
 
         result_data = json.loads(result)
-        print(f"\nSummary:")
+        print("\nSummary:")
         print(json.dumps(result_data["summary"], indent=2))
 
-        print(f"\nTop 5 Expensive Queries:")
+        print("\nTop 5 Expensive Queries:")
         for i, record in enumerate(result_data["records"][:5], 1):
             query_preview = record['query'][:80] + "..." if len(record['query']) > 80 else record['query']
             print(f"{i}. User: {record['user_name']}")
@@ -102,10 +103,10 @@ async def main():
         )
 
         result_data = json.loads(result)
-        print(f"\nSummary:")
+        print("\nSummary:")
         print(json.dumps(result_data["summary"], indent=2))
 
-        print(f"\nTop 5 Users by Billable Scan:")
+        print("\nTop 5 Users by Billable Scan:")
         for i, record in enumerate(result_data["records"][:5], 1):
             print(f"{i}. {record['user_name']}:")
             print(f"   - Queries: {record['queries']}")
@@ -114,7 +115,7 @@ async def main():
             print(f"   - Total Scan: {record['total_scan_gb']} GB")
             print(f"   - Credits: {record['scan_credits']}")
             if 'metering_breakdown_gb' in record:
-                print(f"   - Metering Breakdown:")
+                print("   - Metering Breakdown:")
                 for key, val in record['metering_breakdown_gb'].items():
                     if val > 0:
                         print(f"     - {key}: {val} GB")
@@ -144,10 +145,10 @@ async def main():
         )
 
         result_data = json.loads(result)
-        print(f"\nSummary:")
+        print("\nSummary:")
         print(json.dumps(result_data["summary"], indent=2))
 
-        print(f"\nTop 5 Expensive Content Items:")
+        print("\nTop 5 Expensive Content Items:")
         for i, record in enumerate(result_data["records"][:5], 1):
             print(f"{i}. {record['content_name']} ({record['query_type']})")
             print(f"   - Executions: {record['queries']}")

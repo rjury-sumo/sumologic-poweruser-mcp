@@ -8,7 +8,7 @@ filtering by various criteria.
 
 import json
 import logging
-from typing import Any, Dict, List, Optional, Union, Callable
+from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -36,8 +36,18 @@ def find_array_key(response: Dict[str, Any]) -> Optional[str]:
     """
     # Check for common keys first (performance optimization)
     # Order matters - most common first for performance
-    common_keys = ['data', 'dashboards', 'collectors', 'sources', 'users',
-                   'monitors', 'fields', 'rules', 'partitions', 'roles']
+    common_keys = [
+        "data",
+        "dashboards",
+        "collectors",
+        "sources",
+        "users",
+        "monitors",
+        "fields",
+        "rules",
+        "partitions",
+        "roles",
+    ]
 
     for key in common_keys:
         if key in response and isinstance(response[key], list):
@@ -56,7 +66,7 @@ def filter_by_field(
     field: str,
     value: str,
     case_sensitive: bool = False,
-    exact_match: bool = False
+    exact_match: bool = False,
 ) -> List[Dict[str, Any]]:
     """
     Filter array items by a field value.
@@ -95,10 +105,7 @@ def filter_by_field(
 
 
 def filter_by_multiple_fields(
-    items: List[Dict[str, Any]],
-    search_term: str,
-    fields: List[str],
-    case_sensitive: bool = False
+    items: List[Dict[str, Any]], search_term: str, fields: List[str], case_sensitive: bool = False
 ) -> List[Dict[str, Any]]:
     """
     Filter items by searching across multiple fields.
@@ -124,7 +131,7 @@ def filter_by_multiple_fields(
 
     for item in items:
         # Use 'id' field for deduplication if available
-        item_id = item.get('id', id(item))
+        item_id = item.get("id", id(item))
         if item_id in seen_ids:
             continue
 
@@ -145,8 +152,7 @@ def filter_by_multiple_fields(
 
 
 def filter_by_custom(
-    items: List[Dict[str, Any]],
-    filter_fn: Callable[[Dict[str, Any]], bool]
+    items: List[Dict[str, Any]], filter_fn: Callable[[Dict[str, Any]], bool]
 ) -> List[Dict[str, Any]]:
     """
     Filter items using a custom filter function.
@@ -162,9 +168,7 @@ def filter_by_custom(
 
 
 def truncate_response(
-    response: Dict[str, Any],
-    max_items: Optional[int] = None,
-    max_bytes: Optional[int] = None
+    response: Dict[str, Any], max_items: Optional[int] = None, max_bytes: Optional[int] = None
 ) -> tuple[Dict[str, Any], bool]:
     """
     Truncate response to stay within size limits.
@@ -199,17 +203,17 @@ def truncate_response(
     # Apply byte limit if specified
     if max_bytes:
         while len(json.dumps(truncated)) > max_bytes and len(items) > 0:
-            items = items[:len(items) // 2]  # Binary search approach
+            items = items[: len(items) // 2]  # Binary search approach
             truncated[array_key] = items
             was_truncated = True
 
     # Add metadata about truncation
     if was_truncated:
-        truncated['_metadata'] = truncated.get('_metadata', {})
-        truncated['_metadata']['truncated'] = True
-        truncated['_metadata']['original_count'] = original_count
-        truncated['_metadata']['returned_count'] = len(items)
-        truncated['_metadata']['array_key'] = array_key
+        truncated["_metadata"] = truncated.get("_metadata", {})
+        truncated["_metadata"]["truncated"] = True
+        truncated["_metadata"]["original_count"] = original_count
+        truncated["_metadata"]["returned_count"] = len(items)
+        truncated["_metadata"]["array_key"] = array_key
 
     return truncated, was_truncated
 
@@ -224,7 +228,7 @@ def filter_response(
     exact_match: bool = False,
     max_items: Optional[int] = None,
     max_bytes: Optional[int] = None,
-    custom_filter: Optional[Callable[[Dict[str, Any]], bool]] = None
+    custom_filter: Optional[Callable[[Dict[str, Any]], bool]] = None,
 ) -> Dict[str, Any]:
     """
     Comprehensive filtering function for API responses.
@@ -296,27 +300,27 @@ def filter_response(
         was_truncated = False
 
     # Add metadata
-    filtered['_metadata'] = {
-        'array_key': array_key,
-        'original_count': original_count,
-        'filtered_count': filtered_count,
-        'returned_count': final_count,
-        'was_filtered': filtered_count < original_count,
-        'was_truncated': was_truncated
+    filtered["_metadata"] = {
+        "array_key": array_key,
+        "original_count": original_count,
+        "filtered_count": filtered_count,
+        "returned_count": final_count,
+        "was_filtered": filtered_count < original_count,
+        "was_truncated": was_truncated,
     }
 
     if field and value:
-        filtered['_metadata']['filter'] = {
-            'field': field,
-            'value': value,
-            'case_sensitive': case_sensitive,
-            'exact_match': exact_match
+        filtered["_metadata"]["filter"] = {
+            "field": field,
+            "value": value,
+            "case_sensitive": case_sensitive,
+            "exact_match": exact_match,
         }
     elif search_term and search_fields:
-        filtered['_metadata']['filter'] = {
-            'search_term': search_term,
-            'search_fields': search_fields,
-            'case_sensitive': case_sensitive
+        filtered["_metadata"]["filter"] = {
+            "search_term": search_term,
+            "search_fields": search_fields,
+            "case_sensitive": case_sensitive,
         }
 
     logger.info(
@@ -341,16 +345,16 @@ def get_common_search_fields(array_key: str) -> List[str]:
         List of field names to search
     """
     field_map = {
-        'collectors': ['name', 'description', 'hostName'],
-        'sources': ['name', 'description', 'category'],
-        'dashboards': ['name', 'description'],
-        'users': ['firstName', 'lastName', 'email'],
-        'monitors': ['name', 'description'],
-        'fields': ['fieldName'],
-        'rules': ['name', 'scope'],
-        'partitions': ['name'],
-        'roles': ['name', 'description'],
-        'data': ['name', 'title', 'description'],  # Generic fallback
+        "collectors": ["name", "description", "hostName"],
+        "sources": ["name", "description", "category"],
+        "dashboards": ["name", "description"],
+        "users": ["firstName", "lastName", "email"],
+        "monitors": ["name", "description"],
+        "fields": ["fieldName"],
+        "rules": ["name", "scope"],
+        "partitions": ["name"],
+        "roles": ["name", "description"],
+        "data": ["name", "title", "description"],  # Generic fallback
     }
 
-    return field_map.get(array_key, ['name', 'description'])
+    return field_map.get(array_key, ["name", "description"])

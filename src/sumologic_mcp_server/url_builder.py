@@ -9,22 +9,21 @@ Based on:
 """
 
 from typing import Optional
-from urllib.parse import urlencode, quote
-
+from urllib.parse import urlencode
 
 # Mapping of API endpoints to UI endpoints per region
 # Based on https://www.sumologic.com/help/docs/api/about-apis/getting-started/#sumo-logic-endpoints-by-deployment-and-firewall-security
 API_TO_UI_MAPPING = {
-    'https://api.sumologic.com': 'service.sumologic.com',
-    'https://api.au.sumologic.com': 'service.au.sumologic.com',
-    'https://api.ca.sumologic.com': 'service.ca.sumologic.com',
-    'https://api.de.sumologic.com': 'service.de.sumologic.com',
-    'https://api.eu.sumologic.com': 'service.eu.sumologic.com',
-    'https://api.fed.sumologic.com': 'service.fed.sumologic.com',
-    'https://api.in.sumologic.com': 'service.in.sumologic.com',
-    'https://api.jp.sumologic.com': 'service.jp.sumologic.com',
-    'https://api.kr.sumologic.com': 'service.kr.sumologic.com',
-    'https://api.us2.sumologic.com': 'service.us2.sumologic.com',
+    "https://api.sumologic.com": "service.sumologic.com",
+    "https://api.au.sumologic.com": "service.au.sumologic.com",
+    "https://api.ca.sumologic.com": "service.ca.sumologic.com",
+    "https://api.de.sumologic.com": "service.de.sumologic.com",
+    "https://api.eu.sumologic.com": "service.eu.sumologic.com",
+    "https://api.fed.sumologic.com": "service.fed.sumologic.com",
+    "https://api.in.sumologic.com": "service.in.sumologic.com",
+    "https://api.jp.sumologic.com": "service.jp.sumologic.com",
+    "https://api.kr.sumologic.com": "service.kr.sumologic.com",
+    "https://api.us2.sumologic.com": "service.us2.sumologic.com",
 }
 
 
@@ -50,8 +49,8 @@ def get_ui_base_url(api_endpoint: str, subdomain: Optional[str] = None) -> str:
         'https://mycompany.sumologic.com'
     """
     # Remove /api suffix if present
-    clean_endpoint = api_endpoint.rstrip('/')
-    if clean_endpoint.endswith('/api'):
+    clean_endpoint = api_endpoint.rstrip("/")
+    if clean_endpoint.endswith("/api"):
         clean_endpoint = clean_endpoint[:-4]
 
     # Look up the standard UI endpoint
@@ -60,29 +59,31 @@ def get_ui_base_url(api_endpoint: str, subdomain: Optional[str] = None) -> str:
 
         # If subdomain is provided, replace 'service' with the subdomain
         if subdomain:
-            if ui_host.startswith('service.'):
+            if ui_host.startswith("service."):
                 # service.au.sumologic.com -> mycompany.au.sumologic.com
                 ui_host = subdomain + ui_host[7:]
             else:
                 # Shouldn't happen, but handle gracefully
-                ui_host = subdomain + '.' + ui_host
+                ui_host = subdomain + "." + ui_host
 
-        return f'https://{ui_host}'
+        return f"https://{ui_host}"
 
     # Fallback: try to construct from API endpoint
     # https://api.au.sumologic.com -> https://service.au.sumologic.com or https://mycompany.au.sumologic.com
-    if 'api.' in clean_endpoint:
+    if "api." in clean_endpoint:
         if subdomain:
-            ui_url = clean_endpoint.replace('api.', f'{subdomain}.')
+            ui_url = clean_endpoint.replace("api.", f"{subdomain}.")
         else:
-            ui_url = clean_endpoint.replace('api.', 'service.')
+            ui_url = clean_endpoint.replace("api.", "service.")
         return ui_url
 
     # If no 'api.' in endpoint, it might already be a UI URL or custom domain
     return clean_endpoint
 
 
-def build_library_url(api_endpoint: str, decimal_content_id: str, subdomain: Optional[str] = None) -> str:
+def build_library_url(
+    api_endpoint: str, decimal_content_id: str, subdomain: Optional[str] = None
+) -> str:
     """
     Build a web UI URL for a library content item (folder, search, scheduled search, etc.).
 
@@ -95,10 +96,12 @@ def build_library_url(api_endpoint: str, decimal_content_id: str, subdomain: Opt
         Library URL (e.g., 'https://service.au.sumologic.com/library/6181891')
     """
     base_url = get_ui_base_url(api_endpoint, subdomain)
-    return f'{base_url}/library/{decimal_content_id}'
+    return f"{base_url}/library/{decimal_content_id}"
 
 
-def build_dashboard_url(api_endpoint: str, dashboard_id: str, subdomain: Optional[str] = None) -> str:
+def build_dashboard_url(
+    api_endpoint: str, dashboard_id: str, subdomain: Optional[str] = None
+) -> str:
     """
     Build a web UI URL for a dashboard.
 
@@ -113,7 +116,7 @@ def build_dashboard_url(api_endpoint: str, dashboard_id: str, subdomain: Optiona
         Dashboard URL (e.g., 'https://service.au.sumologic.com/dashboard/8q1pWfcVqCuWHLCf4nt1RpmtTr9hWOHraSjlcARiEQCB8uvHJlnzHqT3YeAD')
     """
     base_url = get_ui_base_url(api_endpoint, subdomain)
-    return f'{base_url}/dashboard/{dashboard_id}'
+    return f"{base_url}/dashboard/{dashboard_id}"
 
 
 def build_search_url(
@@ -121,7 +124,7 @@ def build_search_url(
     query: str,
     start_time: Optional[str] = None,
     end_time: Optional[str] = None,
-    subdomain: Optional[str] = None
+    subdomain: Optional[str] = None,
 ) -> str:
     """
     Build a web UI URL to open a log search.
@@ -143,15 +146,11 @@ def build_search_url(
     base_url = get_ui_base_url(api_endpoint, subdomain)
 
     # Default time range if not provided
-    params = {
-        'query': query,
-        'startTime': start_time or '-1h',
-        'endTime': end_time or '-1s'
-    }
+    params = {"query": query, "startTime": start_time or "-1h", "endTime": end_time or "-1s"}
 
     # Build URL with query parameters
     query_string = urlencode(params)
-    return f'{base_url}/log-search/create?{query_string}'
+    return f"{base_url}/log-search/create?{query_string}"
 
 
 def build_metrics_search_url(
@@ -159,7 +158,7 @@ def build_metrics_search_url(
     query: str,
     start_time: Optional[str] = None,
     end_time: Optional[str] = None,
-    subdomain: Optional[str] = None
+    subdomain: Optional[str] = None,
 ) -> str:
     """
     Build a web UI URL to open a metrics search.
@@ -176,11 +175,7 @@ def build_metrics_search_url(
     """
     base_url = get_ui_base_url(api_endpoint, subdomain)
 
-    params = {
-        'query': query,
-        'startTime': start_time or '-1h',
-        'endTime': end_time or '-1s'
-    }
+    params = {"query": query, "startTime": start_time or "-1h", "endTime": end_time or "-1s"}
 
     query_string = urlencode(params)
-    return f'{base_url}/metrics/create?{query_string}'
+    return f"{base_url}/metrics/create?{query_string}"

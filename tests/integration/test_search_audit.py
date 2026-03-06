@@ -2,6 +2,7 @@
 """Test search audit MCP tool."""
 import asyncio
 import json
+
 from sumologic_mcp_server.sumologic_mcp_server import run_search_audit_query
 
 

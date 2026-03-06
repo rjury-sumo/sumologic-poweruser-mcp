@@ -3,10 +3,11 @@
 
 import asyncio
 import json
+
 from src.sumologic_mcp_server.sumologic_mcp_server import (
+    get_field_extraction_rule,
     list_custom_fields,
     list_field_extraction_rules,
-    get_field_extraction_rule
 )
 
 

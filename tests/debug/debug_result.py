@@ -3,7 +3,9 @@
 
 import asyncio
 import json
+
 from src.sumologic_mcp_server.sumologic_mcp_server import run_search_audit_query
+
 
 async def main():
     result = await run_search_audit_query(
