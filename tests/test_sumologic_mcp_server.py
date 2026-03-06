@@ -58,7 +58,6 @@ class TestClientInitialization:
             reset_config()
             clients.clear()
 
-
             with pytest.raises(Exception):  # Will raise either ValueError or InstanceNotFoundError
                 await get_sumo_client("default")
 

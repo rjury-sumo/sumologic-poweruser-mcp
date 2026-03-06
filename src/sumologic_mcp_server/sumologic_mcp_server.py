@@ -2447,8 +2447,8 @@ query={query_filter}"""
         # Delete the job
         try:
             await client.delete_search_job(job_id)
-        except Exception:  # noqa: S110
-            pass  # Best effort cleanup
+        except Exception:  # nosec B110
+            pass  # Best effort cleanup - job deletion failure is acceptable
 
         # Helper to safely convert to int
         def safe_int(value, default=0):
@@ -2783,8 +2783,8 @@ analytics_tier={analytics_tier_filter}
         # Delete the job
         try:
             await client.delete_search_job(job_id)
-        except Exception:  # noqa: S110
-            pass  # Best effort cleanup
+        except Exception:  # nosec B110
+            pass  # Best effort cleanup - job deletion failure is acceptable
 
         # Helper to safely convert values
         def safe_float(value, default=0.0):
@@ -3878,8 +3878,8 @@ async def analyze_log_volume(
         # Delete the job
         try:
             await client.delete_search_job(job_id)
-        except Exception:  # noqa: S110
-            pass  # Best effort cleanup
+        except Exception:  # nosec B110
+            pass  # Best effort cleanup - job deletion failure is acceptable
 
         # Calculate total if percentage requested
         total_bytes = 0
@@ -4064,8 +4064,8 @@ async def profile_log_schema(
         # Delete the job
         try:
             await client.delete_search_job(job_id)
-        except Exception:  # noqa: S110
-            pass  # Best effort cleanup
+        except Exception:  # nosec B110
+            pass  # Best effort cleanup - job deletion failure is acceptable
 
         # Format results based on mode
         result = {
@@ -4669,7 +4669,7 @@ async def query_examples() -> str:
         sample = all_queries[::step][:sample_size]
 
         # Get list of unique apps for reference
-        all_apps = sorted(list(set([q.get("app", "") for q in all_queries if q.get("app")])))
+        all_apps = sorted({q.get("app", "") for q in all_queries if q.get("app")})
 
         return json.dumps(
             {
@@ -4980,7 +4980,7 @@ async def search_query_examples(
             ]
             # Get sample app names
             sample_apps = sorted(
-                list(set([q.get("app", "") for q in all_queries if q.get("app")]))
+                {q.get("app", "") for q in all_queries if q.get("app")}
             )[:20]
             response["available_apps_sample"] = sample_apps
 

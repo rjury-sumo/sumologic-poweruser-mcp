@@ -29,8 +29,9 @@ jobs:
 
     - name: Run Bandit
       run: |
-        uv run bandit -r src/ -f json -o bandit-report.json
+        uv run bandit -r src/ -f json -o bandit-report.json || true
         uv run bandit -r src/ -f screen
+      continue-on-error: false  # Fail if high/medium severity issues found
 
     - name: Run pip-audit
       run: |
