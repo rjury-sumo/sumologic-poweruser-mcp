@@ -144,6 +144,7 @@ For complete tool documentation with parameters, examples, and use cases, see **
 All tools support an `instance` parameter to target specific Sumo Logic deployments.
 
 📖 **[View Complete Tool Documentation →](docs/mcp-tools-reference.md)**
+💡 **[Example Prompts & Use Cases →](docs/example-prompts.md)** - 100+ example prompts showing how to use each tool
 
 ## Setup
 
