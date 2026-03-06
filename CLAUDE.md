@@ -34,21 +34,25 @@ sumologic-python-mcp/
 ## Core Principles
 
 ### 1. Read-Only Operations
+
 - **NEVER** implement write, update, or delete operations
 - All MCP tools must be read-only GET requests
 - Exception: POST only for async job creation (export jobs, etc.)
 
 ### 2. Centralized API Access
+
 - **ALL** Sumo Logic API calls go through `SumoLogicClient` class
 - **NEVER** create direct HTTP calls in tool functions
 - Add new API methods to `SumoLogicClient` before using them in tools
 
 ### 3. Multi-Instance Support
+
 - All tools must accept `instance` parameter (default='default')
 - Use `get_config()` and `get_sumo_client(instance)` pattern
 - Test with multiple instances when possible
 
 ### 4. Security First
+
 - Use validation functions from `validation.py` for all inputs
 - Apply rate limiting with `get_rate_limiter()`
 - Log all operations via audit logger when enabled
@@ -58,6 +62,7 @@ sumologic-python-mcp/
 Before performing common tasks, consult the relevant skill in `skills/`. Skills capture **how to accomplish tasks** using MCP tools and Sumo Logic best practices.
 
 ### Query & Search Tasks
+
 - **Before writing Sumo Logic queries**: Read [skills/search-write-queries.md](skills/search-write-queries.md)
   - 5-phase query construction pattern (Scope → Parse → Filter → Aggregate → Format)
   - Dashboard panel patterns and complete examples
@@ -72,6 +77,7 @@ Before performing common tasks, consult the relevant skill in `skills/`. Skills 
   - Iterative workflow patterns
 
 ### Discovery Tasks
+
 - **Before helping users find logs**: Read [skills/discovery-logs-without-metadata.md](skills/discovery-logs-without-metadata.md)
   - Multi-phase discovery when metadata is unknown
   - Collector/partition/schema exploration
@@ -80,21 +86,25 @@ Before performing common tasks, consult the relevant skill in `skills/`. Skills 
   - Query patterns for versioned views
 
 ### Cost Analysis Tasks
+
 - **Before analyzing search costs**: Read [skills/cost-analyze-search-costs.md](skills/cost-analyze-search-costs.md)
   - Flex/Infrequent tier scan cost breakdown
   - User/query cost ranking
 
 ### Audit & Compliance Tasks
+
 - **Before searching audit indexes**: Read [skills/audit-user-activity.md](skills/audit-user-activity.md) or [skills/audit-system-health.md](skills/audit-system-health.md)
   - Audit events vs system events vs search audit
   - Pre-built use cases and query patterns
 
 ### Content Management Tasks
+
 - **Before navigating content library**: Read [skills/content-library-navigation.md](skills/content-library-navigation.md)
   - Export dashboards, searches, folders
   - Path resolution and URL generation
 
 ### Development Tasks
+
 - **Before adding new MCP tools**: Review patterns in existing skills to understand tool usage
 - **After adding tools**: Update related skills per "Skills Library Maintenance" section below
 - **For skill overview**: See [skills/README.md](skills/README.md) index
@@ -108,12 +118,14 @@ Before performing common tasks, consult the relevant skill in `skills/`. Skills 
 Follow this **EXACT SEQUENCE** for every new tool:
 
 #### 1. Plan the Tool
+
 - [ ] Review Sumo Logic API documentation
 - [ ] Check if similar functionality exists in existing tools
 - [ ] Determine if new helper modules are needed
 - [ ] Document expected inputs/outputs
 
 #### 2. Add API Method to SumoLogicClient
+
 ```python
 # In src/sumologic_mcp_server/sumologic_mcp_server.py
 # Add to SumoLogicClient class (~line 80-500)
@@ -134,6 +146,7 @@ async def get_new_resource(self, param1: str, param2: int = 100) -> Dict[str, An
 ```
 
 #### 3. Implement the MCP Tool
+
 ```python
 # In src/sumologic_mcp_server/sumologic_mcp_server.py
 # Add after existing tools in appropriate category section
@@ -204,12 +217,14 @@ Brief description.
 ```
 
 **After adding the tool:**
+
 1. Update the tool count in the header (line 4)
 2. Update the category count if adding to existing category
 3. Renumber all subsequent tools if needed
 4. Update README.md tool count if it changed significantly
 
 #### 5. Write Tests
+
 ```python
 # In tests/test_new_module.py or tests/integration/test_integration.py
 
@@ -228,6 +243,7 @@ def test_new_tool_error_handling():
 ```
 
 #### 6. Run Tests and Validation
+
 ```bash
 # Run specific test
 uv run pytest tests/test_new_module.py -v
@@ -240,6 +256,7 @@ uv run mypy src/sumologic_mcp_server/
 ```
 
 #### 7. Update Supporting Documentation
+
 - [ ] Update README.md if tool is significant/featured
 - [ ] Add to CHANGELOG.md under "Unreleased" section
 - [ ] Create `docs/development/FEATURE_NAME.md` if complex feature
@@ -259,6 +276,7 @@ When updating an existing tool:
 ### Tool Documentation Requirements
 
 Every tool in `docs/mcp-tools-reference.md` MUST have:
+
 - Tool number and name
 - Brief description (1-2 sentences)
 - **Parameters** section with types and descriptions
@@ -270,12 +288,14 @@ Every tool in `docs/mcp-tools-reference.md` MUST have:
 ### Development Documentation
 
 Create `docs/development/FEATURE_NAME.md` when:
+
 - Adding complex feature requiring multiple tools
 - Significant refactoring or architecture changes
 - Implementation requires explanation for future developers
 - Feature has multiple phases or components
 
 **Template:**
+
 ```markdown
 # Feature Name
 
@@ -329,6 +349,7 @@ uv run bandit -r src/
 Project uses Ruff for linting with these important rules:
 
 **Enabled checks:**
+
 - `E/W` - pycodestyle (PEP 8 compliance)
 - `F` - pyflakes (unused imports, undefined names)
 - `I` - isort (import sorting)
@@ -337,18 +358,21 @@ Project uses Ruff for linting with these important rules:
 - `UP` - pyupgrade (Python version upgrades)
 
 **Intentionally ignored:**
+
 - `E501` - Line too long (handled by Black)
 - `B008` - Function calls in argument defaults (required for FastMCP Field())
 - `B007` - Loop control variable not used (common in polling loops)
 - `B904` - Exception chaining with `from` (intentionally omitted for API errors)
 
 **Test-specific allowances:**
+
 - `B017` - Allow `pytest.raises(Exception)` in tests
 - `C416` - Allow list comprehensions in tests
 
 ### Exception Handling Best Practices
 
 **DO:** Use specific exception types
+
 ```python
 try:
     await client.delete_search_job(job_id)
@@ -357,6 +381,7 @@ except Exception:  # noqa: S110
 ```
 
 **DON'T:** Use bare except clauses
+
 ```python
 # WRONG - Bandit security warning B110, Ruff E722
 try:
@@ -366,6 +391,7 @@ except:  # ❌ Catches SystemExit, KeyboardInterrupt, etc.
 ```
 
 **DO:** Use exception chaining when re-raising
+
 ```python
 try:
     result = parse_config(data)
@@ -379,6 +405,7 @@ When catching and re-raising API errors, we intentionally don't chain exceptions
 ### Loop Variables Best Practices
 
 **DO:** Use `_` for unused loop variables when appropriate
+
 ```python
 # If attempt number doesn't matter
 for _ in range(max_attempts):
@@ -388,6 +415,7 @@ for _ in range(max_attempts):
 ```
 
 **ACCEPTABLE:** Don't use loop variable in polling loops (B007)
+
 ```python
 # Polling loop where we just need N attempts
 for attempt in range(max_attempts):  # noqa: B007
@@ -404,6 +432,7 @@ The project globally ignores B007 because polling loops are common in async API 
 Bandit scans for security issues. Address these common warnings:
 
 **B110: Try/Except/Pass**
+
 ```python
 # BAD - Silent failures hide problems
 try:
@@ -419,9 +448,11 @@ except Exception:  # noqa: S110
 ```
 
 **B608: SQL Injection**
+
 - Not applicable - this project uses REST APIs, not SQL
 
 **General security rules:**
+
 - Never hardcode credentials
 - Always validate user input
 - Use rate limiting
@@ -480,6 +511,7 @@ except Exception:  # noqa: S110
 ### Module Responsibilities
 
 **sumologic_mcp_server.py**
+
 - MCP server initialization
 - `SumoLogicClient` class with all API methods
 - All `@mcp.tool()` definitions
@@ -487,37 +519,44 @@ except Exception:  # noqa: S110
 - Error handling with `handle_tool_error()`
 
 **config.py**
+
 - Environment variable loading
 - Multi-instance configuration
 - Validation of configuration values
 - Centralized configuration access
 
 **validation.py**
+
 - Input validation functions
 - Pydantic models for complex validation
 - Validation error messages
 
 **url_builder.py**
+
 - API endpoint to UI URL conversion
 - URL generation for web UI (library, dashboard, search)
 - Region/subdomain handling
 
 **content_id_utils.py**
+
 - Hex ↔ Decimal content ID conversion
 - Content ID validation
 - ID format normalization
 
 **search_helpers.py**
+
 - Search-specific helper functions
 - Query parsing and manipulation
 - Search result formatting
 
 **query_patterns.py**
+
 - Query pattern definitions
 - Example query database
 - Pattern matching logic
 
 **async_export_helper.py**
+
 - Async job polling
 - Export job status checking
 - Result retrieval with retry logic
@@ -525,6 +564,7 @@ except Exception:  # noqa: S110
 ## Testing Standards
 
 ### Test Structure
+
 ```python
 """Tests for module_name functionality."""
 
@@ -551,6 +591,7 @@ class TestFunctionName:
 ```
 
 ### Test Requirements
+
 - Unit tests for all utility functions
 - Integration tests for critical tools (when possible)
 - Test error handling and edge cases
@@ -560,6 +601,7 @@ class TestFunctionName:
 ## Git Commit Guidelines
 
 ### Commit Message Format
+
 ```
 <type>: <short description>
 
@@ -568,6 +610,7 @@ class TestFunctionName:
 ```
 
 ### Types
+
 - `feat`: New feature or tool
 - `fix`: Bug fix
 - `docs`: Documentation updates
@@ -576,6 +619,7 @@ class TestFunctionName:
 - `chore`: Maintenance tasks
 
 ### Examples
+
 ```bash
 feat: add search_query_examples tool for pattern discovery
 
@@ -602,6 +646,7 @@ docs: update mcp-tools-reference.md for new URL tools
 Before committing any code:
 
 **Code Quality:**
+
 - [ ] Code formatted with `uv run black src/ tests/`
 - [ ] Linting passes with `uv run ruff check src/ tests/`
 - [ ] No bare `except:` clauses (use `except Exception:` with `# noqa: S110`)
@@ -609,6 +654,7 @@ Before committing any code:
 - [ ] All tests pass with `uv run pytest`
 
 **Security:**
+
 - [ ] All inputs are validated using `validation.py`
 - [ ] No hardcoded credentials or tokens
 - [ ] Rate limiting applied with `get_rate_limiter()`
@@ -620,6 +666,7 @@ Before committing any code:
 ## Common Patterns
 
 ### Pattern 1: Simple API Tool
+
 ```python
 @mcp.tool()
 async def get_simple_resource(
@@ -642,6 +689,7 @@ async def get_simple_resource(
 ```
 
 ### Pattern 2: Complex Query Tool with Time Range
+
 ```python
 @mcp.tool()
 async def query_with_time_range(
@@ -677,6 +725,7 @@ async def query_with_time_range(
 ```
 
 ### Pattern 3: Async Job with Polling
+
 ```python
 @mcp.tool()
 async def export_async_resource(
@@ -715,12 +764,14 @@ The `skills/` directory contains portable skill definitions for use with Claude 
 ### When to Update Skills
 
 **Update existing skills when:**
+
 - Adding new MCP tools that enhance existing capabilities
 - Discovering optimization patterns or best practices
 - Finding common pitfalls users encounter
 - Tools change parameters or behavior
 
 **Create new skills when:**
+
 - Adding entirely new capability areas (e.g., new audit index)
 - Implementing complex multi-step workflows
 - Discovering reusable patterns not covered by existing skills
@@ -754,6 +805,7 @@ When adding or modifying tools:
 ### Skills Organization
 
 Skills are domain-organized:
+
 - `discovery-*.md` - Finding logs and understanding structure
 - `cost-*.md` - Cost analysis and optimization
 - `search-*.md` - Query building and optimization
@@ -803,6 +855,7 @@ Links to official docs
 When adding `new_search_tool` that helps with query optimization:
 
 1. Update `skills/search-optimize-queries.md`:
+
    ```markdown
    ### New Optimization Pattern
 
@@ -814,9 +867,11 @@ When adding `new_search_tool` that helps with query optimization:
    ```
 
    **Use Case:** When you need to...
+
    ```
 
 2. Add to "MCP Tools Used" section:
+
    ```markdown
    - `new_search_tool` - Brief description of what it does
    ```
@@ -849,12 +904,14 @@ At the end of each Claude session:
 ## Getting Help
 
 ### Sumo Logic API References
-- Main API Docs: https://api.sumologic.com/docs/
-- API Getting Started: https://help.sumologic.com/docs/api/
-- Search Job API: https://api.sumologic.com/docs/#tag/searchJobManagement
-- Content API: https://api.sumologic.com/docs/#tag/contentManagement
+
+- Main API Docs: <https://api.sumologic.com/docs/>
+- API Getting Started: <https://help.sumologic.com/docs/api/>
+- Search Job API: <https://api.sumologic.com/docs/#tag/searchJobManagement>
+- Content API: <https://api.sumologic.com/docs/#tag/contentManagement>
 
 ### Project Resources
+
 - Main documentation: `docs/mcp-tools-reference.md`
 - Architecture patterns: `.PATTERNS.md`
 - Development notes: `docs/development/`
@@ -863,6 +920,7 @@ At the end of each Claude session:
 ## Version Control
 
 ### What to Commit
+
 - Source code changes
 - Test files
 - Documentation updates
@@ -870,6 +928,7 @@ At the end of each Claude session:
 - CHANGELOG.md updates
 
 ### What NOT to Commit
+
 - `.env` file (contains secrets)
 - `__pycache__/` directories
 - `.pytest_cache/` directories

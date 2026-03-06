@@ -5,6 +5,7 @@ The Sumo Logic MCP Server now uses **uv exclusively** for package management. Th
 ## What Changed
 
 ### Before (pip/venv)
+
 ```bash
 python -m venv venv
 source venv/bin/activate
@@ -13,6 +14,7 @@ python -m sumologic_mcp_server.sumologic_mcp_server
 ```
 
 ### After (uv)
+
 ```bash
 uv sync --all-extras
 uv run sumologic-mcp-server
@@ -28,16 +30,19 @@ uv run sumologic-mcp-server
 ## Updated Files
 
 ### pyproject.toml
+
 - Changed build backend from setuptools to hatchling
 - Moved dev dependencies to `[tool.uv]` section
 - Updated entry points for proper package resolution
 
 ### GitHub Actions
+
 - All workflows now use `uv sync` instead of `pip install`
 - Commands run with `uv run` prefix
 - Tools installed with `uv tool install`
 
 ### Documentation
+
 - README.md now emphasizes uv as the primary method
 - Added QUICKSTART.md with uv-focused setup
 - All examples use `uv run` commands
@@ -80,6 +85,7 @@ uv sync --all-extras
 ### 4. Update Claude Desktop Config
 
 Change from:
+
 ```json
 {
   "command": "python",
@@ -88,6 +94,7 @@ Change from:
 ```
 
 To:
+
 ```json
 {
   "command": "uv",
@@ -162,6 +169,7 @@ uv tool install black
 ### "uv: command not found"
 
 Add uv to your PATH:
+
 ```bash
 export PATH="$HOME/.cargo/bin:$PATH"
 ```
@@ -171,6 +179,7 @@ Add this to your shell rc file (~/.bashrc, ~/.zshrc, etc.)
 ### Import errors
 
 Make sure you ran `uv sync`:
+
 ```bash
 uv sync --all-extras
 ```
@@ -178,6 +187,7 @@ uv sync --all-extras
 ### Virtual environment conflicts
 
 uv manages its own virtualenvs. If you have issues:
+
 ```bash
 # Remove uv cache
 rm -rf .venv/
@@ -195,6 +205,7 @@ uv creates it in `.venv/` in your project directory. You don't need to activate 
 ### Can I still use pip?
 
 While uv is recommended, you can still use pip if needed:
+
 ```bash
 uv pip install <package>
 ```

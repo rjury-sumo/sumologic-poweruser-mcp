@@ -3,6 +3,7 @@
 ## Executive Summary
 
 Based on the Hajime VSCode extension implementation, this document proposes MCP tools for the Sumo Logic Content Library APIs, addressing the complex folder/content API paradigms including:
+
 - Personal folders (fast folder API)
 - Global folders (export API with `data` array)
 - Admin Recommended folders (export API with `children` array)
@@ -52,24 +53,29 @@ Based on the Hajime VSCode extension implementation, this document proposes MCP 
 ### Core Content Library Tools
 
 #### 1. `get_personal_folder`
+
 Get user's personal folder with optional children.
 
 **Parameters:**
+
 - `include_children` (bool, default=True): Include child items
 - `instance` (str, default='default'): Instance name
 
 **Returns:** Folder with children array
 
 **Use Cases:**
+
 - Get user's personal library root
 - List personal content quickly
 
 ---
 
 #### 2. `get_folder_by_id`
+
 Get a specific folder by ID with optional children.
 
 **Parameters:**
+
 - `folder_id` (str): Hex folder ID
 - `include_children` (bool, default=True): Include child items
 - `instance` (str, default='default'): Instance name
@@ -77,45 +83,54 @@ Get a specific folder by ID with optional children.
 **Returns:** Folder with children array
 
 **Use Cases:**
+
 - Navigate folder hierarchy
 - Get specific folder contents
 
 ---
 
 #### 3. `get_content_by_path`
+
 Get content item by its library path.
 
 **Parameters:**
+
 - `content_path` (str): Full path (e.g., "/Library/Users/user@email.com/MyFolder")
 - `instance` (str, default='default'): Instance name
 
 **Returns:** Content item metadata
 
 **Use Cases:**
+
 - Access content by known path
 - Validate path exists
 
 ---
 
 #### 4. `get_content_path_by_id`
+
 Get the full library path for a content ID.
 
 **Parameters:**
+
 - `content_id` (str): Hex content ID
 - `instance` (str, default='default'): Instance name
 
 **Returns:** `{"path": "/Library/Users/..."}`
 
 **Use Cases:**
+
 - Display content location
 - Build breadcrumb navigation
 
 ---
 
 #### 5. `export_content`
+
 Export full content structure (dashboards, searches, etc.) with async job handling.
 
 **Parameters:**
+
 - `content_id` (str): Hex content ID
 - `is_admin_mode` (bool, default=False): Use admin mode
 - `max_wait_seconds` (int, default=300): Max polling time
@@ -124,6 +139,7 @@ Export full content structure (dashboards, searches, etc.) with async job handli
 **Returns:** Full content export including children, search queries, dashboard panels, etc.
 
 **Use Cases:**
+
 - Get complete dashboard/search definition
 - Export content for backup
 - Deep inspection of content structure
@@ -131,9 +147,11 @@ Export full content structure (dashboards, searches, etc.) with async job handli
 ---
 
 #### 6. `export_global_folder`
+
 Export Global folder contents (async).
 
 **Parameters:**
+
 - `is_admin_mode` (bool, default=False): Use admin mode
 - `max_wait_seconds` (int, default=300): Max polling time
 - `instance` (str, default='default'): Instance name
@@ -141,15 +159,18 @@ Export Global folder contents (async).
 **Returns:** Global folder with `data` array containing children
 
 **Use Cases:**
+
 - List global/shared content
 - Discover organization-wide content
 
 ---
 
 #### 7. `export_admin_recommended_folder`
+
 Export Admin Recommended folder (async).
 
 **Parameters:**
+
 - `is_admin_mode` (bool, default=False): Use admin mode
 - `max_wait_seconds` (int, default=300): Max polling time
 - `instance` (str, default='default'): Instance name
@@ -157,6 +178,7 @@ Export Admin Recommended folder (async).
 **Returns:** Admin Recommended folder with `children` array
 
 **Use Cases:**
+
 - Access admin-curated content
 - Discover best practices content
 
@@ -165,43 +187,52 @@ Export Admin Recommended folder (async).
 ### Content ID Utility Tools
 
 #### 8. `convert_content_id_hex_to_decimal`
+
 Convert hex content ID to decimal format (for web UI URLs).
 
 **Parameters:**
+
 - `hex_id` (str): Hex ID (e.g., "00000000005E5403")
 
 **Returns:** `{"decimal_id": "6181891", "hex_id": "00000000005E5403"}`
 
 **Use Cases:**
+
 - Generate web UI URLs
 - Display user-friendly IDs
 
 ---
 
 #### 9. `convert_content_id_decimal_to_hex`
+
 Convert decimal content ID to hex format (for API calls).
 
 **Parameters:**
+
 - `decimal_id` (str): Decimal ID (e.g., "6181891")
 
 **Returns:** `{"hex_id": "00000000005E5403", "decimal_id": "6181891"}`
 
 **Use Cases:**
+
 - Convert web UI IDs to API format
 - Normalize ID input
 
 ---
 
 #### 10. `get_content_web_url`
+
 Generate web UI URL for content item.
 
 **Parameters:**
+
 - `content_id` (str): Hex or decimal content ID
 - `instance` (str, default='default'): Instance name
 
 **Returns:** `{"url": "https://instance.sumologic.com/library/6181891"}`
 
 **Use Cases:**
+
 - Share content links
 - Open content in browser
 
@@ -210,9 +241,11 @@ Generate web UI URL for content item.
 ### Advanced Navigation Tools
 
 #### 11. `search_content_by_name`
+
 Search for content items by name pattern.
 
 **Parameters:**
+
 - `name_pattern` (str): Name search pattern (supports wildcards)
 - `content_types` (list[str], optional): Filter by types (Dashboard, Search, Folder, etc.)
 - `scope` (str, default='all'): Search scope (personal, global, adminRecommended, all)
@@ -222,15 +255,18 @@ Search for content items by name pattern.
 **Returns:** Array of matching content items
 
 **Use Cases:**
+
 - Find content by name
 - Discover similar content
 
 ---
 
 #### 12. `list_content_tree`
+
 Get hierarchical tree structure from a folder root.
 
 **Parameters:**
+
 - `root_folder_id` (str, optional): Root folder hex ID (defaults to personal)
 - `max_depth` (int, default=3): Maximum depth to traverse
 - `include_content` (bool, default=True): Include non-folder items
@@ -239,6 +275,7 @@ Get hierarchical tree structure from a folder root.
 **Returns:** Hierarchical tree structure with nested children
 
 **Use Cases:**
+
 - Visualize folder structure
 - Export folder hierarchy
 - Build navigation trees
@@ -250,6 +287,7 @@ Get hierarchical tree structure from a folder root.
 ### Phase 1: Core Infrastructure (Week 1)
 
 **Deliverables:**
+
 1. Content ID conversion utilities module (`content_id_utils.py`)
    - hex_to_decimal()
    - decimal_to_hex()
@@ -278,12 +316,14 @@ Get hierarchical tree structure from a folder root.
 ### Phase 2: Basic Content Tools (Week 2)
 
 **Deliverables:**
+
 1. Implement MCP tools 1-4 (synchronous folder/content operations)
 2. Add proper error handling for 403, 404, 429 responses
 3. Add rate limiting (max 4 req/sec)
 4. Unit tests for each tool
 
 **Tests:**
+
 - Test personal folder retrieval
 - Test folder navigation
 - Test path-based content lookup
@@ -294,6 +334,7 @@ Get hierarchical tree structure from a folder root.
 ### Phase 3: Export & Async Tools (Week 3)
 
 **Deliverables:**
+
 1. Implement MCP tools 5-7 (async export operations)
 2. Implement polling logic with timeout
 3. Handle Global folder `data` array vs `children` array
@@ -301,6 +342,7 @@ Get hierarchical tree structure from a folder root.
 5. Integration tests with real API
 
 **Tests:**
+
 - Test export job lifecycle
 - Test Global folder special handling
 - Test Admin Recommended folder
@@ -311,6 +353,7 @@ Get hierarchical tree structure from a folder root.
 ### Phase 4: Utility & Navigation Tools (Week 4)
 
 **Deliverables:**
+
 1. Implement MCP tools 8-12 (ID conversion, search, tree)
 2. Add web URL generation
 3. Implement content search
@@ -318,6 +361,7 @@ Get hierarchical tree structure from a folder root.
 5. Documentation and examples
 
 **Tests:**
+
 - Test ID conversions
 - Test URL generation
 - Test search functionality
@@ -558,12 +602,14 @@ async def convert_content_id_hex_to_decimal(
 ## Testing Strategy
 
 ### Unit Tests
+
 - Content ID conversions (hex ↔ decimal)
 - Export polling logic
 - Error handling (403, 404, 429)
 - Rate limiting
 
 ### Integration Tests
+
 - Personal folder retrieval
 - Folder navigation
 - Content export end-to-end
@@ -573,6 +619,7 @@ async def convert_content_id_hex_to_decimal(
 - Tree traversal
 
 ### Manual Testing Checklist
+
 - [ ] Get personal folder with/without children
 - [ ] Navigate multi-level folder hierarchy
 - [ ] Export dashboard content
@@ -614,7 +661,7 @@ library_config = {
 - Implementation Plan: `docs/library-explorer-implementation-plan.md`
 - Content API Client: `src/api/content.ts`
 - Content ID Utils: `src/utils/contentId.ts`
-- Sumo Logic Content API Docs: https://api.sumologic.com/docs/#tag/contentManagement
+- Sumo Logic Content API Docs: <https://api.sumologic.com/docs/#tag/contentManagement>
 
 ---
 

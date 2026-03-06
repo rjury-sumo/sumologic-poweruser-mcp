@@ -76,7 +76,7 @@ This document provides example prompts for using the Sumo Logic MCP tools effect
 
 ### User Activity Tracking
 
-**Prompt:** "Show me all login attempts by john@example.com in the last 7 days"
+**Prompt:** "Show me all login attempts by <john@example.com> in the last 7 days"
 
 **What it does:** Uses `search_audit_events` filtering by `operator_email` and `event_name='UserLogin*'`.
 
@@ -361,6 +361,7 @@ This document provides example prompts for using the Sumo Logic MCP tools effect
 **Prompt:** "I'm seeing errors for a service called 'payment-api' but don't know where the logs are or how to query them. Help me find and analyze these logs."
 
 **What it does:**
+
 1. Uses `explore_log_metadata` to find partitions/source categories
 2. Uses `search_sumo_logs` to sample logs
 3. Uses `profile_log_schema` to discover fields
@@ -374,6 +375,7 @@ This document provides example prompts for using the Sumo Logic MCP tools effect
 **Prompt:** "I need to reduce my Flex tier search costs. Show me which users and queries are most expensive, and recommend optimizations."
 
 **What it does:**
+
 1. Uses `analyze_search_scan_cost` with `breakdown_type='metering'` and `group_by='user_query'`
 2. Uses `get_estimated_log_search_usage` to test query optimizations
 3. Uses `list_scheduled_views` to find pre-aggregated alternatives
@@ -386,6 +388,7 @@ This document provides example prompts for using the Sumo Logic MCP tools effect
 **Prompt:** "Analyze my data ingestion trends over the last 30 days and predict future capacity needs"
 
 **What it does:**
+
 1. Uses `analyze_data_volume` with `include_timeshift=True` to show trends
 2. Uses `get_usage_forecast` to project future usage
 3. Uses `analyze_data_volume_grouped` to identify top growth drivers
@@ -398,6 +401,7 @@ This document provides example prompts for using the Sumo Logic MCP tools effect
 **Prompt:** "Generate a security audit report showing all failed login attempts, content changes by admins, and monitor status changes in the last 7 days"
 
 **What it does:**
+
 1. Uses `search_audit_events` for failed logins
 2. Uses `search_audit_events` for content changes by specific admin users
 3. Uses `search_system_events` for monitor alerts
@@ -410,6 +414,7 @@ This document provides example prompts for using the Sumo Logic MCP tools effect
 **Prompt:** "My dashboard is loading slowly. Analyze the queries it's using and find ways to speed them up."
 
 **What it does:**
+
 1. Uses `export_content` to get dashboard definition and extract queries
 2. Uses `run_search_audit_query` to analyze query performance history
 3. Uses `get_estimated_log_search_usage` to check scan volumes
@@ -423,6 +428,7 @@ This document provides example prompts for using the Sumo Logic MCP tools effect
 **Prompt:** "I just started collecting Kubernetes logs. What pre-built apps are available, and what dashboards do they have?"
 
 **What it does:**
+
 1. Uses `list_installed_apps` with `filter_name='Kubernetes'` to check installation
 2. Uses `export_installed_apps` to explore app structure
 3. Uses `export_content` to preview dashboard definitions
@@ -459,25 +465,30 @@ This document provides example prompts for using the Sumo Logic MCP tools effect
 ## Tips for Effective Prompts
 
 ### Be Specific About Time Ranges
+
 - ✅ "Show me errors in the last 2 hours"
 - ✅ "Analyze data volume from January 1-7, 2024"
 - ❌ "Show me recent errors"
 
 ### Include Relevant Filters
-- ✅ "Find failed logins for user john@example.com"
+
+- ✅ "Find failed logins for user <john@example.com>"
 - ✅ "List collectors with 'prod' in the name that are active"
 - ❌ "Show me collectors"
 
 ### Specify What You Want to See
+
 - ✅ "Show me the top 10 source categories by GB ingested"
 - ✅ "Export the dashboard and show me the query definitions"
 - ❌ "Get some dashboard info"
 
 ### Combine Goals Clearly
+
 - ✅ "Find CloudTrail logs, show me the fields available, and give me example queries for security use cases"
 - ❌ "Help with CloudTrail"
 
 ### Use Natural Language
+
 - ✅ "Which queries scanned the most data yesterday?"
 - ✅ "Are there any collectors that stopped working?"
 - You don't need to memorize tool names or parameters
@@ -487,29 +498,34 @@ This document provides example prompts for using the Sumo Logic MCP tools effect
 ## Common Use Case Scenarios
 
 ### "I'm New to Sumo Logic"
+
 1. "What instances are configured?" → `list_sumo_instances`
 2. "Show me my personal folder" → `get_personal_folder`
 3. "What apps are installed?" → `list_installed_apps`
 4. "Find example queries for [my technology]" → `search_query_examples`
 
 ### "I Need to Find Logs"
+
 1. "I'm looking for logs from [service/app]" → Multi-step discovery workflow
 2. "What partitions exist?" → `get_sumo_partitions`
 3. "What source categories are available?" → `explore_log_metadata`
 
 ### "I Need to Reduce Costs"
+
 1. "Show me expensive searches" → `analyze_search_scan_cost`
 2. "What scheduled views are available?" → `list_scheduled_views`
 3. "Estimate query cost before running" → `get_estimated_log_search_usage`
 4. "What's driving my ingestion costs?" → `analyze_data_volume_grouped`
 
 ### "I Need to Troubleshoot"
+
 1. "Why is my dashboard slow?" → Export dashboard, analyze queries
 2. "Are my collectors healthy?" → `search_system_events` with health use case
 3. "Which monitors are noisy?" → `search_system_events` with monitor use case
 4. "Who changed this content?" → `search_audit_events`
 
 ### "I Need to Build Queries"
+
 1. "Show me best practices" → `get_skill` for search-write-queries
 2. "Find similar queries" → `search_query_examples`
 3. "What fields are available?" → `profile_log_schema`

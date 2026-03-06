@@ -29,6 +29,7 @@ This MCP server is **intentionally read-only** to minimize risk and showcase saf
 - 🛡️ **Risk mitigation** - Read-only access prevents accidental modifications
 
 **Why read-only?** Adding write capabilities (create/modify/delete) would:
+
 - Introduce significant operational risk to production environments
 - Require extensive permission management and validation
 - Dramatically increase code complexity and attack surface
@@ -39,30 +40,35 @@ This MCP server is **intentionally read-only** to minimize risk and showcase saf
 This MCP server enables **AI-assisted Sumo Logic workflows** for power users and administrators, replacing traditional UI interactions with natural language queries:
 
 **1. Search & Query Assistance**
-   - Natural language to Sumo Logic query translation
-   - Query optimization and troubleshooting
-   - Access to 11,000+ real query examples from published apps
+
+- Natural language to Sumo Logic query translation
+- Query optimization and troubleshooting
+- Access to 11,000+ real query examples from published apps
 
 **2. Environment Discovery**
-   - Discover available log sources, partitions, and metadata
-   - Identify installed apps and available dashboards
-   - Profile log schemas and field structures
+
+- Discover available log sources, partitions, and metadata
+- Identify installed apps and available dashboards
+- Profile log schemas and field structures
 
 **3. Advanced Analytics for Administrators**
-   - **Log Volume Analysis**: Track ingested data volumes and trends over time
-   - **Cost Optimization**: Analyze search scan costs for Flex/Infrequent tier optimization
-   - **Search Audit Analysis**: Identify high-scan queries and poorly performing searches
-   - **Partition Design**: Analyze data distribution to optimize data tiering strategies
-   - **User Behavior**: Track search patterns and query performance by user
-   - **Capacity Planning**: Forecast usage and credit consumption
+
+- **Log Volume Analysis**: Track ingested data volumes and trends over time
+- **Cost Optimization**: Analyze search scan costs for Flex/Infrequent tier optimization
+- **Search Audit Analysis**: Identify high-scan queries and poorly performing searches
+- **Partition Design**: Analyze data distribution to optimize data tiering strategies
+- **User Behavior**: Track search patterns and query performance by user
+- **Capacity Planning**: Forecast usage and credit consumption
 
 **4. Data Tier Optimization (Infrequent / Flex Customers)**
-   - Analyze which data should move to Infrequent tier
-   - Calculate potential cost savings from data tiering
-   - Design partition strategies based on actual query patterns
-   - Monitor search scan costs to validate tier decisions
+
+- Analyze which data should move to Infrequent tier
+- Calculate potential cost savings from data tiering
+- Design partition strategies based on actual query patterns
+- Monitor search scan costs to validate tier decisions
 
 These capabilities are particularly valuable for:
+
 - **Administrators** managing large Sumo Logic deployments
 - **Power users** building complex queries and dashboards
 - **Cost managers** optimizing data tier allocation
@@ -103,22 +109,26 @@ For complete tool documentation with parameters, examples, and use cases, see **
 ### Featured Tools
 
 **Log Search & Analysis:**
+
 - `search_sumo_logs` - Intelligent search with auto query-type detection
 - `explore_log_metadata` - Discover partitions, source categories, and metadata mappings
 - `run_search_audit_query` - Analyze search usage patterns
 - `analyze_search_scan_cost` - Analyze pay-per-search costs for Infrequent/Flex tiers with billable breakdown
 
 **Data Volume & Cost Analysis:**
+
 - `analyze_data_volume` - Standard volume analysis with timeshift comparison
 - `analyze_data_volume_grouped` - Advanced analysis with cardinality reduction for large environments (5000+ sources)
 - `get_estimated_log_search_usage` - Estimate scan costs before running queries
 
 **Account Management:**
+
 - `get_account_status` - Account and subscription information
 - `get_usage_forecast` - Predict future usage and credits
 - `export_usage_report` - Detailed usage reports with CSV export
 
 **Content Library:**
+
 - `get_personal_folder` - Fast access to user's content library
 - `export_content` - Full content export with async job polling
 - `export_installed_apps` - Discover pre-built apps (AWS, Kubernetes, Apache, etc.) already installed
@@ -126,19 +136,23 @@ For complete tool documentation with parameters, examples, and use cases, see **
 - `get_content_web_url` - Generate shareable content links
 
 **Field Management:**
+
 - `list_custom_fields` - List all custom fields defined in the organization
 - `list_field_extraction_rules` - List field extraction rules (FERs) for pre-parsing
 - `get_field_extraction_rule` - Get detailed information about a specific FER
 
 **Log Volume Analysis:**
+
 - `analyze_log_volume` - Analyze raw log volume using _size field to optimize Infrequent tier usage
 - `profile_log_schema` - Discover available fields and suggest good dimensions for volume analysis using facets operator
 
 **Query Examples:**
+
 - `search_query_examples` - Search through 11,000+ real Sumo Logic queries from 280+ published apps by app name, use case, or keywords
 - Resource: `sumo://query-examples` - Browse sample query examples via MCP resources (returns 20 diverse examples)
 
 **Skills Library:**
+
 - `get_skill` - Fetch portable skill definitions (query construction, optimization, discovery workflows, cost analysis)
 
 All tools support an `instance` parameter to target specific Sumo Logic deployments.
@@ -157,6 +171,7 @@ All tools support an `instance` parameter to target specific Sumo Logic deployme
 ### Option 1: Docker Installation (Recommended for Portability)
 
 **Prerequisites:**
+
 - Docker installed ([Get Docker](https://docs.docker.com/get-docker/))
 - Docker Compose (included with Docker Desktop)
 
@@ -194,6 +209,7 @@ docker run -it --rm \
 ```
 
 **Benefits:**
+
 - ✅ No need to install Python or uv
 - ✅ Consistent environment across all platforms
 - ✅ Easy deployment and portability
@@ -235,7 +251,7 @@ uv sync
 cp .env.example .env
 ```
 
-2. **Edit `.env` with your credentials:**
+1. **Edit `.env` with your credentials:**
 
 ```bash
 # Default instance
@@ -257,7 +273,7 @@ SUMO_STAGING_ENDPOINT=https://api.eu.sumologic.com
 
 **⚠️ Security Note:** Never commit your `.env` file to version control!
 
-3. **Configure MCP Client**
+1. **Configure MCP Client**
 
 Choose your MCP client configuration below. You can use either the Docker container or the local uv installation.
 
@@ -369,6 +385,7 @@ node ~/.vscode/extensions/anthropic.claude-code-*/resources/claude-code/cli.js m
 ```
 
 **Verify Configuration:**
+
 ```bash
 node ~/.vscode/extensions/anthropic.claude-code-*/resources/claude-code/cli.js mcp list
 ```
@@ -378,11 +395,13 @@ You should see: `sumologic: uv run ... - ✓ Connected`
 **Restart VSCode:** Quit completely (Cmd+Q / Ctrl+Q) and reopen.
 
 **Troubleshooting:**
+
 - Check logs: View → Output → "Claude VSCode" dropdown
 - List servers: `node ~/.vscode/.../cli.js mcp list`
 - Remove server: `node ~/.vscode/.../cli.js mcp remove sumologic`
 
 **Claude Code MCP References:**
+
 - [Connect Claude Code to tools via MCP - Official Docs](https://docs.claude.com/en/docs/claude-code/mcp)
 - [Configuring MCP Tools in Claude Code - The Better Way](https://scottspence.com/posts/configuring-mcp-tools-in-claude-code-the-better-way)
 - [How to Extend Claude Code with MCP Guide](https://dev.to/anthropic/how-to-extend-claude-code-with-mcp-secure-project-file-control-guide)
@@ -426,11 +445,13 @@ to_time: "1705315200000"           # Epoch milliseconds
 ### Query Types
 
 **Messages (Raw Logs)**: Queries that return individual log entries
+
 - Example: `_sourceCategory=prod/app`
 - Example: `error | where severity="high"`
 - Returns: Array of log messages with timestamps and metadata
 
 **Records (Aggregates)**: Queries with aggregation operators
+
 - Example: `error | count by _sourceHost`
 - Example: `* | timeslice 1h | count by _timeslice`
 - Example: `metric | avg, sum, min, max by dimension`
@@ -439,6 +460,7 @@ to_time: "1705315200000"           # Epoch milliseconds
 ### Advanced Search: byReceiptTime
 
 Use `by_receipt_time=true` for:
+
 - Very recent logs (last few minutes)
 - Delayed log ingestion scenarios
 - Matching Sumo Logic UI behavior for recent searches
@@ -504,6 +526,7 @@ Search 11,000+ real Sumo Logic queries from 280+ published apps using intelligen
 **Note:** The query examples database is included as `logs_searches.json.gz` (2.9MB compressed). It will automatically decompress on first use to `logs_searches.json` (13MB).
 
 **Search Features:**
+
 - 🎯 **Natural language search** - Just describe what you want: "apache 4xx errors by server"
 - 🏆 **Relevance scoring** - Results ranked by how well they match your criteria
 - 🔤 **Tokenized search** - Multi-word searches automatically split and match
@@ -555,6 +578,7 @@ search_query_examples:
 ```
 
 **Match Modes:**
+
 - `any` (default) - Scores by relevance, more matches = higher rank
 - `all` - Strict AND, all filters must match
 - `fuzzy` - Auto-relaxes filters if zero results
@@ -595,6 +619,7 @@ See [SECURITY.md](SECURITY.md) for detailed security information.
 ### For Contributors and AI Assistants
 
 **📖 Essential Reading for Development:**
+
 - **[CLAUDE.md](CLAUDE.md)** - Development guidelines for Claude/AI-assisted development
 - **[.PATTERNS.md](.PATTERNS.md)** - Architecture patterns and coding standards
 - **[docs/QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md)** - Quick lookup for common tasks
@@ -685,6 +710,7 @@ The `skills/` directory contains **portable knowledge artifacts** that teach how
 ### What are Skills?
 
 Skills capture the **"how-to"** knowledge for working with Sumo Logic:
+
 - **Query construction patterns** - 5-phase approach (Scope → Parse → Filter → Aggregate → Format)
 - **Discovery workflows** - Finding logs when you don't know metadata
 - **Cost optimization techniques** - Using scheduled views for 10x-100x improvements
@@ -703,6 +729,7 @@ Skills capture the **"how-to"** knowledge for working with Sumo Logic:
 | **Admin** | 2 skills | Collector management, field extraction |
 
 **Featured Skills:**
+
 - **[search-write-queries.md](skills/search-write-queries.md)** - Complete 5-phase query construction guide
 - **[search-optimize-queries.md](skills/search-optimize-queries.md)** - Performance and cost optimization
 - **[search-optimize-with-views.md](skills/search-optimize-with-views.md)** - Transform queries to use scheduled views
@@ -715,6 +742,7 @@ Skills capture the **"how-to"** knowledge for working with Sumo Logic:
 
 **With the MCP Server:**
 Use the `get_skill` tool to fetch skills dynamically:
+
 ```
 get_skill("search-write-queries")
 ```
@@ -728,6 +756,7 @@ Copy any skill markdown file and provide it as context to your AI assistant.
 ### Skill Format
 
 Each skill includes:
+
 - **Intent** - What the skill accomplishes
 - **Prerequisites** - Required knowledge/access
 - **Context** - When to use it
@@ -869,6 +898,7 @@ query_parts.append(AggregationPatterns.top_n('gbytes', limit=100))
 ```
 
 These patterns centralize complex query logic, making it easier to:
+
 - Fix bugs in one place and have fixes propagate everywhere
 - Ensure consistent null handling across all timeshift queries
 - Write unit tests for query generation
@@ -881,6 +911,7 @@ These patterns centralize complex query logic, making it easier to:
 **Problem:** `Authentication failed for instance 'default'`
 
 **Solution:**
+
 1. Verify credentials in `.env` file
 2. Check that access ID and key are correct
 3. Ensure endpoint matches your Sumo Logic deployment
@@ -891,6 +922,7 @@ These patterns centralize complex query logic, making it easier to:
 **Problem:** `Rate limit exceeded for search_sumo_logs`
 
 **Solution:**
+
 1. Wait for the rate limit window to reset
 2. Reduce query frequency
 3. Increase `RATE_LIMIT_PER_MINUTE` in `.env` if appropriate
@@ -901,6 +933,7 @@ These patterns centralize complex query logic, making it easier to:
 **Problem:** `Search job timed out after X seconds`
 
 **Solution:**
+
 1. Use more specific queries with filters
 2. Reduce time range (use fewer hours_back)
 3. Increase `MAX_SEARCH_TIMEOUT` in `.env`
@@ -911,6 +944,7 @@ These patterns centralize complex query logic, making it easier to:
 **Problem:** `Instance 'prod' not configured`
 
 **Solution:**
+
 1. Check `.env` file for `SUMO_PROD_ACCESS_ID` and related variables
 2. Verify environment variable names follow pattern: `SUMO_<NAME>_ACCESS_ID`
 3. Use `list_sumo_instances` tool to see configured instances
@@ -920,6 +954,7 @@ These patterns centralize complex query logic, making it easier to:
 **Problem:** Server fails to initialize
 
 **Solution:**
+
 1. Check logs for specific error messages
 2. Verify all required environment variables are set
 3. Test credentials manually with Sumo Logic API
@@ -938,11 +973,13 @@ Contributions are welcome! Please:
 ## API Documentation
 
 For Sumo Logic API documentation, see:
+
 - [Sumo Logic API Documentation](https://help.sumologic.com/docs/api/)
 - [Search Job API](https://help.sumologic.com/docs/api/search-job/)
 - [Metrics Query API](https://help.sumologic.com/docs/api/metrics-queries/)
 
 For MCP protocol documentation, see:
+
 - [Model Context Protocol](https://modelcontextprotocol.io/)
 
 ## License
@@ -957,6 +994,7 @@ See [LICENSE](LICENSE) file for details.
 ## Acknowledgments
 
 This project was created with assistance from Claude (Anthropic) and uses:
+
 - [FastMCP](https://github.com/jlowin/fastmcp) - MCP server framework
 - [httpx](https://www.python-httpx.org/) - HTTP client
 - [Pydantic](https://docs.pydantic.dev/) - Data validation

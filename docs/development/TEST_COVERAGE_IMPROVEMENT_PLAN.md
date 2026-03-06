@@ -7,6 +7,7 @@
 ## Executive Summary
 
 This plan identifies modules with poor test coverage and provides actionable tasks to improve testing. Priority is given to modules that:
+
 1. Are critical to server functionality (client, validation, error handling)
 2. Have complex logic prone to bugs (search helpers, query patterns)
 3. Have zero or minimal coverage currently
@@ -38,12 +39,14 @@ This plan identifies modules with poor test coverage and provides actionable tas
 **Priority:** 🔴 Critical - Used by 10+ MCP tools for content export
 
 **Missing Coverage:**
+
 - `poll_export_job()` - Async job polling with exponential backoff
 - `poll_async_folder_export()` - Folder export job polling
 - `start_content_export()` - Content export job initiation
 - `get_export_result()` - Export result retrieval
 
 **Test Tasks:**
+
 ```python
 # tests/test_async_export_helper.py (NEW FILE)
 
@@ -89,6 +92,7 @@ class TestGetExportResult:
 ```
 
 **Mocking Strategy:**
+
 - Mock `SumoLogicClient` methods: `start_export_job()`, `get_export_status()`, `get_export_result()`
 - Use `asyncio.sleep` mocks to speed up polling tests
 - Test various job states: PENDING, PROCESSING, SUCCESS, FAILED
@@ -102,6 +106,7 @@ class TestGetExportResult:
 **Priority:** 🟡 High - Used for URL generation and content identification
 
 **Missing Coverage:**
+
 - `hex_to_decimal()` - Convert 16-char hex ID to decimal
 - `decimal_to_hex()` - Convert decimal ID to 16-char hex
 - `is_valid_hex_id()` - Validate hex ID format
@@ -109,6 +114,7 @@ class TestGetExportResult:
 - `normalize_content_id()` - Auto-detect and normalize IDs
 
 **Test Tasks:**
+
 ```python
 # tests/test_content_id_utils.py (NEW FILE)
 
@@ -168,6 +174,7 @@ class TestNormalize:
 ```
 
 **Approach:**
+
 - Pure functions, no mocking needed
 - Test known hex/decimal pairs from real Sumo Logic content IDs
 - Test edge cases: max values, min values, boundary conditions
@@ -183,6 +190,7 @@ class TestNormalize:
 **Priority:** 🔴 Critical - Main MCP server with all tools
 
 **Coverage Analysis:**
+
 - ✅ **Well-tested:** Basic client initialization, search job integration
 - ❌ **Not tested:** Most MCP tool functions (50+ tools with 0% coverage)
 - ❌ **Not tested:** Error handling in tool functions
@@ -215,6 +223,7 @@ Focus on high-impact areas rather than exhaustive tool testing:
    - Test rate limiting in tools
 
 **Test Tasks:**
+
 ```python
 # tests/test_sumologic_mcp_server.py (EXPAND EXISTING)
 
@@ -279,6 +288,7 @@ class TestToolErrorHandling:
 ```
 
 **Mocking Strategy:**
+
 - Mock `httpx.AsyncClient` responses for client methods
 - Mock `get_sumo_client()` for tool tests to avoid real API calls
 - Mock rate limiter for fast tests
@@ -295,6 +305,7 @@ class TestToolErrorHandling:
 **Priority:** 🔴 Critical - Used by all search-related tools
 
 **Missing Coverage:**
+
 - Lines 134-135: `format_time_range_human()` - Human-readable time formatting
 - Lines 158-175: `extract_scope_from_query()` - Scope extraction logic
 - Lines 211-231: `parse_scope_expression()` - Scope parsing
@@ -303,6 +314,7 @@ class TestToolErrorHandling:
 - Lines 413-457: `build_search_query_with_scope()` - Query building
 
 **Test Tasks:**
+
 ```python
 # tests/test_search_helpers.py (NEW FILE)
 
@@ -364,6 +376,7 @@ class TestBuildSearchQuery:
 ```
 
 **Approach:**
+
 - Test with real Sumo Logic query examples
 - Test edge cases: empty queries, malformed queries
 - Test all operators: count, sum, avg, max, min, etc.
@@ -379,12 +392,14 @@ class TestBuildSearchQuery:
 **Priority:** 🟡 High - Query example database with 11,000+ patterns
 
 **Missing Coverage:**
+
 - Lines 667-696: `_build_pattern_index()` - Index building
 - Lines 736-946: `_load_examples()` - Example loading from JSON
 - Lines 976-1062: `_score_example()` - Relevance scoring
 - Lines 1097-1301: `search_examples()` - Main search function
 
 **Test Tasks:**
+
 ```python
 # tests/test_query_patterns.py (EXPAND EXISTING)
 
@@ -436,6 +451,7 @@ class TestSearchExamples:
 ```
 
 **Approach:**
+
 - Test with subset of real query examples
 - Test scoring algorithm correctness
 - Test search result relevance
@@ -449,12 +465,14 @@ class TestSearchExamples:
 **Priority:** 🟢 Medium - Rate limiting for API protection
 
 **Missing Coverage:**
+
 - Line 42: `_cleanup_old_requests()` - Cleanup logic
 - Line 73: `wait_time_ms` calculation
 - Lines 87-90: Log rate limit warning
 - Lines 108, 122-129: Edge cases in acquire/release
 
 **Test Tasks:**
+
 ```python
 # tests/test_rate_limiter.py (EXPAND EXISTING)
 
@@ -486,6 +504,7 @@ class TestRateLimiterAdvanced:
 **Priority:** 🟢 Medium - Input validation for security
 
 **Missing Coverage:**
+
 - Lines 44, 49, 53: Query validation edge cases
 - Lines 69, 71, 79, 81: Time range validation edge cases
 - Lines 94-96, 109, 113: Pagination validation
@@ -494,6 +513,7 @@ class TestRateLimiterAdvanced:
 - Lines 192-193: MonitorSearchValidation
 
 **Test Tasks:**
+
 ```python
 # tests/test_validation.py (NEW FILE)
 
@@ -547,11 +567,13 @@ class TestPydanticValidators:
 **Priority:** 🟢 Medium - Custom exception classes
 
 **Missing Coverage:**
+
 - Lines 14-17: `SumoMCPError.__init__()`
 - Lines 44-45: `APIError.__init__()`
 - Lines 49-52: `TimeoutError.__init__()`
 
 **Test Tasks:**
+
 ```python
 # tests/test_exceptions.py (NEW FILE)
 
@@ -585,6 +607,7 @@ class TestExceptions:
 ### 5.1 Improve `config.py` (87% → 95%)
 
 **Test Tasks:**
+
 - Test environment variable parsing edge cases
 - Test missing required variables
 - Test invalid configuration values
@@ -593,6 +616,7 @@ class TestExceptions:
 ### 5.2 Improve `audit_helpers.py` (78% → 90%)
 
 **Test Tasks:**
+
 - Test all pre-built use case queries
 - Test query builder with all parameter combinations
 - Test edge cases in event filtering
@@ -600,6 +624,7 @@ class TestExceptions:
 ### 5.3 Improve `url_builder.py` (81% → 95%)
 
 **Test Tasks:**
+
 - Test subdomain handling edge cases
 - Test all region endpoints
 - Test query parameter encoding
@@ -760,6 +785,7 @@ uv run pytest-watch tests/test_async_export_helper.py
 ### Updating Documentation
 
 When adding tests:
+
 1. Update `CHANGELOG.md` with coverage improvements
 2. Update `README.md` if test running instructions change
 3. Update `.github/workflows/ci.yml` if new test categories added
@@ -769,6 +795,7 @@ When adding tests:
 **Last Updated:** 2026-03-07
 **Status:** Draft - Ready for Review
 **Next Steps:**
+
 1. Review and approve plan
 2. Create GitHub issues for each phase
 3. Assign phases to development sprints

@@ -9,6 +9,7 @@ Added client-side response filtering to handle large API responses that exceed C
 ## Problem Solved
 
 Some Sumo Logic APIs (collectors, dashboards, users, etc.) can return payloads > 1MB when listing all resources. This causes:
+
 - Responses that exceed Claude UI limits
 - Inability to work with full result sets
 - Poor user experience when searching for specific items
@@ -51,6 +52,7 @@ Main filtering module with functions:
 ### tests/test_response_filter.py
 
 Comprehensive test suite with 30 tests covering:
+
 - Array key detection
 - Field filtering (case-sensitive, exact match, substring)
 - Multi-field search
@@ -143,6 +145,7 @@ def _resolve_field_value(value: Any) -> Any:
 ## Usage Examples
 
 ### Filter Dashboards by Name
+
 ```python
 # MCP client call
 result = await get_sumo_dashboards(filter_name="AWS")
@@ -169,12 +172,14 @@ result = await get_sumo_dashboards(filter_name="AWS")
 ```
 
 ### Search Across Multiple Fields
+
 ```python
 # Search for "security" in title or description
 result = await get_sumo_dashboards(search_term="security")
 ```
 
 ### Custom Filter Example
+
 ```python
 from src.sumologic_mcp_server.response_filter import filter_response
 
@@ -186,6 +191,7 @@ result = filter_response(
 ```
 
 ### Truncate Large Results
+
 ```python
 # Limit to 50 items even if more match
 result = filter_response(
@@ -223,6 +229,7 @@ To add filtering to other large-response tools:
 ### 1. Identify Candidate Tools
 
 Tools that return large lists:
+
 - ✅ `get_sumo_dashboards` - Implemented
 - 🔄 `get_sumo_collectors` - Should add filtering
 - 🔄 `get_sumo_sources` - Consider filtering
@@ -296,12 +303,15 @@ From `get_common_search_fields()`:
 ## Best Practices
 
 ### 1. Always Include Metadata
+
 The `_metadata` field helps users understand:
+
 - How many total items exist
 - How many matched their filter
 - What filter was applied
 
 ### 2. Use Descriptive Field Descriptions
+
 ```python
 # Good
 filter_name: Optional[str] = Field(
@@ -314,12 +324,15 @@ filter_name: Optional[str] = Field(default=None, description="Filter by name")
 ```
 
 ### 3. Combine Multiple Filter Options
+
 Allow users to choose their preferred filtering method:
+
 - Single field filter (precise)
 - Multi-field search (flexible)
 - Custom filter (advanced)
 
 ### 4. Document in Tool Docstring
+
 ```python
 """
 Get list of collectors with optional client-side filtering.
@@ -335,7 +348,9 @@ Filtering Examples:
 ```
 
 ### 5. Test with Real Data
+
 Always test filtering with actual API responses to ensure:
+
 - Correct array key detection
 - Expected field names exist
 - Size reduction is meaningful
@@ -389,6 +404,7 @@ uv run pytest tests/test_response_filter.py -v
 ```
 
 All 30 tests should pass:
+
 - ✅ Array key detection (5 tests)
 - ✅ Field filtering (5 tests)
 - ✅ Multi-field search (4 tests)
@@ -400,9 +416,9 @@ All 30 tests should pass:
 
 ## API References
 
-- Dashboards API: https://api.sumologic.com/docs/#operation/listDashboards
-- Collectors API: https://api.sumologic.com/docs/#operation/getCollectors
-- Content API: https://api.sumologic.com/docs/#tag/contentManagement
+- Dashboards API: <https://api.sumologic.com/docs/#operation/listDashboards>
+- Collectors API: <https://api.sumologic.com/docs/#operation/getCollectors>
+- Content API: <https://api.sumologic.com/docs/#tag/contentManagement>
 
 ## Related Files
 
@@ -415,6 +431,7 @@ All 30 tests should pass:
 
 **Status:** ✅ Complete
 **Next Steps:**
+
 1. Update `docs/mcp-tools-reference.md` with new dashboard filter parameters
 2. Apply filtering pattern to `get_sumo_collectors` tool
 3. Consider filtering for `get_sumo_users` and other list tools

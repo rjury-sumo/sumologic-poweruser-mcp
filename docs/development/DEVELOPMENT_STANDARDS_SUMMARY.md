@@ -6,6 +6,7 @@
 ## Problem Statement
 
 Previous development sessions encountered recurring issues:
+
 1. **Inconsistent documentation updates** - Tools added without updating `docs/mcp-tools-reference.md`
 2. **Temporary files in root** - Development notes and working files committed to repo
 3. **Inconsistent API patterns** - Varied approaches to API calls and error handling
@@ -29,6 +30,7 @@ Previous development sessions encountered recurring issues:
 **Rule:** Every new or modified tool MUST update `docs/mcp-tools-reference.md` in the same session.
 
 **Enforced by:**
+
 - Explicit instructions in `CLAUDE.md`
 - Checklist in development template
 - Warning in README.md
@@ -37,11 +39,13 @@ Previous development sessions encountered recurring issues:
 #### 2. File Organization Standards
 
 **Centralized API Access:**
+
 - All API calls through `SumoLogicClient` class
 - No direct HTTP calls in tool functions
 - Consistent error handling via `handle_tool_error()`
 
 **Code Location Rules:**
+
 ```
 MCP tools               → sumologic_mcp_server.py
 API client methods      → SumoLogicClient class (same file)
@@ -56,6 +60,7 @@ Tests                   → tests/test_*.py
 #### 3. Standardized Tool Pattern
 
 Every MCP tool follows this structure:
+
 1. Initialize config and rate limiting
 2. Validate all inputs
 3. Get client and call API method
@@ -67,6 +72,7 @@ See `.PATTERNS.md` for complete template and examples.
 #### 4. Development Workflow
 
 **For New Tools:**
+
 1. Plan → Review API docs, check existing code
 2. Implement → Add API method, then tool
 3. Document → Update `mcp-tools-reference.md` (MANDATORY)
@@ -78,6 +84,7 @@ See `.PATTERNS.md` for complete template and examples.
 #### 5. Prevent Temporary File Commits
 
 **Updated `.gitignore`:**
+
 ```gitignore
 # Temporary development files - should not be committed
 /*_temp.md
@@ -98,12 +105,14 @@ See `.PATTERNS.md` for complete template and examples.
 ### Architecture Patterns Documented
 
 #### API Client Pattern
+
 - Centralized `SumoLogicClient` class
 - All HTTP requests through `_request()` method
 - Automatic authentication, logging, error handling
 - Consistent API version handling (v1 vs v2)
 
 #### MCP Tool Pattern
+
 - Standard parameter ordering (required → optional → instance)
 - Consistent error handling with `handle_tool_error()`
 - Rate limiting on every tool
@@ -111,30 +120,35 @@ See `.PATTERNS.md` for complete template and examples.
 - JSON string return format
 
 #### Validation Pattern
+
 - Validate early, fail fast
 - Clear, actionable error messages
 - Type-safe validation with Pydantic
 - Reusable validation functions
 
 #### Configuration Pattern
+
 - All config from `.env` file
 - Multi-instance support with naming convention
 - Type-safe config with Pydantic models
 - No hardcoded credentials or endpoints
 
 #### Error Handling Pattern
+
 - Custom exception hierarchy
 - Sanitized error messages (no sensitive data)
 - Consistent error response format
 - Comprehensive logging
 
 #### Async Operations Pattern
+
 - Centralized polling helpers
 - Configurable timeouts
 - Progress indication
 - Graceful failure handling
 
 #### URL Generation Pattern
+
 - Centralized URL builder module
 - Regional endpoint mapping
 - Custom subdomain support
@@ -143,12 +157,14 @@ See `.PATTERNS.md` for complete template and examples.
 ### Testing Standards
 
 **Test Structure:**
+
 - Class-based test organization
 - Descriptive test names
 - One logical assertion per test
 - Use fixtures for setup/teardown
 
 **Coverage Goals:**
+
 - Unit tests: 80%+ for utility functions
 - Integration tests: Critical path coverage
 - Error handling: All error paths tested
@@ -157,6 +173,7 @@ See `.PATTERNS.md` for complete template and examples.
 ### Security Checklist
 
 Required before every commit:
+
 - [ ] No hardcoded credentials
 - [ ] All inputs validated
 - [ ] Rate limiting applied
@@ -168,6 +185,7 @@ Required before every commit:
 ### Git Conventions
 
 **Commit Message Format:**
+
 ```
 <type>: <short description>
 
@@ -238,6 +256,7 @@ README.md                          ← User documentation
 ## Files Modified
 
 ### New Files Created
+
 - `/CLAUDE.md` - Development guidelines (20 sections, 1000+ lines)
 - `/.PATTERNS.md` - Architecture patterns (9 major patterns with examples)
 - `/docs/QUICK_REFERENCE.md` - Quick lookup reference
@@ -245,6 +264,7 @@ README.md                          ← User documentation
 - `/docs/development/DEVELOPMENT_STANDARDS_SUMMARY.md` - This file
 
 ### Files Updated
+
 - `/.gitignore` - Added temp file exclusions
 - `/README.md` - Added development section with links
 - `/CHANGELOG.md` - Documented all changes
@@ -255,16 +275,19 @@ README.md                          ← User documentation
 ### For Claude/AI Assistants
 
 **At Start of Session:**
+
 1. Read `CLAUDE.md` for guidelines
 2. Review `.PATTERNS.md` for architecture
 3. Check `docs/QUICK_REFERENCE.md` for common tasks
 
 **During Development:**
+
 1. Follow standard tool pattern from `CLAUDE.md`
 2. Use patterns from `.PATTERNS.md`
 3. Copy checklist from `docs/development/.CHECKLIST_TEMPLATE.md`
 
 **Before Ending Session:**
+
 1. ⚠️ **VERIFY** `docs/mcp-tools-reference.md` updated
 2. Verify tool counts updated
 3. Verify tests pass
@@ -274,16 +297,19 @@ README.md                          ← User documentation
 ### For Human Developers
 
 **Starting Development:**
+
 1. Review `README.md` → Development section
 2. Read `CLAUDE.md` and `.PATTERNS.md`
 3. Copy `.CHECKLIST_TEMPLATE.md` for your feature
 
 **During Development:**
+
 - Use Quick Reference for common patterns
 - Follow established patterns
 - Update docs as you go
 
 **Code Review:**
+
 - Verify documentation updated
 - Check pattern compliance
 - Validate security checklist
@@ -300,20 +326,22 @@ README.md                          ← User documentation
 ## Maintenance
 
 **Review Cadence:**
+
 - Guidelines: Review quarterly or after major changes
 - Patterns: Update when new patterns emerge
 - Checklist: Update as process improves
 
 **Version Control:**
+
 - Track versions at bottom of each guideline file
 - Update "Last Updated" date on changes
 - Document breaking changes in CHANGELOG.md
 
 ## References
 
-- **MCP Protocol**: https://modelcontextprotocol.io/
-- **Sumo Logic API Docs**: https://api.sumologic.com/docs/
-- **FastMCP**: https://github.com/jlowin/fastmcp
+- **MCP Protocol**: <https://modelcontextprotocol.io/>
+- **Sumo Logic API Docs**: <https://api.sumologic.com/docs/>
+- **FastMCP**: <https://github.com/jlowin/fastmcp>
 - **Project Repo**: [GitHub URL]
 
 ---

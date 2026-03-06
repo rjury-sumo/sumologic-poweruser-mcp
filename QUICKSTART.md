@@ -46,6 +46,7 @@ For production use, create a dedicated service account:
    - See [docs/GITHUB_ACTIONS_SETUP.md](docs/GITHUB_ACTIONS_SETUP.md) for detailed permission list
 
 **Why service accounts?**
+
 - Purpose-built for automation
 - No MFA conflicts
 - Independent from user accounts
@@ -67,6 +68,7 @@ nano .env
 ```
 
 **Minimum configuration in `.env`:**
+
 ```bash
 SUMO_ACCESS_ID=your_service_account_access_id_here
 SUMO_ACCESS_KEY=your_service_account_access_key_here
@@ -74,6 +76,7 @@ SUMO_ENDPOINT=https://api.sumologic.com
 ```
 
 **Optional: Add multiple instances:**
+
 ```bash
 # Production
 SUMO_PROD_ACCESS_ID=your_prod_id
@@ -137,7 +140,7 @@ SUMO_STAGING_ENDPOINT=https://api.eu.sumologic.com
 
 Close and reopen Claude Desktop. The MCP server will start automatically.
 
-## 6. Test It!
+## 6. Test It
 
 Ask Claude:
 
@@ -156,12 +159,14 @@ Search my Sumo Logic logs for errors in the last hour
 ### Can't find uv command
 
 Make sure uv is in your PATH:
+
 ```bash
 # Add to ~/.bashrc, ~/.zshrc, or equivalent
 export PATH="$HOME/.cargo/bin:$PATH"
 ```
 
 Then restart your terminal or run:
+
 ```bash
 source ~/.bashrc  # or ~/.zshrc
 ```
@@ -171,7 +176,7 @@ source ~/.bashrc  # or ~/.zshrc
 1. Check your `.env` file has the correct credentials
 2. Make sure there are no extra spaces or quotes
 3. Verify your Sumo Logic endpoint matches your deployment region
-4. Test your credentials manually: https://help.sumologic.com/docs/api/
+4. Test your credentials manually: <https://help.sumologic.com/docs/api/>
 
 ### Claude Desktop can't find the server
 
@@ -185,6 +190,7 @@ source ~/.bashrc  # or ~/.zshrc
 ### Permission denied on .env
 
 Set proper permissions:
+
 ```bash
 chmod 600 .env
 ```

@@ -32,12 +32,14 @@ The compliance assessment found a **95% compliance rate** with newly documented 
 **Impact:** Potential maintainability concerns if file continues to grow
 
 #### Details
+
 - Current organization is **good and functional**
 - File is well-structured with clear category sections
 - All tools in one file provides single source of truth
 - Approaching but not exceeding maintainability threshold (~3000 lines)
 
 #### Recommendation
+
 **Action:** Monitor, do not refactor now
 **Trigger for Action:** If file exceeds 3000 lines or 200KB
 **Priority:** P3 (Low)
@@ -47,11 +49,13 @@ The compliance assessment found a **95% compliance rate** with newly documented 
 #### Implementation Plan (If Triggered)
 
 **Phase 1: Analysis**
+
 1. Review current tool count and categorization
 2. Identify logical groupings (e.g., search, content, account)
 3. Plan module structure
 
 **Phase 2: Refactoring**
+
 ```
 Current:
   src/sumologic_mcp_server/sumologic_mcp_server.py  (all tools)
@@ -70,11 +74,13 @@ Proposed (if needed):
 ```
 
 **Phase 3: Testing**
+
 1. Verify all tools still register correctly
 2. Run full test suite
 3. Test MCP integration
 
 **Decision Criteria:**
+
 - ❌ Do not refactor if < 3000 lines
 - ✅ Consider refactoring if > 3000 lines **AND** adding 10+ new tools
 - ✅ Refactor if maintainability becomes concern
@@ -93,20 +99,24 @@ Proposed (if needed):
 #### Details
 
 **Examples of Excellent Docstrings:**
+
 - `list_installed_apps` (lines 1243-1283): 40+ lines with use cases, flow, links
 - `search_sumo_logs` (lines 660-678): Clear query types, time formats, usage notes
 - `get_content_web_url` (lines 2359-2372): Format examples, subdomain support
 
 **Examples of Minimal Docstrings:**
+
 - `get_sumo_dashboards` (line 1307): One-line description
 - Some system tools: Brief but adequate
 
 **Assessment:**
+
 - All docstrings are **adequate** for MCP tool usage
 - Richer docstrings improve developer experience
 - Not a blocker or issue, just an opportunity for enhancement
 
 #### Recommendation
+
 **Action:** Opportunistic enhancement during tool updates
 **Priority:** P4 (Very Low)
 **Effort:** 15-30 minutes per tool (20-40 total hours for all minimal docstrings)
@@ -115,6 +125,7 @@ Proposed (if needed):
 #### Implementation Approach
 
 **Template for Enhanced Docstring:**
+
 ```python
 @mcp.tool()
 async def tool_name(
@@ -144,6 +155,7 @@ async def tool_name(
 ```
 
 **Implementation Strategy:**
+
 1. **Opportunistic updates** - Enhance when touching a tool for other reasons
 2. **Batch update** - If slow period, enhance 5-10 tools at once
 3. **Priority order:**
@@ -152,6 +164,7 @@ async def tool_name(
    - System tools last
 
 **Tracking:**
+
 - Create issue: "Enhance docstrings for tools with minimal documentation"
 - Tag as `documentation`, `enhancement`, `good-first-issue`
 - No deadline - ongoing improvement
@@ -170,16 +183,19 @@ async def tool_name(
 #### Details
 
 **Standard Ordering (from .PATTERNS.md):**
+
 1. Required parameters (no defaults)
 2. Optional parameters (with defaults)
 3. `instance` parameter (always last)
 
 **Compliance:**
+
 - 38/41 tools perfectly follow standard ordering
 - 3 tools have minor logical variations in optional parameter order
 - All 41 tools have `instance` parameter last ✅
 
 **Example Variations:**
+
 ```python
 # Tool A: Standard order
 async def tool_a(
@@ -201,18 +217,22 @@ async def tool_b(
 ```
 
 #### Assessment
+
 - Variations are **logical** (grouping related parameters)
 - No confusion or maintainability impact
 - Stricter standardization would harm readability in some cases
 
 #### Recommendation
+
 **Action:** No action required
 **Rationale:**
+
 - Current variations improve code readability
 - All tools follow core principle (instance last)
 - Minor variations are acceptable for semantic grouping
 
 **Future Guidance:**
+
 - New tools should follow standard ordering
 - Except when logical grouping improves clarity
 - Document reasoning if deviating
@@ -232,6 +252,7 @@ These are **not problems** but opportunities to go beyond current excellent stan
 **Priority:** P3 (Nice to have)
 
 #### Proposed Tool
+
 ```python
 # scripts/verify_docs.py
 """Verify docs/mcp-tools-reference.md matches implemented tools."""
@@ -264,6 +285,7 @@ if __name__ == "__main__":
 ```
 
 #### Usage
+
 ```bash
 # Run manually
 python scripts/verify_docs.py
@@ -285,12 +307,14 @@ python scripts/verify_docs.py
 **Priority:** P3 (Nice to have)
 
 #### Current State
+
 - URL builder: Comprehensive tests (16 tests) ✅
 - Content ID utils: Basic tests ✅
 - Validation: Tests present ✅
 - Tools: Limited integration tests
 
 #### Proposed Expansion
+
 Focus on **critical path tools**:
 
 1. **Search Tools** (High Priority)
@@ -311,6 +335,7 @@ Focus on **critical path tools**:
    - Test usage reporting
 
 #### Implementation Approach
+
 ```python
 # tests/integration/test_search_integration.py
 @pytest.mark.integration
@@ -348,6 +373,7 @@ class TestSearchIntegration:
 **Priority:** P4 (Low)
 
 #### Proposal
+
 Add optional usage tracking to audit log:
 
 ```python
@@ -361,6 +387,7 @@ if config.server_config.enable_audit_log:
 ```
 
 #### Benefits
+
 - Identify most-used tools for optimization focus
 - Track error rates per tool
 - Guide future development priorities
@@ -374,10 +401,13 @@ if config.server_config.enable_audit_log:
 ## Implementation Timeline
 
 ### Immediate (Week 1)
+
 **Nothing required** - Codebase is standards-compliant ✅
 
 ### Short-Term (1-3 Months)
+
 **Optional Improvements:**
+
 - [x] Implement documentation verification script (2 hours) - ✅ **COMPLETED 2026-03-04**
   - Created `scripts/verify_docs.py`
   - Verifies tool counts and names match between code and docs
@@ -387,13 +417,17 @@ if config.server_config.enable_audit_log:
   - Added comprehensive use cases, examples, and workflow guidance
 
 ### Medium-Term (3-6 Months)
+
 **If Desired:**
+
 - [ ] Add integration tests for search tools (4 hours)
 - [ ] Add integration tests for content tools (3 hours)
 - [ ] Implement usage analytics (4 hours)
 
 ### Long-Term (6+ Months)
+
 **Monitoring:**
+
 - [ ] Monitor main file size (quarterly check)
 - [ ] Consider modularization if > 3000 lines
 - [ ] Continue opportunistic docstring enhancements
@@ -403,6 +437,7 @@ if config.server_config.enable_audit_log:
 ## Success Metrics
 
 ### Current Baseline
+
 - Compliance Score: **95%**
 - Documentation Coverage: **100%** (41/41 tools)
 - Error Handling: **100%** (41/41 tools)
@@ -410,6 +445,7 @@ if config.server_config.enable_audit_log:
 - Security Checklist: **100%** (all items verified)
 
 ### Target Metrics (Optional)
+
 - Maintain compliance score: **≥95%**
 - Documentation coverage: **100%**
 - Integration test coverage: **≥30%** of critical tools
@@ -421,16 +457,19 @@ if config.server_config.enable_audit_log:
 ## Recommendations Summary
 
 ### DO NOT DO (Unnecessary)
+
 ❌ Refactor file organization (current structure is good)
 ❌ Enforce strict parameter ordering (variations are logical)
 ❌ Add validation to exempt tools (not needed)
 
 ### SHOULD DO (Recommended)
+
 ✅ Implement documentation verification script
 ✅ Monitor main file size quarterly
 ✅ Continue following documented standards for new tools
 
 ### COULD DO (Optional Value-Adds)
+
 💡 Enhance docstrings opportunistically
 💡 Add integration tests for confidence
 💡 Implement usage analytics for insights
@@ -442,6 +481,7 @@ if config.server_config.enable_audit_log:
 **No remediation is required.** The codebase is production-ready and exemplifies the documented standards.
 
 The items in this plan are **enhancement opportunities** that can be pursued based on:
+
 - Available development time
 - Team priorities
 - Perceived value
@@ -462,6 +502,7 @@ The items in this plan are **enhancement opportunities** that can be pursued bas
 
 **Document Status:** ✅ Complete
 **Related Documents:**
+
 - [COMPLIANCE_ASSESSMENT.md](COMPLIANCE_ASSESSMENT.md) - Detailed compliance review
 - [CLAUDE.md](../../CLAUDE.md) - Development guidelines
 - [.PATTERNS.md](../../.PATTERNS.md) - Architecture patterns

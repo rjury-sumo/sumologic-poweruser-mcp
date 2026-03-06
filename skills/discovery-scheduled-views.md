@@ -1,15 +1,18 @@
 # Skill: Discover and Understand Scheduled Views
 
 ## Intent
+
 Discover available scheduled views in a Sumo Logic organization and understand their purpose, schema, and query patterns to determine if they can accelerate specific query use cases.
 
 ## Prerequisites
+
 - Access to Sumo Logic instance with scheduled views configured
 - Basic understanding of log query concepts and aggregation operators
 
 ## Context
 
 **Use this skill when:**
+
 - User asks "what views are available?" or "are there any scheduled views?"
 - Looking for pre-aggregated data sources for a specific use case
 - Dashboard queries are slow and you want to find faster alternatives
@@ -17,6 +20,7 @@ Discover available scheduled views in a Sumo Logic organization and understand t
 - Investigating cost optimization opportunities (tiered or flex accounts)
 
 **Don't use this when:**
+
 - User needs to create or modify scheduled views (requires admin access and different tools)
 - Looking for partitions instead of views (partitions are indexed at ingestion, views are query-time)
 - Need real-time data (views have 1-minute processing delay)
@@ -26,6 +30,7 @@ Discover available scheduled views in a Sumo Logic organization and understand t
 ### Phase 1: Inventory Discovery
 
 1. **List all scheduled views** to understand what's available:
+
    ```json
    {
      "name": "list_scheduled_views",
@@ -45,6 +50,7 @@ Discover available scheduled views in a Sumo Logic organization and understand t
    - `next` - Pagination token if more views exist
 
 3. **Handle pagination** if many views exist:
+
    ```json
    {
      "name": "list_scheduled_views",
@@ -93,12 +99,14 @@ Discover available scheduled views in a Sumo Logic organization and understand t
 ## Query Patterns
 
 ### View Discovery by Name Pattern
+
 ```
 # List views, then filter by name pattern client-side
 # Look for: indexName containing keywords like "apache", "cloudtrail", "k8s"
 ```
 
 ### View Schema Inspection
+
 ```
 # From list_scheduled_views response, extract:
 {
@@ -110,6 +118,7 @@ Discover available scheduled views in a Sumo Logic organization and understand t
 ```
 
 ### View Query Syntax Examples
+
 ```
 # Basic view query
 _view=apache_status_code_1m_v2
@@ -135,12 +144,14 @@ _view=apache_status_code_1m_v2 status_code>=400 | sum(_count) by status_code | t
 **User request:** "Are there any views that can help me analyze Apache web server logs?"
 
 **Approach:**
+
 1. List all scheduled views
 2. Filter results client-side for names containing "apache" or "web" or "http"
 3. Present matching views with their schemas
 4. Suggest query patterns based on available fields
 
 **Sample Response:**
+
 ```
 Found 2 scheduled views for Apache analysis:
 
@@ -162,12 +173,14 @@ Found 2 scheduled views for Apache analysis:
 **User request:** "I need to analyze CloudTrail events - are there any pre-aggregated views?"
 
 **Approach:**
+
 1. List scheduled views
 2. Search for "cloudtrail", "aws", "security" in indexName or query fields
 3. Analyze schema for security-relevant fields (eventName, userIdentity, sourceIP, etc.)
 4. Provide query examples for common security use cases
 
 **Sample Response:**
+
 ```
 Found 1 scheduled view for CloudTrail:
 
@@ -193,6 +206,7 @@ _view=cloudtrail_events_1m_v3 eventName IN (DeleteBucket, DeleteUser, PutBucketP
 **User request:** "My dashboard panel is querying 7 days of raw logs and times out. Can a view help?"
 
 **Approach:**
+
 1. Understand the panel's query intent (what fields/aggregations are needed)
 2. List scheduled views
 3. Match view schema to panel requirements
@@ -200,12 +214,14 @@ _view=cloudtrail_events_1m_v3 eventName IN (DeleteBucket, DeleteUser, PutBucketP
 5. Explain performance and cost benefits
 
 **Original slow query:**
+
 ```
 _sourceCategory=apache error OR exception | parse "status=*" as status_code | where status_code >= 400 | count by status_code, _timeslice | timeslice 1h
 ```
 
 **Approach:**
-1. List views, find `apache_status_code_1m_v2` with fields: status_code, host, _count
+
+1. List views, find `apache_status_code_1m_v2` with fields: status_code, host,_count
 2. Propose view-based alternative:
 
 ```
@@ -213,6 +229,7 @@ _view=apache_status_code_1m_v2 status_code>=400 | sum(_count) by status_code, _t
 ```
 
 **Benefits:**
+
 - **Performance**: Pre-parsed, pre-filtered, 1m aggregated → re-aggregate to 1h is near-instant
 - **Cost (Tiered)**: 0 scan cost for aggregate view vs scanning raw logs
 - **Cost (Flex)**: Minimal scan (1m aggregated data) vs scanning 7 days of raw logs
@@ -223,6 +240,7 @@ _view=apache_status_code_1m_v2 status_code>=400 | sum(_count) by status_code, _t
 **User request:** "Are there any views that cache threat intelligence lookups? My security dashboard times out querying 30 days of firewall logs."
 
 **Approach:**
+
 1. List scheduled views
 2. Search for views with "threat", "malicious", "geo", "ip" in name or query
 3. Look for views using threatip, geoip, or lookup operators in query definition
@@ -230,6 +248,7 @@ _view=apache_status_code_1m_v2 status_code>=400 | sum(_count) by status_code, _t
 5. Check for geo/ASN enrichment fields in schema
 
 **Discovery Query Analysis:**
+
 ```json
 {
   "name": "list_scheduled_views",
@@ -238,6 +257,7 @@ _view=apache_status_code_1m_v2 status_code>=400 | sum(_count) by status_code, _t
 ```
 
 **Found View:**
+
 ```
 threat_matches_1m
 - Query: Includes "threatip src_ip | where !(isempty(malicious_confidence))"
@@ -253,6 +273,7 @@ threat_matches_1m
 ```
 
 **Key Insights:**
+
 - **Pre-filtering**: View only stores malicious IPs (not all traffic)
 - **Lookup caching**: threatip, geoip, ASN lookups done once at 1m intervals
 - **Temporal accuracy**: Threat intelligence stored as it was when logs arrived
@@ -286,6 +307,7 @@ _view=threat_matches_1m actor="apt29"
 ```
 
 **Benefits vs Raw Log Query:**
+
 - **Performance**: 5+ minutes (or timeout) → 5 seconds (60x+ faster)
 - **Scan volume**: 5TB raw logs → 10GB pre-filtered view (500x reduction)
 - **Cost (Flex)**: Massive scan cost savings
@@ -295,6 +317,7 @@ _view=threat_matches_1m actor="apt29"
 
 **View Pattern Recognition:**
 Views containing these query patterns indicate lookup caching:
+
 - `threatip` operator → Threat intelligence enrichment cached
 - `geoip` operator → Geographic enrichment cached
 - `lookup ... from asn://` → ASN enrichment cached
@@ -304,15 +327,18 @@ Views containing these query patterns indicate lookup caching:
 ## Common Pitfalls
 
 ### Pitfall 0: Using count instead of sum on aggregate columns (CRITICAL)
+
 **Problem:** `_view=apache_status | count by status_code` counts view rows, NOT original events
 
 **Solution:**
+
 - **Always check `reduceOnlyFields`** to find aggregate column names
 - Use `sum(_count)`, `sum(requests)`, etc. based on actual field names
 - Never use bare `| count` on aggregate views
 - Common column names: `_count`, `_sum`, `_avg`, or custom aliases like `requests`, `total_bytes`
 
 **Example:**
+
 ```
 # View definition: | count by status_code, _timeslice
 # reduceOnlyFields: ["status_code", "_timeslice", "_count"]
@@ -324,43 +350,53 @@ _view=apache_status | sum(requests) as total by status_code  # ✓ Correct
 ```
 
 ### Pitfall 1: Querying views with keywords
+
 **Problem:** `_view=apache_status_code_1m error` fails - views don't support keyword search
 
 **Solution:** Views have fixed schemas. Only use:
+
 - Field=value filters: `_view=name field=value`
 - Indexed field filters for best performance
 - Post-aggregation filtering with `| where` if needed
 
 ### Pitfall 2: Expecting real-time data
+
 **Problem:** Views show data with ~1 minute delay
 
 **Solution:**
+
 - For real-time use cases, query raw logs instead
 - For historical analysis and dashboards, views are ideal
 - Views are perfect for time ranges > 1 hour where delay doesn't matter
 
 ### Pitfall 3: Not understanding schema limitations
+
 **Problem:** Trying to parse or extract new fields from view data
 
 **Solution:**
+
 - Views have fixed schema defined by `reduceOnlyFields`
 - You can't extract new fields from view data (already aggregated)
 - Check schema before proposing view-based query
 - If needed fields aren't in view, must use raw logs or request new view
 
 ### Pitfall 4: Ignoring view versioning
+
 **Problem:** Querying old view version (v1) when newer version (v2) has better schema
 
 **Solution:**
+
 - Always check for multiple versions of similarly-named views
 - Compare `reduceOnlyFields` across versions
 - Use wildcard `_view=name_*` to query all versions if appropriate
 - Recommend latest version unless specific version needed
 
 ### Pitfall 5: Not leveraging indexed fields
+
 **Problem:** Filtering on non-indexed fields causes slower queries
 
 **Solution:**
+
 - Use `indexedFields` for scope filtering: `_view=name indexed_field=value`
 - Use non-indexed fields in post-aggregation filters: `| where non_indexed_field=value`
 - Indexed filters are pushed down → much faster

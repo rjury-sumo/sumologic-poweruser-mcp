@@ -12,11 +12,13 @@ This document summarizes the security hardening and best practice improvements i
 ### 1. ✅ Multi-Instance Support
 
 **Files Created/Modified:**
+
 - `src/sumologic_mcp_server/config.py` (new)
 - `src/sumologic_mcp_server/sumologic_mcp_server.py` (refactored)
 - `.env.example` (new)
 
 **Features:**
+
 - Support for multiple Sumo Logic instances with separate credentials
 - Environment variable pattern: `SUMO_<INSTANCE_NAME>_ACCESS_ID/KEY/ENDPOINT`
 - Default instance + unlimited named instances (prod, staging, dev, etc.)
@@ -25,6 +27,7 @@ This document summarizes the security hardening and best practice improvements i
 - Centralized configuration management with validation
 
 **Usage Example:**
+
 ```bash
 # .env file
 SUMO_ACCESS_ID=default_id
@@ -39,9 +42,11 @@ SUMO_PROD_ENDPOINT=https://api.us2.sumologic.com
 ### 2. ✅ Input Validation & Sanitization
 
 **Files Created:**
+
 - `src/sumologic_mcp_server/validation.py` (new)
 
 **Features:**
+
 - Pydantic-based validation models for all inputs
 - Query validation (max length 10,000 chars, null byte detection)
 - Time range validation (0-8760 hours, with warnings for >30 days)
@@ -52,6 +57,7 @@ SUMO_PROD_ENDPOINT=https://api.us2.sumologic.com
 - Monitor search query validation
 
 **Security Benefits:**
+
 - Prevents injection attacks
 - Protects against resource exhaustion
 - Validates all user inputs before API calls
@@ -60,9 +66,11 @@ SUMO_PROD_ENDPOINT=https://api.us2.sumologic.com
 ### 3. ✅ Error Handling & Custom Exceptions
 
 **Files Created:**
+
 - `src/sumologic_mcp_server/exceptions.py` (new)
 
 **Exception Classes:**
+
 - `SumoMCPError` - Base exception with structured error responses
 - `ConfigurationError` - Configuration issues
 - `ValidationError` - Input validation failures
@@ -73,6 +81,7 @@ SUMO_PROD_ENDPOINT=https://api.us2.sumologic.com
 - `InstanceNotFoundError` - Instance not configured
 
 **Security Benefits:**
+
 - Sanitized error messages (no stack traces to clients)
 - Full errors logged server-side for debugging
 - Proper HTTP status code mapping
@@ -81,9 +90,11 @@ SUMO_PROD_ENDPOINT=https://api.us2.sumologic.com
 ### 4. ✅ Rate Limiting
 
 **Files Created:**
+
 - `src/sumologic_mcp_server/rate_limiter.py` (new)
 
 **Features:**
+
 - Token bucket rate limiter implementation
 - Per-tool rate limiting (prevents individual tool abuse)
 - Configurable requests per minute (default: 60)
@@ -93,11 +104,13 @@ SUMO_PROD_ENDPOINT=https://api.us2.sumologic.com
 - Applied to all MCP tools
 
 **Configuration:**
+
 ```bash
 RATE_LIMIT_PER_MINUTE=60  # in .env
 ```
 
 **Security Benefits:**
+
 - Prevents DoS attacks
 - Protects Sumo Logic API from excessive calls
 - Prevents accidental resource exhaustion
@@ -106,17 +119,20 @@ RATE_LIMIT_PER_MINUTE=60  # in .env
 ### 5. ✅ Audit Logging
 
 **Implementation:**
+
 - Separate audit logger writes to `sumo_mcp_audit.log`
 - Logs all API requests with: instance, method, path, status
 - Configurable via `ENABLE_AUDIT_LOG` environment variable
 - Added to `.gitignore` to prevent accidental commits
 
 **Log Format:**
+
 ```
 2025-02-25 10:30:45 - instance=default method=POST path=/api/v1/search/jobs status=200
 ```
 
 **Security Benefits:**
+
 - Track all API operations for compliance
 - Detect suspicious patterns
 - Forensics support for security incidents
@@ -125,13 +141,16 @@ RATE_LIMIT_PER_MINUTE=60  # in .env
 ### 6. ✅ Dependency Pinning
 
 **Files Modified:**
+
 - `pyproject.toml`
 
 **Changes:**
+
 - All dependencies pinned to specific versions (not `>=`)
 - Added security scanning tools to dev dependencies
 
 **Dependencies Pinned:**
+
 ```toml
 httpx==0.27.2
 mcp[cli]==1.12.0
@@ -146,6 +165,7 @@ bandit==1.8.0
 ```
 
 **Security Benefits:**
+
 - Reproducible builds
 - Prevents supply chain attacks
 - Known vulnerability tracking
@@ -154,11 +174,13 @@ bandit==1.8.0
 ### 7. ✅ Security Documentation
 
 **Files Created:**
+
 - `SECURITY.md` (new)
 - `.env.example` (new)
 - Updated `README.md` with security section
 
 **SECURITY.md Contents:**
+
 - Security model and principles
 - Vulnerability reporting process
 - Response timeline commitments
@@ -167,6 +189,7 @@ bandit==1.8.0
 - Security contact information
 
 **README.md Updates:**
+
 - Comprehensive security best practices section
 - DO/DON'T lists for credential management
 - Security features overview
@@ -176,10 +199,12 @@ bandit==1.8.0
 ### 8. ✅ CI/CD Pipeline
 
 **Files Created:**
+
 - `.github/workflows/ci.yml` (new)
 - `.github/workflows/security.yml` (new)
 
 **CI Workflow (`ci.yml`):**
+
 - Tests on Python 3.10, 3.11, 3.12
 - Code coverage reporting (Codecov integration)
 - Black formatting checks
@@ -188,6 +213,7 @@ bandit==1.8.0
 - Runs on push and pull requests
 
 **Security Workflow (`security.yml`):**
+
 - Daily automated security scans (2 AM UTC)
 - Bandit static security analysis
 - pip-audit dependency vulnerability scanning
@@ -196,6 +222,7 @@ bandit==1.8.0
 - Manual trigger support
 
 **Security Benefits:**
+
 - Automated security scanning
 - Early detection of vulnerabilities
 - Consistent code quality
@@ -255,11 +282,13 @@ list_sumo_instances()
 ## Testing & Validation
 
 ### Run Tests
+
 ```bash
 pytest --cov=src --cov-report=html
 ```
 
 ### Run Security Scans
+
 ```bash
 # Static analysis
 bandit -r src/
@@ -278,6 +307,7 @@ black --check src/
 ## Next Steps (Future Enhancements)
 
 ### Phase 2: Medium Priority
+
 - [ ] Enhanced test coverage (target >80%)
 - [ ] Integration tests with mocked Sumo API
 - [ ] Response caching with TTL
@@ -285,6 +315,7 @@ black --check src/
 - [ ] Health check endpoint
 
 ### Phase 3: Production Hardening
+
 - [ ] Structured JSON logging
 - [ ] PII redaction in logs
 - [ ] Request/response logging
@@ -292,6 +323,7 @@ black --check src/
 - [ ] OpenTelemetry tracing
 
 ### Phase 4: Advanced Features
+
 - [ ] OAuth2 support for Sumo Logic
 - [ ] Request signing/verification
 - [ ] IP allowlist/denylist
@@ -304,12 +336,14 @@ black --check src/
 ### For Existing Users
 
 1. **Update configuration:**
+
    ```bash
    cp .env.example .env
    # Edit .env with your credentials
    ```
 
 2. **Update Claude Desktop config:**
+
    ```json
    {
      "mcpServers": {
@@ -323,6 +357,7 @@ black --check src/
    ```
 
 3. **Install updated dependencies:**
+
    ```bash
    uv pip install -e ".[dev]"
    ```

@@ -1,27 +1,33 @@
 # Skill: Analyze Search Scan Costs
 
 ## Intent
+
 Analyze and optimize search costs in Sumo Logic Flex and Infrequent Data Tier accounts where you pay per search based on data scanned. Identify expensive queries, users consuming most scan volume, and opportunities to reduce costs.
 
 ## Prerequisites
+
 - Sumo Logic Flex or Infrequent Data Tier account
 - Access to Search Audit Index (`_view=sumologic_search_usage_per_query`)
 - Understanding of your organization type (Flex vs Tiered Infrequent)
 - Basic knowledge of tier vs metering breakdown differences
 
 ## Context
+
 **Use this skill when:**
+
 - You're on Flex or Infrequent tier with pay-per-search pricing
 - Monthly search costs are unexpectedly high
 - You need to identify which users/queries are driving costs
 - Optimizing budgets and setting scan quotas
 
 **Don't use this when:**
+
 - You're on legacy Continuous tier (flat pricing)
 - You only need query performance metrics (use search audit without cost analysis)
 - Looking for ingestion costs (use data volume analysis instead)
 
 **Tier vs Metering Breakdown:**
+
 - **Tier breakdown** (for Tiered Infrequent customers): Continuous, Frequent, Infrequent
 - **Metering breakdown** (for Flex customers): Flex (billable), FlexSecurity (non-billable), Continuous, Frequent, etc.
 - **CRITICAL:** Flex orgs MUST use metering breakdown. Tier breakdown returns near-zero scan data.
@@ -29,9 +35,11 @@ Analyze and optimize search costs in Sumo Logic Flex and Infrequent Data Tier ac
 ## Approach
 
 ### Step 1: Detect Organization Type (Auto)
+
 The `analyze_search_scan_cost` tool auto-detects Flex vs Tiered via account status API.
 
 **MCP Tool:** `analyze_search_scan_cost` with `breakdown_type='auto'` (default)
+
 ```json
 {
   "from_time": "-24h",
@@ -41,12 +49,14 @@ The `analyze_search_scan_cost` tool auto-detects Flex vs Tiered via account stat
 ```
 
 **Auto-Detection Logic:**
+
 - Calls account status API
 - Checks plan type for "Flex" keyword
 - Returns `detected_org_type: "Flex"` or `"Tiered"` in response
 - Selects appropriate breakdown automatically
 
 **Benefits:**
+
 - No manual configuration needed
 - Prevents using wrong breakdown type
 - Warning if mismatch detected
@@ -54,6 +64,7 @@ The `analyze_search_scan_cost` tool auto-detects Flex vs Tiered via account stat
 ### Step 2: Identify Top Users by Scan Volume
 
 #### For All Organizations (Auto-Detect)
+
 ```json
 {
   "from_time": "-7d",
@@ -65,6 +76,7 @@ The `analyze_search_scan_cost` tool auto-detects Flex vs Tiered via account stat
 ```
 
 **Returns (Flex):**
+
 ```json
 {
   "user_name": "analyst@company.com",
@@ -82,6 +94,7 @@ The `analyze_search_scan_cost` tool auto-detects Flex vs Tiered via account stat
 ```
 
 **Returns (Tiered Infrequent):**
+
 ```json
 {
   "user_name": "analyst@company.com",
@@ -99,6 +112,7 @@ The `analyze_search_scan_cost` tool auto-detects Flex vs Tiered via account stat
 ```
 
 **Analysis:**
+
 - **Flex:** Focus on `billable_scan_tb` (TB is primary unit)
 - **Tiered:** Focus on `scan_credits` (0.016 cr/GB = 16 cr/TB standard rate)
 - Look for users with high scan per query (divide total by queries)
@@ -106,6 +120,7 @@ The `analyze_search_scan_cost` tool auto-detects Flex vs Tiered via account stat
 ### Step 3: Identify Expensive Queries
 
 #### Group by Query Text
+
 ```json
 {
   "from_time": "-7d",
@@ -118,12 +133,14 @@ The `analyze_search_scan_cost` tool auto-detects Flex vs Tiered via account stat
 ```
 
 **Pattern to Look For:**
+
 - Queries with broad scope (e.g., `*` or no partition filter)
 - Long time ranges (-30d or more)
 - No aggregation (raw message queries)
 - Repeated similar queries (query variations)
 
 **Example Result:**
+
 ```json
 {
   "user_name": "analyst@company.com",
@@ -136,6 +153,7 @@ The `analyze_search_scan_cost` tool auto-detects Flex vs Tiered via account stat
 ```
 
 **Red Flags:**
+
 - `scope: "*"` - Scanning all data
 - No partition in scope
 - High query count with same pattern (automation gone wrong?)
@@ -143,6 +161,7 @@ The `analyze_search_scan_cost` tool auto-detects Flex vs Tiered via account stat
 ### Step 4: Analyze by Scope (Partition/View)
 
 #### Group by Scope + Query
+
 ```json
 {
   "from_time": "-7d",
@@ -155,6 +174,7 @@ The `analyze_search_scan_cost` tool auto-detects Flex vs Tiered via account stat
 ```
 
 **Returns:**
+
 ```json
 {
   "user_name": "analyst@company.com",
@@ -166,6 +186,7 @@ The `analyze_search_scan_cost` tool auto-detects Flex vs Tiered via account stat
 ```
 
 **Benefits:**
+
 - See if users are scoping queries properly
 - Identify missing partition filters
 - Compare scan volume by partition
@@ -173,6 +194,7 @@ The `analyze_search_scan_cost` tool auto-detects Flex vs Tiered via account stat
 ### Step 5: Analyze Dashboard/Scheduled Search Costs
 
 #### Group by Content
+
 ```json
 {
   "from_time": "-30d",
@@ -185,6 +207,7 @@ The `analyze_search_scan_cost` tool auto-detects Flex vs Tiered via account stat
 ```
 
 **Use Cases:**
+
 - Find expensive dashboards that auto-refresh
 - Identify scheduled searches needing optimization
 - Audit automated queries
@@ -192,6 +215,7 @@ The `analyze_search_scan_cost` tool auto-detects Flex vs Tiered via account stat
 ## Query Patterns
 
 ### Search Audit Cost Query (Flex - Metering)
+
 ```
 _view=sumologic_search_usage_per_query
 | json field=scanned_bytes_breakdown_by_metering_type "$['Flex']" as flex_bytes nodrop
@@ -207,6 +231,7 @@ _view=sumologic_search_usage_per_query
 ```
 
 ### Search Audit Cost Query (Tiered Infrequent)
+
 ```
 _view=sumologic_search_usage_per_query
 | json field=scanned_bytes_breakdown "$['Infrequent']" as inf_bytes nodrop
@@ -220,6 +245,7 @@ _view=sumologic_search_usage_per_query
 ```
 
 ### Scope Extraction Pattern
+
 ```
 | parse regex field=query "^(?<scope>[^|]+)" nodrop
 | where scope matches "*_index=*" OR scope matches "*_view=*"
@@ -229,6 +255,7 @@ _view=sumologic_search_usage_per_query
 ## Examples
 
 ### Example 1: Flex Org - Find Top Scan Users
+
 **Scenario:** Flex customer, need to identify top 10 users by billable scan in last month.
 
 ```bash
@@ -241,6 +268,7 @@ MCP: analyze_search_scan_cost
 ```
 
 **Result:**
+
 ```
 1. analyst@company.com: 23.4 TB billable (487 queries, 48 GB/query avg)
 2. data-engineer@company.com: 18.7 TB billable (1234 queries, 15 GB/query avg)
@@ -248,11 +276,14 @@ MCP: analyze_search_scan_cost
 ```
 
 **Analysis:**
+
 - User 1: High scan per query (48 GB) - investigate queries
 - User 3: High query count (8900) - likely automated dashboard, optimize refresh rate
 
 **Next Steps:**
-- Drill into analyst@company.com queries:
+
+- Drill into <analyst@company.com> queries:
+
   ```json
   {
     "user_name": "analyst@company.com",
@@ -262,6 +293,7 @@ MCP: analyze_search_scan_cost
   ```
 
 ### Example 2: Tiered Infrequent - Expensive Queries
+
 **Scenario:** Infrequent tier customer, find queries costing >1 credit each.
 
 ```bash
@@ -275,6 +307,7 @@ MCP: analyze_search_scan_cost
 ```
 
 **Result:**
+
 ```
 Query: "* | where error" by user@company.com
 - Queries: 12
@@ -285,6 +318,7 @@ Query: "* | where error" by user@company.com
 
 **Optimization:**
 Add partition scope:
+
 ```
 Before: * | where error
 After:  _index=prod_logs error | where ...
@@ -292,6 +326,7 @@ Scan:   1875 GB → 45 GB (41x reduction!)
 ```
 
 ### Example 3: Dashboard Cost Analysis
+
 **Scenario:** Identify most expensive dashboards.
 
 ```bash
@@ -304,6 +339,7 @@ MCP: analyze_search_scan_cost
 ```
 
 **Result:**
+
 ```
 Dashboard: "Production Monitoring Overview"
 - Queries: 4320 (every 10 min for 30 days)
@@ -312,12 +348,14 @@ Dashboard: "Production Monitoring Overview"
 ```
 
 **Optimization Options:**
+
 1. Reduce refresh rate (10m → 30m): 4320 → 1440 queries
 2. Reduce time range (-24h → -6h on some panels)
 3. Use scheduled searches to pre-aggregate data
 4. Move high-volume panels to Continuous tier partition
 
 ### Example 4: Find Queries Missing Partition Scope
+
 **Scenario:** Audit queries to find those not using partitions.
 
 ```bash
@@ -329,6 +367,7 @@ MCP: analyze_search_scan_cost
 ```
 
 **Filter results where `scope` does NOT contain `_index=` or `_view=`:
+
 ```
 # High-cost queries without partition:
 1. scope: "error", scan: 234 GB
@@ -342,12 +381,14 @@ Work with users to add partition scoping.
 ## Common Pitfalls
 
 ### Pitfall 1: Using Tier Breakdown on Flex Org
+
 **Problem:** `breakdown_type='tier'` on Flex org returns near-zero scan data
 
 **Solution:** Always use `'auto'` or `'metering'` for Flex customers
 
 **Detection:**
 Tool warns if tier breakdown used on suspected Flex org:
+
 ```json
 {
   "warning": "Detected Flex organization but using tier breakdown. Consider using breakdown_type='metering'"
@@ -355,21 +396,25 @@ Tool warns if tier breakdown used on suspected Flex org:
 ```
 
 ### Pitfall 2: Not Filtering to Billable Data
+
 **Problem:** Analyzing all scans including FlexSecurity (non-billable)
 
 **Solution:** Focus on `billable_scan_gb` field, not `total_scan_gb`
 
 ### Pitfall 3: Ignoring Credits Per Query Metric
+
 **Problem:** Only looking at total scan, not scan efficiency
 
 **Solution:** Calculate `scan_gb / queries` to find inefficient query patterns
 
 ### Pitfall 4: Short Time Range for Analysis
+
 **Problem:** Analyzing only 24h might miss periodic expensive queries
 
 **Solution:** Use 7d or 30d time range for comprehensive analysis
 
 ### Pitfall 5: Not Correlating with Users
+
 **Problem:** Finding expensive queries but not knowing who runs them
 
 **Solution:** Always include `user_name` in group_by or start with user-level analysis
@@ -377,12 +422,15 @@ Tool warns if tier breakdown used on suspected Flex org:
 ## Optimization Strategies
 
 ### Strategy 1: Add Partition Scoping
+
 **Before:**
+
 ```
 _sourceCategory=prod/app error | count by service
 ```
 
 **After:**
+
 ```
 _index=prod_logs _sourceCategory=prod/app error | count by service
 ```
@@ -390,18 +438,22 @@ _index=prod_logs _sourceCategory=prod/app error | count by service
 **Impact:** Can reduce scan 10x-100x depending on partition size
 
 ### Strategy 2: Reduce Dashboard Refresh Rates
+
 **Before:** Every 5 minutes (288 queries/day/panel)
 **After:** Every 30 minutes (48 queries/day/panel)
 **Impact:** 6x reduction in query count
 
 ### Strategy 3: Use Scheduled Searches for Pre-Aggregation
+
 **Before:** Dashboard queries raw logs every refresh
 **After:** Scheduled search runs hourly, dashboard queries results index
 **Impact:** Query cost moves to scheduled search (predictable), dashboard becomes cheap
 
 ### Strategy 4: Optimize Time Ranges
+
 **Before:** All panels query -24h
 **After:**
+
 - Summary panels: -1h (refreshed often)
 - Trend panels: -24h (refreshed less often)
 - Historical panels: -7d (manual refresh only)
@@ -409,6 +461,7 @@ _index=prod_logs _sourceCategory=prod/app error | count by service
 **Impact:** Reduce time range by 24x on frequently refreshed panels
 
 ### Strategy 5: Move Hot Data to Continuous Tier
+
 **Before:** High-query-frequency data in Flex/Infrequent (pay per scan)
 **After:** Hot data in Continuous tier partition (flat rate)
 **Impact:** Predictable costs for high-query-volume data
@@ -416,6 +469,7 @@ _index=prod_logs _sourceCategory=prod/app error | count by service
 ## Advanced Filtering
 
 ### Filter by Analytics Tier
+
 ```json
 {
   "analytics_tier_filter": "*flex*",
@@ -424,6 +478,7 @@ _index=prod_logs _sourceCategory=prod/app error | count by service
 ```
 
 ### Filter by User Pattern
+
 ```json
 {
   "user_name": "*@company.com",
@@ -432,6 +487,7 @@ _index=prod_logs _sourceCategory=prod/app error | count by service
 ```
 
 ### Filter by Query Pattern (Regex)
+
 ```bash
 MCP: run_search_audit_query
   scope_filters: ["query=*count by*"]
@@ -443,34 +499,41 @@ Finds slow aggregate queries.
 ## Cost Estimation
 
 ### Flex Pricing (Example - Verify with Contract)
+
 - Typical range: $0.016 - $0.02 per GB scanned
 - 1 TB scan ≈ $16-20 USD
 
 **Example Calculation:**
+
 - User scans 10 TB billable in a month
 - At $0.018/GB: 10,000 GB × $0.018 = $180
 
 ### Infrequent Tier Pricing (Standard Rates)
+
 - 0.4 credits per GB (0.016 credits × 25)
 - 1 TB = 400 credits
 - Credits cost varies by contract
 
 **Example Calculation:**
+
 - User scans 5 TB Infrequent in a month
 - 5,000 GB × 0.4 cr/GB = 2,000 credits
 
 ## Related Skills
+
 - [Query Optimization](./search-optimize-queries.md) - Reduce scan volume
 - [Log Discovery](./discovery-logs-without-metadata.md) - Find right partitions
 - [Data Volume Analysis](./cost-analyze-data-volume.md) - Analyze ingestion costs
 
 ## MCP Tools Used
+
 - `analyze_search_scan_cost` - Primary tool for scan cost analysis
 - `run_search_audit_query` - Low-level search audit queries
 - `get_account_status` - Detect org type (Flex vs Tiered)
 - `get_estimated_log_search_usage` - Estimate scan before querying
 
 ## API References
+
 - [Search Audit Index](https://help.sumologic.com/docs/manage/security/audit-indexes/search-audit-index/)
 - [Infrequent Data Tier](https://help.sumologic.com/docs/manage/partitions/data-tiers/infrequent-data-tier/)
 - [Flex Pricing](https://help.sumologic.com/docs/manage/partitions/flex/)

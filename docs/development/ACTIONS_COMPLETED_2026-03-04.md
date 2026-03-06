@@ -68,6 +68,7 @@ $ uv run python scripts/verify_docs.py
 ### Integration Possibilities
 
 The script can be integrated into:
+
 - Pre-commit hooks
 - CI/CD pipeline (GitHub Actions, etc.)
 - Developer workflow (run before committing)
@@ -103,34 +104,41 @@ Enhanced documentation for 5 high-traffic tools with comprehensive examples and 
 Each enhanced docstring now includes:
 
 ✅ **Detailed Description**
+
 - What the tool does
 - Why you'd use it
 - Key concepts explained
 
 ✅ **Returns Section**
+
 - Describes output structure
 - Lists key fields with explanations
 
 ✅ **Use Cases Section**
+
 - 5+ specific use cases with context
 - Real-world scenarios
 - Integration examples
 
 ✅ **Example Output**
+
 - Sample JSON output
 - Shows actual data structure
 
 ✅ **Workflow/Usage Guidance**
+
 - Step-by-step usage instructions
 - Related tools to use together
 - Query examples
 
 ✅ **API Reference Links**
+
 - Links to official Sumo Logic API documentation
 
 ### Before & After Comparison
 
 #### Before (Minimal)
+
 ```python
 @mcp.tool()
 async def get_sumo_dashboards(...) -> str:
@@ -138,6 +146,7 @@ async def get_sumo_dashboards(...) -> str:
 ```
 
 #### After (Enhanced)
+
 ```python
 @mcp.tool()
 async def get_sumo_dashboards(...) -> str:
@@ -202,6 +211,7 @@ async def get_sumo_dashboards(...) -> str:
 ## Verification & Testing
 
 ### Documentation Verification
+
 ```bash
 # Verify docs are still in sync after changes
 $ uv run python scripts/verify_docs.py
@@ -210,6 +220,7 @@ $ uv run python scripts/verify_docs.py
 ```
 
 ### Code Tests
+
 ```bash
 # Verify code still works after docstring changes
 $ uv run pytest tests/test_url_builder.py -v
@@ -221,9 +232,11 @@ $ uv run pytest tests/test_url_builder.py -v
 ## Files Modified
 
 ### Created
+
 - `scripts/verify_docs.py` (new, 150 lines)
 
 ### Modified
+
 - `src/sumologic_mcp_server/sumologic_mcp_server.py`:
   - Enhanced docstrings for 5 tools
   - No functional code changes
@@ -244,11 +257,13 @@ $ uv run pytest tests/test_url_builder.py -v
 ### Documentation Verification Script
 
 **Suggested Usage:**
+
 1. **Manual:** Run before committing changes that add/modify tools
 2. **Pre-commit hook:** Add to `.git/hooks/pre-commit` for automatic checks
 3. **CI/CD:** Add to GitHub Actions workflow
 
 **Example CI/CD Integration:**
+
 ```yaml
 # .github/workflows/verify-docs.yml
 name: Verify Documentation
@@ -267,11 +282,13 @@ jobs:
 ### Docstring Enhancement
 
 **Opportunistic Approach:**
+
 - When modifying an existing tool, check if its docstring is minimal
 - If minimal, enhance it using the template from the 5 completed tools
 - No need to enhance all at once - do it gradually
 
 **Priority Order for Future Enhancements:**
+
 1. High-traffic tools (search, content, account tools) - Most impact
 2. Complex tools - Where users need most guidance
 3. Utility tools - Lower priority, simpler functionality
@@ -283,28 +300,34 @@ jobs:
 ### Immediate Benefits
 
 ✅ **Documentation drift prevention**
+
 - Automatic detection of missing tool documentation
 - Prevents future documentation issues
 
 ✅ **Improved tool usability**
+
 - 5 frequently-used tools now have excellent documentation
 - Clear use cases and examples for developers
 
 ✅ **Establishes patterns**
+
 - Verification script serves as model for other checks
 - Enhanced docstrings serve as template for future tools
 
 ### Long-Term Benefits
 
 ✅ **Maintenance reduction**
+
 - Less time debugging documentation issues
 - Self-documenting code through examples
 
 ✅ **Developer onboarding**
+
 - New developers see excellent examples
 - Clear patterns to follow
 
 ✅ **Quality improvement**
+
 - Documentation stays synchronized with code
 - Continuous improvement as tools are touched
 

@@ -15,10 +15,12 @@ The search job functionality has critical gaps compared to the advanced script. 
 ## Critical Issues to Fix
 
 ### 1. Messages vs Records ❌ CRITICAL
+
 **Current:** Always calls `/messages` endpoint
 **Problem:** Aggregate queries return `records`, not `messages`!
 
 **Queries that are BROKEN right now:**
+
 ```
 error | count by _sourceHost          ← Returns NOTHING (should use /records)
 | timeslice 1h | count                ← Returns NOTHING (should use /records)
@@ -26,16 +28,19 @@ _sourceCategory=* | count by level    ← Returns NOTHING (should use /records)
 ```
 
 **Fix Required:**
+
 1. Add `get_search_job_records()` method to client
 2. Use `detect_query_type()` from search_helpers.py
 3. Call correct endpoint based on query type
 4. Set `requiresRawMessages` appropriately
 
 ### 2. Missing Parameters ❌ HIGH
+
 - `byReceiptTime` - Not exposed (needed for delayed log scenarios)
 - `requiresRawMessages` - Not set (causes performance issues)
 
 ### 3. Time Format Support ⚠️ MEDIUM
+
 - No relative time support (-1h, -30m, etc.)
 - Users must calculate timestamps manually
 
@@ -220,6 +225,7 @@ async def get_sumo_search_job_results(
 ### Step 4: Update Documentation (10 min)
 
 Update README.md with:
+
 1. Query type explanation (messages vs records)
 2. Time format examples
 3. byReceiptTime use cases
@@ -305,6 +311,7 @@ After implementation, verify:
 🔴 **URGENT** - Current aggregate queries may be broken!
 
 Test immediately:
+
 ```
 query: "error | count by _sourceHost"
 ```
@@ -314,6 +321,7 @@ If this returns empty results, it's because we're calling `/messages` instead of
 ---
 
 **Next Steps:**
+
 1. Run quick test with aggregate query
 2. Implement Step 1 (critical fixes)
 3. Test with real queries

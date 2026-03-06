@@ -18,6 +18,7 @@ Skills are reusable knowledge artifacts that describe **how to accomplish specif
 Skills are organized by domain:
 
 ### Search & Query (`search-*.md`, `ui-*.md`)
+
 - **Writing queries**: Complete 5-phase construction guide
 - **Query optimization**: Performance and cost optimization with views
 - **UI navigation**: Interactive investigation techniques
@@ -25,6 +26,7 @@ Skills are organized by domain:
 - Search cost analysis
 
 ### Data Discovery (`discovery-*.md`)
+
 - Finding logs without knowing metadata
 - Schema profiling
 - Partition discovery
@@ -32,24 +34,28 @@ Skills are organized by domain:
 - Field exploration
 
 ### Cost Analysis (`cost-*.md`)
+
 - Search scan cost analysis
 - Data volume analysis
 - Credit calculation
 - Usage forecasting
 
 ### Audit & Compliance (`audit-*.md`)
+
 - Searching audit indexes
 - User activity tracking
 - System health monitoring
 - Compliance reporting
 
 ### Content Management (`content-*.md`)
+
 - Library navigation
 - Dashboard management
 - Content export
 - URL generation
 
 ### Administration (`admin-*.md`)
+
 - Collector management
 - User and role management
 - Field extraction rules
@@ -58,12 +64,15 @@ Skills are organized by domain:
 ## Using Skills
 
 ### With Claude Code
+
 Skills can be referenced in Claude Code via the [Skills documentation](https://code.claude.com/docs/en/skills).
 
 ### With Other LLMs
+
 Copy the relevant skill markdown file and provide it as context to your LLM.
 
 ### In Automation
+
 Extract the patterns and examples from skills to build automated workflows.
 
 ## Skill Template
@@ -138,30 +147,35 @@ See [CLAUDE.md](../CLAUDE.md) for developer guidelines on keeping skills synchro
 ### Core Query Skills
 
 **[Writing Queries](./search-write-queries.md)** - Start here for query construction
+
 - 5-phase pattern: Scope → Parse → Filter → Aggregate → Format
 - Complete examples for each phase
 - Dashboard panel patterns
 - Integrates with MCP tools
 
 **[UI Navigation](./ui-navigate-and-search.md)** - Interactive investigation
+
 - Field Browser and Log Message Inspector
 - Iterative workflow patterns
 - Histogram and auto log level features
 - UI-only (no MCP tools)
 
 **[Query Optimization](./search-optimize-queries.md)** - Make queries faster and cheaper
+
 - Scope optimization techniques
 - Cost reduction strategies (10x-100x improvements)
 - Anti-patterns to avoid
 - Uses MCP tools for analysis
 
 **[Optimize with Views](./search-optimize-with-views.md)** - Transform slow queries to use scheduled views
+
 - Replace raw log queries with pre-aggregated view queries
 - Achieve 10x-100x performance improvements
 - Dramatically reduce scan costs (especially Flex/Infrequent)
 - Patterns for direct replacement, re-aggregation, dimension collapsing
 
 **Combined Workflow:**
+
 1. Use **UI Navigation** to explore and build queries interactively
 2. Apply **Writing Queries** patterns for proper structure
 3. Optimize with **Query Optimization** techniques
@@ -171,6 +185,7 @@ See [CLAUDE.md](../CLAUDE.md) for developer guidelines on keeping skills synchro
 ### Discovery Skills
 
 **[Scheduled Views Discovery](./discovery-scheduled-views.md)** - Find and understand scheduled views
+
 - Inventory all available views in organization
 - Understand view schemas and field availability
 - Match views to use cases

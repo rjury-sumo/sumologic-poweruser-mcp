@@ -4,11 +4,12 @@
 
 ## Overview
 
-Added full support for Sumo Logic Dashboard API pagination and mode filtering to align with official API specification at https://api.sumologic.com/docs/#operation/listDashboards
+Added full support for Sumo Logic Dashboard API pagination and mode filtering to align with official API specification at <https://api.sumologic.com/docs/#operation/listDashboards>
 
 ## Problem
 
 The `get_sumo_dashboards` tool was missing critical API parameters:
+
 - ❌ No `mode` parameter (createdByUser vs allViewableByUser)
 - ❌ No `token` parameter for proper cursor-based pagination
 - ❌ Only used deprecated `offset` pagination
@@ -58,6 +59,7 @@ async def get_dashboards(
 **Updated `get_sumo_dashboards()` tool:**
 
 **New Parameters:**
+
 - `mode` (str, default='allViewableByUser') - Filter dashboards by visibility
 - `token` (str, optional) - Cursor-based pagination token
 
@@ -79,12 +81,15 @@ async def get_sumo_dashboards(
 ## Mode Parameter
 
 ### allViewableByUser (default)
+
 Returns all dashboards the user can view, including:
+
 - Dashboards created by the user
 - Dashboards shared with the user
 - Dashboards in folders the user has access to
 
 ### createdByUser
+
 Returns only dashboards created by the current user
 
 **Usage Examples:**
@@ -109,6 +114,7 @@ get_sumo_dashboards(
 ### Why Token-Based?
 
 Token-based (cursor) pagination is:
+
 - ✅ More efficient than offset-based
 - ✅ Handles concurrent updates correctly
 - ✅ Recommended by Sumo Logic API
@@ -160,6 +166,7 @@ while next_token:
 ```
 
 **Fields:**
+
 - `dashboards`: Array of dashboard objects
 - `next`: Pagination token (present if more results available)
 
@@ -168,17 +175,20 @@ while next_token:
 ### Test Results
 
 ✅ **Token-based pagination working:**
+
 - First page: 10 dashboards
 - Pagination token received
 - Second page: 10 different dashboards
 - Third page token available
 
 ✅ **Mode parameter working:**
+
 - `allViewableByUser`: Returns 10 dashboards
 - `createdByUser`: Returns 10 user-created dashboards
 - Mode filtering happens server-side (fast)
 
 ✅ **Combined features:**
+
 - Mode + pagination: ✓ Working
 - Mode + client filters: ✓ Working
 - Mode + pagination + client filters: ✓ Working
@@ -220,6 +230,7 @@ Dashboard Pagination & Mode Test
 ## Performance Comparison
 
 ### Old Implementation (Offset-based)
+
 ```python
 # Page 1
 get_sumo_dashboards(limit=100, offset=0)
@@ -232,11 +243,13 @@ get_sumo_dashboards(limit=100, offset=200)
 ```
 
 **Issues:**
+
 - Large offsets are slow
 - Can miss/duplicate results if data changes
 - Not recommended by API
 
 ### New Implementation (Token-based)
+
 ```python
 # Page 1
 response = get_sumo_dashboards(limit=100)
@@ -250,6 +263,7 @@ token = json.loads(response).get('next')
 ```
 
 **Benefits:**
+
 - ✅ Fast regardless of position
 - ✅ Consistent results even with concurrent updates
 - ✅ Recommended by Sumo Logic
@@ -258,6 +272,7 @@ token = json.loads(response).get('next')
 ## Use Cases
 
 ### 1. Find Your Own Dashboards
+
 ```python
 get_sumo_dashboards(
     mode='createdByUser',
@@ -266,6 +281,7 @@ get_sumo_dashboards(
 ```
 
 ### 2. Paginate Through Large Dashboard Libraries
+
 ```python
 all_dashboards = []
 token = None
@@ -284,6 +300,7 @@ print(f"Total dashboards: {len(all_dashboards)}")
 ```
 
 ### 3. Find Specific Dashboard Types
+
 ```python
 # Find all AWS dashboards created by user
 get_sumo_dashboards(
@@ -334,13 +351,15 @@ Now **100% aligned** with Sumo Logic Dashboard API specification:
 
 ## Best Practices
 
-### ✅ DO:
+### ✅ DO
+
 - Use `mode='createdByUser'` to find your own dashboards
 - Use token-based pagination for >100 dashboards
 - Check for `next` field to detect more pages
 - Combine mode with client-side filters for precise results
 
-### ❌ DON'T:
+### ❌ DON'T
+
 - Don't use offset-based pagination for new code
 - Don't assume all results fit in one page
 - Don't ignore the `next` field
@@ -349,6 +368,7 @@ Now **100% aligned** with Sumo Logic Dashboard API specification:
 ## Future Enhancements
 
 Potential improvements:
+
 1. Add helper function for automatic pagination
 2. Add caching for frequently accessed dashboards
 3. Add support for additional dashboard metadata filtering

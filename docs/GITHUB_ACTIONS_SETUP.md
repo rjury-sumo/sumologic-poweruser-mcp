@@ -7,6 +7,7 @@ This document explains how to configure GitHub Actions secrets for running integ
 The CI workflow has two modes:
 
 ### Push Events (Fast Unit Tests)
+
 - **Triggers:** Push to `main` or `develop` branches
 - **Tests:** Unit tests only (`tests/test_*.py`)
 - **Duration:** ~1-2 minutes
@@ -14,6 +15,7 @@ The CI workflow has two modes:
 - **Purpose:** Quick validation of basic functionality
 
 ### Pull Request Events (Full Integration Tests)
+
 - **Triggers:** Pull requests to `main` or `develop` branches
 - **Tests:** Full test suite including integration tests
 - **Duration:** ~5-10 minutes
@@ -114,6 +116,7 @@ Your API endpoint depends on your Sumo Logic deployment region:
 | FED | `https://api.fed.sumologic.com` |
 
 **Finding your region:**
+
 - Check your Sumo Logic login URL
 - Example: `https://service.us2.sumologic.com` → US2 region → Use `https://api.us2.sumologic.com`
 - **Note:** Do NOT include `/api` suffix - it's added automatically
@@ -123,17 +126,19 @@ Your API endpoint depends on your Sumo Logic deployment region:
 If your organization uses a custom subdomain for Sumo Logic UI access:
 
 **Example UI URLs:**
+
 - Default: `https://service.us2.sumologic.com` → No subdomain needed, leave `SUMO_SUBDOMAIN` unset
 - Custom: `https://mycompany.us2.sumologic.com` → Set `SUMO_SUBDOMAIN=mycompany`
 
 **When to set SUMO_SUBDOMAIN:**
+
 - Only if you access Sumo Logic at `https://[your-subdomain].[region].sumologic.com`
 - Used for generating correct web UI URLs in tool responses
 - Leave unset if you use the default `service.xx.sumologic.com` URL
 
 ### Step 3: Add Secrets to GitHub Repository
 
-#### For Repository Owners/Admins:
+#### For Repository Owners/Admins
 
 1. Go to your GitHub repository
 2. Click **Settings** > **Secrets and variables** > **Actions**
@@ -141,21 +146,25 @@ If your organization uses a custom subdomain for Sumo Logic UI access:
 4. Add each required secret:
 
 **Secret 1: SUMO_ACCESS_ID** (Required)
+
 - Name: `SUMO_ACCESS_ID`
 - Value: `[paste your Access ID from Step 1]`
 - Click **Add secret**
 
 **Secret 2: SUMO_ACCESS_KEY** (Required)
+
 - Name: `SUMO_ACCESS_KEY`
 - Value: `[paste your Access Key from Step 1]`
 - Click **Add secret**
 
 **Secret 3: SUMO_ENDPOINT** (Required)
+
 - Name: `SUMO_ENDPOINT`
 - Value: `[your API endpoint from Step 2, e.g., https://api.us2.sumologic.com]`
 - Click **Add secret**
 
 **Secret 4: SUMO_SUBDOMAIN** (Optional)
+
 - Name: `SUMO_SUBDOMAIN`
 - Value: `[your subdomain from Step 2b, e.g., mycompany]`
 - Click **Add secret**
@@ -176,6 +185,7 @@ If your organization uses a custom subdomain for Sumo Logic UI access:
 **Best Practice:** Always use service accounts instead of user access keys for CI/CD:
 
 **Why Service Accounts?**
+
 - **Purpose-built:** Designed for automation, not human users
 - **No MFA conflicts:** Service accounts don't require multi-factor authentication
 - **Independent lifecycle:** Not tied to employee accounts (no disruption when team members leave)
@@ -184,6 +194,7 @@ If your organization uses a custom subdomain for Sumo Logic UI access:
 
 **Required Capabilities:**
 Enable ONLY these view permissions (never manage/create/delete):
+
 - View Collectors, Fields, Field Extraction Rules
 - View Users, Roles
 - View Content, Dashboards, Monitors
@@ -191,6 +202,7 @@ Enable ONLY these view permissions (never manage/create/delete):
 - View Account Overview
 
 **🔒 Security Benefits:**
+
 - Minimizes blast radius if credentials are compromised
 - Prevents accidental modifications during testing
 - Aligns with principle of least privilege
@@ -207,6 +219,7 @@ Enable ONLY these view permissions (never manage/create/delete):
 ### Limit Test Scope
 
 Integration tests should:
+
 - Use read-only operations when possible
 - Query small time ranges (e.g., last 1 hour)
 - Avoid expensive searches
@@ -219,6 +232,7 @@ Integration tests should:
 **Symptom:** Tests fail with `ValidationError` or "Missing required configuration"
 
 **Solution:**
+
 1. Verify all three secrets are set in GitHub repository
 2. Check secret names match exactly (case-sensitive)
 3. Ensure secrets have no leading/trailing spaces
@@ -229,6 +243,7 @@ Integration tests should:
 **Symptom:** Tests fail with `401` or authentication errors
 
 **Solution:**
+
 1. Verify Access ID and Access Key are correct
 2. Check that access key is not expired or deleted
 3. Ensure user has sufficient permissions
@@ -239,6 +254,7 @@ Integration tests should:
 **Symptom:** Tests fail with `404` or endpoint not found
 
 **Solution:**
+
 1. Verify `SUMO_ENDPOINT` matches your Sumo Logic region (see Step 2 table)
 2. Ensure endpoint does NOT include `/api` suffix (it's added automatically)
 3. Check for typos in the endpoint URL
@@ -249,6 +265,7 @@ Integration tests should:
 **Symptom:** Tests take too long or timeout
 
 **Solution:**
+
 1. Check Sumo Logic instance performance
 2. Verify network connectivity
 3. Review test queries for efficiency
@@ -277,12 +294,14 @@ integration-tests:
 To run the same tests locally:
 
 ### Unit Tests Only
+
 ```bash
 # Same as push CI
 uv run pytest tests/test_*.py --ignore=tests/integration --ignore=tests/utilities --ignore=tests/debug -v
 ```
 
 ### Full Integration Tests
+
 ```bash
 # Same as PR CI (requires .env file)
 cp .env.example .env
@@ -299,6 +318,7 @@ Integration tests query your Sumo Logic instance:
 - **Estimated cost per PR:** < 0.1 credits (typically negligible)
 
 **Best practices:**
+
 - Use test data in Continuous tier when possible
 - Keep query time ranges small (1 hour)
 - Run full tests on PRs only, not every push

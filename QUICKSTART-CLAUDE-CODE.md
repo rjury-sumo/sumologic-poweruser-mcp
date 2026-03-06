@@ -68,19 +68,21 @@ SUMO_ENDPOINT=https://api.sumologic.com
 ```
 
 **Finding Your Credentials:**
+
 1. Log in to Sumo Logic
 2. Go to **Administration** → **Security** → **Access Keys**
 3. Create a new access key or use an existing one
 4. Copy the Access ID and Access Key
 
 **Finding Your Endpoint:**
+
 - Check your Sumo Logic URL: `https://service.sumologic.com`
 - Map to API endpoint:
   - `sumologic.com` → `https://api.sumologic.com`
   - `us2.sumologic.com` → `https://api.us2.sumologic.com`
   - `eu.sumologic.com` → `https://api.eu.sumologic.com`
   - `au.sumologic.com` → `https://api.au.sumologic.com`
-  - See full list: https://help.sumologic.com/docs/api/getting-started/#sumo-logic-endpoints
+  - See full list: <https://help.sumologic.com/docs/api/getting-started/#sumo-logic-endpoints>
 
 ## Step 4: Make Wrapper Script Executable
 
@@ -122,6 +124,7 @@ node ~/.vscode/extensions/anthropic.claude-code-*/resources/claude-code/cli.js m
 ```
 
 **Finding Your Path:**
+
 ```bash
 # Run this in your project directory
 pwd
@@ -129,16 +132,19 @@ pwd
 ```
 
 **Verify Configuration:**
+
 ```bash
 node ~/.vscode/extensions/anthropic.claude-code-*/resources/claude-code/cli.js mcp list
 ```
 
 You should see output like:
+
 ```
 sumologic: uv run ... - ✓ Connected
 ```
 
 **Restart VSCode Completely:**
+
 - Quit VSCode fully (Cmd+Q / Ctrl+Q)
 - Reopen VSCode
 
@@ -157,6 +163,7 @@ node ~/.vscode/extensions/anthropic.claude-code-*/resources/claude-code/cli.js m
 This Python wrapper loads the `.env` file before starting the server.
 
 **⚠️ Security Note:**
+
 - Method A stores credentials in the MCP configuration
 - Method B keeps credentials in `.env` file (more secure)
 - Never commit files containing credentials
@@ -164,16 +171,19 @@ This Python wrapper loads the `.env` file before starting the server.
 ### Troubleshooting CLI Configuration
 
 **Remove Existing Configuration:**
+
 ```bash
 node ~/.vscode/extensions/anthropic.claude-code-*/resources/claude-code/cli.js mcp remove sumologic
 ```
 
 **List All MCP Servers:**
+
 ```bash
 node ~/.vscode/extensions/anthropic.claude-code-*/resources/claude-code/cli.js mcp list
 ```
 
 **Check Logs:**
+
 1. Open VSCode Output panel (View → Output)
 2. Select "Claude VSCode" from dropdown
 3. Look for server startup messages and errors
@@ -185,6 +195,7 @@ After restarting VSCode, verify the server is working:
 1. **Check Server Status**
 
    Open a Claude Code chat and type:
+
    ```
    /mcp
    ```
@@ -201,21 +212,25 @@ After restarting VSCode, verify the server is working:
 Open Claude Code and try these commands:
 
 **Test 1: List Available Tools**
+
 ```
 List all available Sumo Logic MCP tools
 ```
 
 **Test 2: Search Logs**
+
 ```
 Search Sumo Logic logs for "error" in the last hour
 ```
 
 **Test 3: Get Account Status**
+
 ```
 Get my Sumo Logic account status
 ```
 
 **Test 4: List Instances**
+
 ```
 What Sumo Logic instances are configured?
 ```
@@ -225,11 +240,13 @@ What Sumo Logic instances are configured?
 ### Issue: MCP Server Not Starting
 
 **Check Logs:**
+
 1. Open **Output** panel in VSCode (View → Output)
 2. Select **"Claude Code"** from the dropdown
 3. Look for error messages related to "sumologic"
 
 **Common Causes:**
+
 - ✅ Verify `uv` is installed: `uv --version`
 - ✅ Check absolute path is correct in CLI command
 - ✅ Ensure `.env` file exists and has correct credentials
@@ -239,6 +256,7 @@ What Sumo Logic instances are configured?
 ### Issue: "Command not found: uv"
 
 **Solution 1: Add uv to PATH**
+
 ```bash
 # Add to ~/.zshrc or ~/.bashrc
 export PATH="$HOME/.local/bin:$PATH"
@@ -250,12 +268,14 @@ source ~/.zshrc  # or source ~/.bashrc
 **Solution 2: Use absolute path to uv**
 
 Find uv location:
+
 ```bash
 which uv
 # Output: /Users/yourname/.local/bin/uv
 ```
 
 Update `.vscode/mcp.json`:
+
 ```json
 {
   "mcpServers": {
@@ -275,18 +295,22 @@ Update `.vscode/mcp.json`:
 ### Issue: Authentication Errors
 
 **Symptoms:**
+
 - "Authentication failed for instance 'default'"
 - "Invalid credentials"
 - "401 Unauthorized"
 
 **Solutions:**
+
 1. Verify credentials in `.env` file
 2. Check access ID and access key are correct (no extra spaces)
 3. Ensure endpoint matches your Sumo Logic deployment
 4. Test credentials manually:
+
    ```bash
    curl -u "ACCESS_ID:ACCESS_KEY" https://api.sumologic.com/api/v1/account/status
    ```
+
 5. Verify access key hasn't expired in Sumo Logic UI
 
 ### Issue: Permission Denied
@@ -294,6 +318,7 @@ Update `.vscode/mcp.json`:
 **Error:** `Permission denied: scripts/run-with-env.sh`
 
 **Solution:**
+
 ```bash
 chmod +x scripts/run-with-env.sh
 ```
@@ -301,6 +326,7 @@ chmod +x scripts/run-with-env.sh
 ### Issue: Server Starts But No Tools Available
 
 **Check:**
+
 1. Verify server logs show successful startup
 2. In Claude Code chat, type `/mcp` to see if "sumologic" appears
 3. Try reloading window: Command Palette → `Developer: Reload Window`
@@ -309,6 +335,7 @@ chmod +x scripts/run-with-env.sh
 
 **Debug Mode:**
 Edit `.env` and add:
+
 ```bash
 LOG_LEVEL=DEBUG
 ```
@@ -333,7 +360,7 @@ SUMO_STAGING_ACCESS_KEY=your_staging_key
 SUMO_STAGING_ENDPOINT=https://api.eu.sumologic.com
 ```
 
-2. **Use instances in queries:**
+1. **Use instances in queries:**
 
 ```
 Search logs in production:
@@ -344,7 +371,7 @@ Get staging account status:
 instance: "staging"
 ```
 
-3. **List available instances:**
+1. **List available instances:**
 
 ```
 What Sumo Logic instances are configured?
@@ -419,21 +446,25 @@ SUMO_SUBDOMAIN=mycompany          # For generating web UI URLs
 ## Common Commands
 
 **Log Search:**
+
 - `search_sumo_logs` - Search logs with auto query-type detection
 - `create_sumo_search_job` - Create async search job for long queries
 - `get_sumo_search_job_results` - Get results from async job
 
 **Account Management:**
+
 - `get_account_status` - Account and subscription info
 - `get_usage_forecast` - Predict future usage and credits
 - `export_usage_report` - Detailed usage reports with CSV
 
 **Content Library:**
+
 - `get_personal_folder` - Your personal content library
 - `export_content` - Full content export with async polling
 - `list_installed_apps` - Discover pre-built apps
 
 **Data Analysis:**
+
 - `analyze_data_volume` - Volume analysis with timeshift comparison
 - `analyze_search_scan_cost` - Analyze pay-per-search costs
 - `run_search_audit_query` - Analyze search usage patterns
@@ -441,17 +472,20 @@ SUMO_SUBDOMAIN=mycompany          # For generating web UI URLs
 ## Getting Help
 
 **Resources:**
+
 - 📚 Documentation: [docs/mcp-tools-reference.md](docs/mcp-tools-reference.md)
 - 🐛 Issues: [GitHub Issues](https://github.com/yourusername/sumologic-python-mcp/issues)
 - 🔒 Security: [SECURITY.md](SECURITY.md)
 - 💬 Ask Claude: "How do I use the Sumo Logic MCP server?"
 
 **Claude Code MCP References:**
+
 - [Connect Claude Code to tools via MCP - Official Docs](https://docs.claude.com/en/docs/claude-code/mcp)
 - [Configuring MCP Tools in Claude Code - The Better Way](https://scottspence.com/posts/configuring-mcp-tools-in-claude-code-the-better-way)
 - [How to Extend Claude Code with MCP Guide](https://dev.to/anthropic/how-to-extend-claude-code-with-mcp-secure-project-file-control-guide)
 
 **Support:**
+
 - Review logs in VSCode Output → "Claude Code"
 - Check `.env` file has correct credentials
 - Verify server starts: `uv run sumologic-mcp-server`

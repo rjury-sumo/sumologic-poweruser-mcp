@@ -1,22 +1,26 @@
 # Skill: Writing Sumo Logic Search Queries
 
 ## Intent
+
 Build effective Sumo Logic search queries from raw logs to valuable insights using the five-phase query construction pattern: scope, parse, filter, aggregate, and format.
 
 ## Prerequisites
+
 - Understanding of log structure (JSON, tab-separated, unstructured)
-- Basic knowledge of metadata fields (_sourceCategory, _index, _view)
+- Basic knowledge of metadata fields (_sourceCategory,_index, _view)
 - Access to Sumo Logic with log data available
 
 ## Context
 
 **Use this skill when:**
+
 - Building queries for dashboards or alerts
 - Investigating log data for troubleshooting
 - Creating saved searches for recurring analysis
 - Converting UI-based searches to API/MCP tool queries
 
 **Don't use this when:**
+
 - Just browsing raw logs (use simple scope-only queries)
 - Working with metrics (different query syntax)
 
@@ -25,10 +29,12 @@ Build effective Sumo Logic search queries from raw logs to valuable insights usi
 Sumo Logic queries follow a pipeline structure with five broad phases:
 
 ### 1. Scope Phase
+
 **Purpose:** Narrow down which logs to search using metadata and keywords
 **Performance:** Most critical for cost and speed - good scope = fast query
 
 **Metadata fields:**
+
 - `_sourceCategory` - Source category assigned at ingestion
 - `_index` or `_view` - Partition name (same field, different names)
 - `_sourceHost` - Host where logs originated
@@ -36,11 +42,13 @@ Sumo Logic queries follow a pipeline structure with five broad phases:
 - `_collector` - Collector name
 
 **Pattern:**
+
 ```
 _sourceCategory=prod/app error exception
 ```
 
 **Best practices:**
+
 - Always include metadata filter when possible
 - Use keywords to eliminate unwanted events early
 - Implicit AND: spaces = AND operator
@@ -48,6 +56,7 @@ _sourceCategory=prod/app error exception
 - Explicit logic: `(error OR exception) AND prod`
 
 **Examples:**
+
 ```
 // Good scope - specific metadata + keywords
 _sourceCategory=aws/cloudtrail errorCode AccessDenied
@@ -61,6 +70,7 @@ error exception
 
 **MCP Tool Integration:**
 Use `explore_log_metadata` to discover optimal scope:
+
 ```json
 {
   "scope": "*",
@@ -70,6 +80,7 @@ Use `explore_log_metadata` to discover optimal scope:
 ```
 
 ### 2. Parse Phase (Optional)
+
 **Purpose:** Extract fields from log messages for analysis
 **When to use:** When you need fields for filtering, grouping, or aggregation
 
@@ -79,40 +90,48 @@ JSON logs are auto-parsed by default - all JSON keys become fields
 **Manual parsing operators:**
 
 **`json` - Extract JSON fields:**
+
 ```
 | json field=_raw "errorCode" as error_code
 | json field=_raw "errorMessage" as error_msg
 | json "userIdentity.arn" as user_arn nodrop
 ```
+
 - `nodrop` keyword prevents filtering out logs without the field
 
 **`parse` - Simple anchor-based parsing:**
+
 ```
 | parse "eventSource\":\"*\"" as event_source
 | parse "User: * Action: *" as username, action
 ```
 
 **`parse regex` - Complex patterns:**
+
 ```
 | parse regex "(?<timestamp>\d{4}-\d{2}-\d{2}) (?<level>\w+) (?<message>.*)"
 | parse regex field=arn "^arn:aws:[a-z]+::[0-9]+:(?<role>.+)" nodrop
 ```
 
 **Other parsers:**
+
 - `csv` - Comma-separated values
 - `keyvalue` - key=value pairs
 - `xml` - XML documents
 
 **Best practices:**
+
 - Use explicit parsing instead of auto-parsing for better performance
 - Add `nodrop` for optional fields
 - Parse only fields you need (parsing is compute-intensive)
 
 ### 3. Filter Phase (Optional)
+
 **Purpose:** Narrow results using field values
 **When to use:** After parsing, when you need precise field-based filtering
 
 **`where` operator - Numeric and string filtering:**
+
 ```
 | where status_code >= 400 and status_code < 500
 | where duration_ms > 1000
@@ -121,6 +140,7 @@ JSON logs are auto-parsed by default - all JSON keys become fields
 ```
 
 **`matches` operator - Pattern matching:**
+
 ```
 | where error_code matches "*Limit*"
 | where error matches "*Limit*" or error matches "*Exceeded*"
@@ -128,6 +148,7 @@ JSON logs are auto-parsed by default - all JSON keys become fields
 ```
 
 **Other filtering:**
+
 ```
 | where field in ("value1", "value2", "value3")
 | where field not in ("excluded1", "excluded2")
@@ -136,9 +157,11 @@ JSON logs are auto-parsed by default - all JSON keys become fields
 ```
 
 **Best practices:**
+
 - Use keywords in scope for faster filtering (runs before parsing)
 - Use `where` for numeric comparisons or complex logic
 - Combine keywords + where for optimal performance:
+
   ```
   _sourceCategory=prod (*Limit* OR *Exceeded*)  // Fast keyword filter
   | json "errorCode" as error
@@ -146,10 +169,12 @@ JSON logs are auto-parsed by default - all JSON keys become fields
   ```
 
 ### 4. Aggregate Phase
+
 **Purpose:** Transform log events into insights
 **When to use:** For dashboards, alerts, statistical analysis
 
 **Categorical aggregation (no time dimension):**
+
 ```
 // Simple count by field
 | count by error_code
@@ -165,6 +190,7 @@ JSON logs are auto-parsed by default - all JSON keys become fields
 ```
 
 **Time series aggregation:**
+
 ```
 // Simple time series
 | timeslice 5m
@@ -184,6 +210,7 @@ JSON logs are auto-parsed by default - all JSON keys become fields
 ```
 
 **Statistical aggregations:**
+
 ```
 | avg(duration_ms) as avg_duration,
   max(duration_ms) as max_duration,
@@ -193,6 +220,7 @@ JSON logs are auto-parsed by default - all JSON keys become fields
 ```
 
 **Time comparison:**
+
 ```
 | timeslice 1h
 | count by _timeslice
@@ -200,22 +228,26 @@ JSON logs are auto-parsed by default - all JSON keys become fields
 ```
 
 **Best practices:**
+
 - Use `timeslice` without parameters for auto-sizing based on time range
 - Use `transpose` for dynamic field values in time series
 - Sort categorical results: `| sort _count desc`
 - Limit results: `| top 10 field by _count`
 
 ### 5. Format Phase (Optional)
+
 **Purpose:** Clean up output for dashboards or readability
 **When to use:** For final presentation, field manipulation
 
 **Field selection:**
+
 ```
 | fields error_code, error_message, count
 | fields - unwanted_field  // Exclude field
 ```
 
 **String formatting:**
+
 ```
 | concat(field1, " - ", field2) as combined
 | toLowerCase(field) as field_lower
@@ -225,12 +257,14 @@ JSON logs are auto-parsed by default - all JSON keys become fields
 ```
 
 **Formatting operators:**
+
 ```
 | format("%s - %s", field1, field2) as formatted
 | formatDate(_messageTime, "yyyy-MM-dd") as date
 ```
 
 **Geo operators:**
+
 ```
 | geoip client_ip
 | count by latitude, longitude, country_name
@@ -239,6 +273,7 @@ JSON logs are auto-parsed by default - all JSON keys become fields
 ## Complete Query Examples
 
 ### Example 1: CloudTrail Error Analysis (Categorical)
+
 ```
 _sourceCategory=Labs/AWS/CloudTrail* errorcode
 | json field=_raw "errorCode" as error_code
@@ -252,6 +287,7 @@ _sourceCategory=Labs/AWS/CloudTrail* errorcode
 ```
 
 **Breakdown:**
+
 1. Scope: CloudTrail logs with "errorcode" keyword
 2. Parse: Extract JSON fields and parse additional fields
 3. Filter: None (all errors included)
@@ -259,6 +295,7 @@ _sourceCategory=Labs/AWS/CloudTrail* errorcode
 5. Format: Sort and limit to top 20
 
 ### Example 2: Rate Limit Errors Over Time
+
 ```
 _sourceCategory=Labs/AWS/CloudTrail* errorcode (*exceed* or *limit*)
 | json field=_raw "errorCode" as error_code
@@ -269,6 +306,7 @@ _sourceCategory=Labs/AWS/CloudTrail* errorcode (*exceed* or *limit*)
 ```
 
 **Breakdown:**
+
 1. Scope: CloudTrail + keywords for fast filtering
 2. Parse: Extract error code
 3. Filter: Precise match on specific error patterns
@@ -276,6 +314,7 @@ _sourceCategory=Labs/AWS/CloudTrail* errorcode (*exceed* or *limit*)
 5. Format: Transpose for multi-series chart
 
 ### Example 3: CloudFront Status Code Distribution
+
 ```
 _sourceCategory=*cloudfront*
 | parse "*\t*\t*\t*\t*\t*\t*\t*\t*" as date,time,edge,bytes,ip,method,host,uri,status
@@ -285,6 +324,7 @@ _sourceCategory=*cloudfront*
 ```
 
 **Breakdown:**
+
 1. Scope: CloudFront logs
 2. Parse: Tab-separated fields
 3. Filter: Only error status codes (>= 400)
@@ -292,6 +332,7 @@ _sourceCategory=*cloudfront*
 5. Format: Sort descending
 
 ### Example 4: Response Time Statistics
+
 ```
 _sourceCategory=prod/app
 | json "duration" as duration_ms
@@ -308,6 +349,7 @@ _sourceCategory=prod/app
 ```
 
 **Breakdown:**
+
 1. Scope: Production app logs
 2. Parse: Extract duration and endpoint
 3. Filter: Exclude zero/invalid durations
@@ -315,6 +357,7 @@ _sourceCategory=prod/app
 5. Format: Sort by p95 (high latency endpoints first)
 
 ### Example 5: Geographic Traffic Analysis
+
 ```
 _sourceCategory=web/access
 | parse "* * * * \"*\" * * \"*\" \"*\"" as ip, user, date, time, request, status, bytes, referrer, user_agent
@@ -324,6 +367,7 @@ _sourceCategory=web/access
 ```
 
 **Breakdown:**
+
 1. Scope: Web access logs
 2. Parse: Common log format
 3. Filter: Exclude invalid geoip results
@@ -333,7 +377,9 @@ _sourceCategory=web/access
 ## Query Optimization Patterns
 
 ### Pattern 1: Keywords Before Parse
+
 **Bad:**
+
 ```
 _sourceCategory=prod/app
 | json "level" as log_level
@@ -341,30 +387,38 @@ _sourceCategory=prod/app
 ```
 
 **Good:**
+
 ```
 _sourceCategory=prod/app ERROR
 | json "level" as log_level
 | where log_level = "ERROR"
 ```
+
 Keywords filter before parsing (faster).
 
 ### Pattern 2: Explicit Parsing vs Auto-Parsing
+
 **Bad (auto-parsing):**
+
 ```
 _sourceCategory=prod/app
 | count by %"errorCode"
 ```
 
 **Good (explicit):**
+
 ```
 _sourceCategory=prod/app
 | json "errorCode" as error_code
 | count by error_code
 ```
+
 Explicit parsing is faster and more maintainable.
 
 ### Pattern 3: Filter Before Aggregate
+
 **Bad:**
+
 ```
 _sourceCategory=prod/app
 | timeslice 5m
@@ -373,6 +427,7 @@ _sourceCategory=prod/app
 ```
 
 **Good:**
+
 ```
 _sourceCategory=prod/app ERROR
 | json "level" as level
@@ -380,25 +435,31 @@ _sourceCategory=prod/app ERROR
 | timeslice 5m
 | count by _timeslice
 ```
+
 Filter reduces data before aggregation.
 
 ### Pattern 4: Use Specific Scope
+
 **Bad:**
+
 ```
 error exception timeout
 | count
 ```
 
 **Good:**
+
 ```
 _index=prod_logs _sourceCategory=app/service (error OR exception OR timeout)
 | count
 ```
+
 Specific scope reduces scan volume significantly.
 
 ## Dashboard Query Patterns
 
 ### For Categorical Panels (Pie, Bar, Table)
+
 ```
 // Must have aggregation without timeslice
 <scope>
@@ -409,6 +470,7 @@ Specific scope reduces scan volume significantly.
 ```
 
 ### For Time Series Panels (Line, Area, Column)
+
 ```
 // Must have timeslice
 <scope>
@@ -420,6 +482,7 @@ Specific scope reduces scan volume significantly.
 ```
 
 ### For Single Value Panels
+
 ```
 // Single metric result
 <scope>
@@ -429,6 +492,7 @@ Specific scope reduces scan volume significantly.
 ```
 
 ### For Honeycomb Panels
+
 ```
 // Categorical aggregation for nodes
 <scope>
@@ -438,6 +502,7 @@ Specific scope reduces scan volume significantly.
 ```
 
 ### For Map Panels
+
 ```
 // Must have latitude, longitude fields
 <scope>
@@ -449,44 +514,60 @@ Specific scope reduces scan volume significantly.
 ## Common Pitfalls
 
 ### Pitfall 1: No Scope on Aggregate Queries
+
 **Problem:** Scans all data in account
+
 ```
 error | count by _sourceHost
 ```
+
 **Solution:** Always add scope
+
 ```
 _sourceCategory=prod/* error | count by _sourceHost
 ```
 
 ### Pitfall 2: Forgetting nodrop for Optional Fields
+
 **Problem:** Filters out logs without the field
+
 ```
 | json "optional_field" as field
 ```
+
 **Solution:** Add nodrop
+
 ```
 | json "optional_field" as field nodrop
 ```
 
 ### Pitfall 3: Using Auto-Parsed Fields in Production
+
 **Problem:** Slower queries, fragile field names
+
 ```
 | count by %"errorCode"
 ```
+
 **Solution:** Explicit parsing
+
 ```
 | json "errorCode" as error_code
 | count by error_code
 ```
 
 ### Pitfall 4: Filtering After Aggregation
+
 **Problem:** Aggregates all data then filters (inefficient)
+
 ```
 | timeslice 5m
 | count by _timeslice, status
 | where status = "500"
 ```
+
 **Solution:** Filter before aggregation
+
 ```
 | where status = "500"
 | timeslice 5m
@@ -494,12 +575,16 @@ _sourceCategory=prod/* error | count by _sourceHost
 ```
 
 ### Pitfall 5: Missing transpose for Multi-Series Time Charts
+
 **Problem:** Wrong format for charting
+
 ```
 | timeslice 5m
 | count by _timeslice, error_code
 ```
+
 **Solution:** Add transpose
+
 ```
 | timeslice 5m
 | count by _timeslice, error_code

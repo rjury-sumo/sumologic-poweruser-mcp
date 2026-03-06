@@ -1,6 +1,7 @@
 # Sumo Logic MCP Server - Tools Reference
 
 ## Overview
+
 Total Tools: **46**
 
 ---
@@ -8,9 +9,11 @@ Total Tools: **46**
 ## Search & Query Tools (9)
 
 ### 1. `search_sumo_logs`
+
 Search Sumo Logic logs using a query. Automatically detects query type (raw messages or aggregated records) and returns appropriate results.
 
 **Parameters:**
+
 - `query` (str) - Sumo Logic search query
 - `hours_back` (int, default=1) - Number of hours to search back
 - `from_time` (str, optional) - Start time (ISO8601, epoch ms, or relative like '-1h')
@@ -24,9 +27,11 @@ Search Sumo Logic logs using a query. Automatically detects query type (raw mess
 ---
 
 ### 2. `create_sumo_search_job`
+
 Create a search job and return immediately with job ID. Use for long-running searches.
 
 **Parameters:**
+
 - `query` (str) - Sumo Logic search query
 - `from_time` (str) - Start time
 - `to_time` (str) - End time
@@ -39,9 +44,11 @@ Create a search job and return immediately with job ID. Use for long-running sea
 ---
 
 ### 3. `get_sumo_search_job_status`
+
 Get the status of a search job.
 
 **Parameters:**
+
 - `job_id` (str) - Search job ID
 - `instance` (str, default='default') - Instance name
 
@@ -50,9 +57,11 @@ Get the status of a search job.
 ---
 
 ### 4. `get_sumo_search_job_results`
+
 Get results from a completed search job. Auto-detects result type (messages or records).
 
 **Parameters:**
+
 - `job_id` (str) - Search job ID
 - `result_type` (str, default='auto') - Result type: 'auto', 'messages', or 'records'
 - `offset` (int, default=0) - Pagination offset
@@ -64,9 +73,11 @@ Get results from a completed search job. Auto-detects result type (messages or r
 ---
 
 ### 5. `query_sumo_metrics`
+
 Query Sumo Logic metrics.
 
 **Parameters:**
+
 - `query` (str) - Metrics query (e.g., "metric=CPU_User | avg by host")
 - `hours_back` (int, default=1) - Hours to query back
 - `instance` (str, default='default') - Instance name
@@ -76,9 +87,11 @@ Query Sumo Logic metrics.
 ---
 
 ### 6. `run_search_audit_query`
+
 Run a search audit query to analyze search usage and performance. Queries the special `_view=sumologic_search_usage_per_query` index.
 
 **Parameters:**
+
 - `from_time` (str, default='-24h') - Start time (relative or ISO8601)
 - `to_time` (str, default='now') - End time (relative or ISO8601)
 - `query_type` (str, default='*') - Filter by type (Interactive, Scheduled, Monitors, etc.)
@@ -90,12 +103,14 @@ Run a search audit query to analyze search usage and performance. Queries the sp
 - `instance` (str, default='default') - Instance name
 
 **Returns:** Aggregated search metrics with:
+
 - Total searches, data scanned (GB), Infrequent/Flex tier breakdown
 - Results count, avg partitions scanned, avg time range
 - Runtime statistics (total and average in minutes)
 - Grouped by user, query, query type, content name
 
 **Example Use Cases:**
+
 - All searches in last 24h: (use defaults)
 - Interactive searches by user: `query_type='Interactive'`, `user_name='john@example.com'`
 - Dashboard searches: `query_type='Scheduled'`, `content_name='*Dashboard*'`
@@ -106,9 +121,11 @@ Run a search audit query to analyze search usage and performance. Queries the sp
 ---
 
 ### 7. `explore_log_metadata`
+
 Explore log metadata values for a given scope to discover partitions, source categories, and other metadata dimensions.
 
 **Parameters:**
+
 - `scope` (str, default='*') - Log search scope
 - `from_time` (str, default='-15m') - Start time (ISO8601, epoch ms, or relative)
 - `to_time` (str, default='now') - End time
@@ -119,6 +136,7 @@ Explore log metadata values for a given scope to discover partitions, source cat
 - `instance` (str, default='default') - Instance name
 
 **Common Metadata Fields:**
+
 - `_view` / `_index` - Partition name
 - `_sourceCategory` - Source category assigned to logs
 - `_collector` - Collector name
@@ -129,6 +147,7 @@ Explore log metadata values for a given scope to discover partitions, source cat
 **Returns:** JSON with metadata combinations and message counts
 
 **Use Cases:**
+
 - Discover which partitions/views contain specific logs
 - Map source categories to partitions for query optimization
 - Essential for Flex/Infrequent tier accounts to scope queries before incurring scan charges
@@ -136,11 +155,13 @@ Explore log metadata values for a given scope to discover partitions, source cat
 ---
 
 ### 8. `analyze_search_scan_cost`
+
 Analyze search scan costs with detailed tier/metering breakdown for Infrequent and Flex customers. Specifically designed for analyzing pay-per-search costs.
 
 **⚠️ IMPORTANT FOR FLEX ORGANIZATIONS**: Flex orgs MUST use `breakdown_type='metering'` or `'auto'` (default). Using `'tier'` returns near-zero scan data for Flex logs.
 
 **Parameters:**
+
 - `from_time` (str, default='-24h') - Start time (relative or ISO8601)
 - `to_time` (str, default='now') - End time (relative or ISO8601)
 - `query_type` (str, default='*') - Filter by type (Interactive, Scheduled, etc.)
@@ -157,11 +178,13 @@ Analyze search scan costs with detailed tier/metering breakdown for Infrequent a
 - `instance` (str, default='default') - Instance name
 
 **Breakdown Types:**
+
 - **auto** (DEFAULT): Automatically detects organization type (Flex vs Tiered) via account status API and selects appropriate breakdown
 - **tier** (Tiered customers ONLY): Continuous, Frequent, Infrequent data tier breakdown. **WARNING**: Returns near-zero data on Flex orgs!
 - **metering** (Flex customers - REQUIRED): Flex, FlexSecurity, Continuous, Frequent, Infrequent, Security, Tracing breakdown with billable vs non-billable calculation
 
 **Group By Options:**
+
 - **user**: Aggregate by user_name only
 - **user_query**: Group by user_name and query text
 - **user_scope_query**: Group by user_name, scope (_index/_view), and query
@@ -171,6 +194,7 @@ Analyze search scan costs with detailed tier/metering breakdown for Infrequent a
 **Returns:** JSON with scan cost analysis including:
 
 **For Tier Breakdown (Infrequent tier):**
+
 - queries: Number of searches
 - total_scan_gb: Total data scanned
 - scan_credits: Estimated credits (0.016 cr/GB standard rate)
@@ -178,6 +202,7 @@ Analyze search scan costs with detailed tier/metering breakdown for Infrequent a
 - tier_breakdown_gb: GB per tier (continuous/frequent/infrequent)
 
 **For Metering Breakdown (Flex):**
+
 - queries: Number of searches
 - total_scan_gb: Total data scanned
 - billable_scan_gb: Billable scan volume in GB
@@ -187,10 +212,12 @@ Analyze search scan costs with detailed tier/metering breakdown for Infrequent a
 - flex_billing_note: Note that credits are NOT calculated (contract-specific)
 
 **Both:**
+
 - detected_org_type: Organization type if auto-detected (Flex/Tiered)
 - warning: Alert if using 'tier' breakdown on suspected Flex org
 
 **Use Cases:**
+
 1. **Auto-detect and analyze** (RECOMMENDED): `breakdown_type='auto'` (default)
 2. **Infrequent tier cost analysis**: `analytics_tier_filter='*infrequent*'`, `group_by='user_query'`
 3. **Flex billable scan analysis**: `breakdown_type='metering'`, `group_by='user_scope_query'`
@@ -198,6 +225,7 @@ Analyze search scan costs with detailed tier/metering breakdown for Infrequent a
 5. **User scan ranking**: `group_by='user'`, `sort_by='billable_scan_gb'` (Flex) or `'scan_credits'` (Tiered)
 
 **Important Notes:**
+
 - **Infrequent tier**: Credits calculated using 0.016 cr/GB (16 cr/TB) standard rate
 - **Flex tier**: Credits NOT calculated - rates vary by contract. Use TB values for cost estimation.
 
@@ -208,6 +236,7 @@ Analyze search scan costs with detailed tier/metering breakdown for Infrequent a
 ## Audit Index Tools (3)
 
 **⚠️ NOTE ON TERMINOLOGY:**
+
 - **"Audit Index Tools"** (below): Search audit *event* indexes for user actions, authentication, system operations
   - Indexes: `_index=sumologic_audit`, `_index=sumologic_audit_events`, `_index=sumologic_system_events`
   - Track: Login events, content changes, collector health, CSE operations, etc.
@@ -217,9 +246,11 @@ Analyze search scan costs with detailed tier/metering breakdown for Infrequent a
   - Track: What searches were run, data scanned, query performance, costs
 
 ### 9. `search_legacy_audit`
+
 Search the legacy Sumo Logic audit index (_index=sumologic_audit) for user activity, authentication, and system events.
 
 **Parameters:**
+
 - `action` (str, optional) - Action filter (e.g., "login", "create", "update")
 - `status` (str, optional) - Status filter (e.g., "SUCCESS", "FAILURE")
 - `source_category` (str, optional) - Source category filter (e.g., "user_activity", "scheduled_search")
@@ -235,29 +266,34 @@ Search the legacy Sumo Logic audit index (_index=sumologic_audit) for user activ
 **Returns:** Query results with audit events. If aggregate_by specified, returns aggregated counts.
 
 **Pre-built Use Cases:**
+
 - `logins` - User login events
 - `scheduled_search_triggers` - Scheduled search alert triggers
 - `user_activity` - General user activity
 - `content_changes` - Content creation/modification/deletion
 
 **Example Events:**
-- Login: "User user@example.com successfully logged in via SAML"
+
+- Login: "User <user@example.com> successfully logged in via SAML"
 - Alert: "Scheduled search alert triggered [Name=...] [SchSearchId=...][AlertType=...]"
 
 **Use Cases:**
+
 - Track user authentication activity
 - Monitor scheduled search alert triggers
 - Audit content changes
 - Investigate user actions
 
-**API Reference:** https://www.sumologic.com/help/docs/manage/security/audit-indexes/audit-index/
+**API Reference:** <https://www.sumologic.com/help/docs/manage/security/audit-indexes/audit-index/>
 
 ---
 
 ### 10. `search_audit_events`
+
 Search the enterprise audit events index (_index=sumologic_audit_events) for structured JSON audit logs.
 
 **Parameters:**
+
 - `event_name` (str, optional) - Event name filter (e.g., "UserLoginSuccess", "ContentUpdated", "InsightCreated")
 - `source_category` (str, optional) - Source category filter (e.g., "userSessions", "content", "cseInsight")
 - `operator_email` (str, optional) - Filter by operator email address
@@ -273,6 +309,7 @@ Search the enterprise audit events index (_index=sumologic_audit_events) for str
 **Returns:** Parsed JSON audit events with extracted fields. If aggregate_by specified, returns aggregated counts.
 
 **Common Event Categories:**
+
 - **Authentication**: UserLoginSuccess, UserLoginFailure, UserLogout, MfaEnabled
 - **Content Management**: ContentCreated, ContentUpdated, ContentDeleted, ContentMoved
 - **Data Collection**: CollectorCreated, SourceCreated, SourceUpdated
@@ -281,6 +318,7 @@ Search the enterprise audit events index (_index=sumologic_audit_events) for str
 - **Monitoring**: MonitorCreated, MonitorUpdated, MonitorTriggered
 
 **Common Source Categories:**
+
 - `userSessions` - Authentication events
 - `content` - Content library operations
 - `dashboards` - Dashboard operations
@@ -288,9 +326,11 @@ Search the enterprise audit events index (_index=sumologic_audit_events) for str
 - `cseInsight/cseSignal/cseRule` - Cloud SIEM operations
 
 **Default Extracted Fields:**
+
 - eventName, eventTime, operator.email, operator.id, operator.sourceIp
 
 **Use Cases:**
+
 - Track user authentication patterns
 - Audit content library changes by specific users
 - Monitor Cloud SIEM insight creation and updates
@@ -298,15 +338,18 @@ Search the enterprise audit events index (_index=sumologic_audit_events) for str
 - Generate compliance reports on user activity
 
 **API Reference:**
-- https://www.sumologic.com/help/docs/manage/security/audit-indexes/audit-event-index/
-- https://service.sumologic.com/audit/docs/
+
+- <https://www.sumologic.com/help/docs/manage/security/audit-indexes/audit-event-index/>
+- <https://service.sumologic.com/audit/docs/>
 
 ---
 
 ### 11. `search_system_events`
+
 Search the enterprise system events index (_index=sumologic_system_events) for system-level operations and health events.
 
 **Parameters:**
+
 - `use_case` (str, optional) - Pre-built use case: "collector_source_health"
 - `event_name` (str, optional) - Event name filter
 - `source_category` (str, optional) - Source category filter
@@ -322,11 +365,13 @@ Search the enterprise system events index (_index=sumologic_system_events) for s
 **Returns:** Parsed JSON system events. If aggregate_by specified, returns aggregated counts.
 
 **Pre-built Use Cases:**
+
 - `collector_source_health` - Monitor unhealthy collector/source states (ideal for alerts/monitors)
 - `monitor_alerts` - Analyze monitor alert state changes and frequency (find most frequently alerting monitors)
 - `monitor_alert_timeline` - Timeline view of alert status changes with durations and details
 
 **Common System Events:**
+
 - **Health-Change** events - Collector/source health status changes (healthy/unhealthy)
 - **Alert state changes** - Monitor alert transitions (Normal, Critical, Warning, etc.)
 - Automated data management operations
@@ -335,6 +380,7 @@ Search the enterprise system events index (_index=sumologic_system_events) for s
 - System configuration changes
 
 **Use Cases:**
+
 - Monitor collector and source health status
 - Create alerts for unhealthy data collection infrastructure
 - Analyze monitor alert patterns and identify noisy monitors
@@ -345,17 +391,20 @@ Search the enterprise system events index (_index=sumologic_system_events) for s
 **Use Case Examples:**
 
 *collector_source_health*:
+
 - Filters for "Health-Change" unhealthy events
 - Extracts resource name, error message, tracker ID
 - Aggregates by resource for one alert per unhealthy collector/source
 
 *monitor_alerts*:
+
 - Analyzes monitor alert state changes (excludes Normal states)
 - Shows alert counts by monitor name
 - Helps identify frequently alerting monitors
 - Useful for alert fatigue analysis
 
 *monitor_alert_timeline*:
+
 - Shows chronological timeline of all alert state changes
 - Includes alert duration in minutes, monitor path, and granularity
 - Displays time series grouping and previous/current status
@@ -363,17 +412,20 @@ Search the enterprise system events index (_index=sumologic_system_events) for s
 - Can be filtered by specific monitors in query scope
 
 **API Reference:**
-- https://www.sumologic.com/help/docs/manage/security/audit-indexes/system-event-index/
-- https://service.sumologic.com/audit/docs/#tag/Health-Events-(System)
+
+- <https://www.sumologic.com/help/docs/manage/security/audit-indexes/system-event-index/>
+- <https://service.sumologic.com/audit/docs/#tag/Health-Events-(System)>
 
 ---
 
 ## Query Examples Tools (1)
 
 ### 12. `search_query_examples`
+
 Search through 11,000+ real Sumo Logic queries from 280+ published apps using intelligent scoring and relevance ranking.
 
 **Parameters:**
+
 - `query` (str, optional) - Natural language search (e.g., "apache 4xx errors by server")
 - `app_name` (str, optional) - Filter by app name (e.g., "Apache", "AWS", "Kubernetes")
 - `use_case` (str, optional) - Filter by use case (e.g., "performance", "security", "errors")
@@ -383,6 +435,7 @@ Search through 11,000+ real Sumo Logic queries from 280+ published apps using in
 - `match_mode` (str, default='any') - Matching mode: 'any', 'all', or 'fuzzy'
 
 **Search Features:**
+
 - Natural language search with relevance scoring
 - Tokenized multi-word search
 - Technology aliases (k8s→Kubernetes, httpd→Apache)
@@ -390,6 +443,7 @@ Search through 11,000+ real Sumo Logic queries from 280+ published apps using in
 - Smart fallback that relaxes filters when no results found
 
 **Match Modes:**
+
 - `any` (default) - Scores by relevance, more matches = higher rank
 - `all` - Strict AND, all filters must match
 - `fuzzy` - Auto-relaxes filters if zero results
@@ -397,6 +451,7 @@ Search through 11,000+ real Sumo Logic queries from 280+ published apps using in
 **Returns:** Array of matching queries with scores, match metadata, and query details
 
 **Use Cases:**
+
 - Find example queries for specific technologies or use cases
 - Learn query patterns and best practices
 - Discover queries for monitoring specific applications
@@ -408,9 +463,11 @@ Search through 11,000+ real Sumo Logic queries from 280+ published apps using in
 ## Log Volume Analysis Tools (2)
 
 ### 13. `analyze_log_volume`
+
 Analyze raw log volume using the _size field to understand ingestion drivers and optimize Infrequent tier usage.
 
 **Parameters:**
+
 - `scope` (str) - Search scope expression (e.g., '_index=prod_app_logs', '_sourceCategory=*cloudtrail*')
 - `aggregate_by` (list[str]) - List of fields to aggregate by (e.g., ['_sourceCategory'], ['eventname', 'eventsource'])
 - `from_time` (str, default='-24h') - Start time
@@ -423,6 +480,7 @@ Analyze raw log volume using the _size field to understand ingestion drivers and
 **Returns:** Volume analysis with GB/MB breakdown, event counts, and percentages
 
 **Use Cases:**
+
 - Find top volume drivers within a partition by metadata
 - Analyze CloudTrail volume by event type
 - Multi-dimensional analysis with sampling
@@ -431,9 +489,11 @@ Analyze raw log volume using the _size field to understand ingestion drivers and
 ---
 
 ### 14. `profile_log_schema`
+
 Discover available fields and suggest good dimensions for volume analysis using the facets operator.
 
 **Parameters:**
+
 - `scope` (str) - Search scope expression
 - `from_time` (str, default='-15m') - Start time (keep short for better performance)
 - `to_time` (str, default='now') - End time
@@ -443,6 +503,7 @@ Discover available fields and suggest good dimensions for volume analysis using 
 **Returns:** Discovered fields with cardinality estimates and suggestions for good aggregate_by dimensions
 
 **Use Cases:**
+
 - Discover what fields are available in logs before analyzing volume
 - Identify high-cardinality fields that may not work well for aggregation
 - Find good candidate fields for volume analysis
@@ -452,24 +513,29 @@ Discover available fields and suggest good dimensions for volume analysis using 
 ## Content Library Tools (10)
 
 ### 15. `get_personal_folder`
+
 Get user's personal folder with optional children. Fast synchronous access to personal library.
 
 **Parameters:**
+
 - `include_children` (bool, default=True) - Include child items
 - `instance` (str, default='default') - Instance name
 
 **Returns:** Folder metadata and children array
 
 **Use Cases:**
+
 - Access user's personal library root
 - List personal content quickly
 
 ---
 
 ### 16. `get_folder_by_id`
+
 Get a specific folder by ID with optional children. Navigate folder hierarchy.
 
 **Parameters:**
+
 - `folder_id` (str) - Hex folder ID (16 characters)
 - `include_children` (bool, default=True) - Include children
 - `instance` (str, default='default') - Instance name
@@ -477,45 +543,54 @@ Get a specific folder by ID with optional children. Navigate folder hierarchy.
 **Returns:** Folder metadata and immediate children
 
 **Use Cases:**
+
 - Navigate multi-level folder structures
 - Browse folder contents
 
 ---
 
 ### 17. `get_content_by_path`
+
 Get content item by its library path.
 
 **Parameters:**
+
 - `content_path` (str) - Full library path (e.g., "/Library/Users/user@email.com/MyFolder")
 - `instance` (str, default='default') - Instance name
 
 **Returns:** Content item metadata
 
 **Use Cases:**
+
 - Access content by known path
 - Validate path exists
 
 ---
 
 ### 18. `get_content_path_by_id`
+
 Get the full library path for a content ID.
 
 **Parameters:**
+
 - `content_id` (str) - Hex content ID
 - `instance` (str, default='default') - Instance name
 
 **Returns:** Full path and path items array
 
 **Use Cases:**
+
 - Display content location
 - Build breadcrumb navigation
 
 ---
 
 ### 19. `export_content`
+
 Export full content structure (dashboards, searches, etc.) with async job handling.
 
 **Parameters:**
+
 - `content_id` (str) - Hex content ID to export
 - `is_admin_mode` (bool, default=False) - Use admin permissions
 - `max_wait_seconds` (int, default=300) - Max polling time
@@ -524,6 +599,7 @@ Export full content structure (dashboards, searches, etc.) with async job handli
 **Returns:** Complete content structure including nested elements, queries, panels, etc.
 
 **Use Cases:**
+
 - Get complete dashboard definition
 - Export searches with all details
 - Backup content
@@ -532,9 +608,11 @@ Export full content structure (dashboards, searches, etc.) with async job handli
 ---
 
 ### 20. `export_global_folder`
+
 Export Global folder contents (async) with optional truncation. **IMPORTANT:** Uses 'data' array instead of 'children'.
 
 **Parameters:**
+
 - `is_admin_mode` (bool, default=False) - Use admin mode
 - `max_wait_seconds` (int, default=300) - Max polling time
 - `max_items` (int, optional) - Maximum items to return (truncates large folders)
@@ -543,10 +621,12 @@ Export Global folder contents (async) with optional truncation. **IMPORTANT:** U
 **Returns:** Global folder with 'data' array containing children, optional `_metadata` if truncated
 
 **Truncation Examples:**
+
 - `max_items=50` - Limit to first 50 items (helps with >1MB responses)
 - Useful for very large Global folders with 100+ items
 
 **Use Cases:**
+
 - List global/shared content
 - Discover organization-wide content
 - Preview large folders without full export (use max_items)
@@ -554,9 +634,11 @@ Export Global folder contents (async) with optional truncation. **IMPORTANT:** U
 ---
 
 ### 21. `export_admin_recommended_folder`
+
 Export Admin Recommended folder (async) with optional truncation. Uses 'children' array (unlike Global folder).
 
 **Parameters:**
+
 - `is_admin_mode` (bool, default=False) - Use admin mode
 - `max_wait_seconds` (int, default=300) - Max polling time
 - `max_items` (int, optional) - Maximum items to return (truncates large folders)
@@ -565,9 +647,11 @@ Export Admin Recommended folder (async) with optional truncation. Uses 'children
 **Returns:** Admin Recommended folder with 'children' array, optional `_metadata` if truncated
 
 **Truncation Examples:**
+
 - `max_items=50` - Limit to first 50 items for large folders
 
 **Use Cases:**
+
 - Access admin-curated content
 - Discover best practices content
 - Sample large Admin Recommended folders (use max_items)
@@ -575,54 +659,64 @@ Export Admin Recommended folder (async) with optional truncation. Uses 'children
 ---
 
 ### 22. `export_installed_apps`
+
 Export Installed Apps folder to discover pre-built apps available in your Sumo Logic instance (async).
 
 **Parameters:**
+
 - `is_admin_mode` (bool, default=False) - View as admin to see all apps
 - `max_wait_seconds` (int, default=300) - Maximum seconds to wait for async job
 - `instance` (str, default='default') - Instance name
 
 **Returns:** JSON with installed apps structure containing:
+
 - App folders organized by category/technology
 - Each app contains dashboards, searches, monitors
 - Content IDs for accessing specific app components
 
 **Use Cases:**
+
 - **Discover available apps**: See what pre-built content is already installed
 - **Find relevant dashboards**: Locate dashboards for AWS, Kubernetes, Apache, etc.
 - **Log discovery integration**: After finding logs, discover if there's already an app for them
 - **Use case mapping**: Connect log sources to pre-built monitoring solutions
 
 **App Catalog References:**
-- Browse all apps: https://www.sumologic.com/app-catalog
+
+- Browse all apps: <https://www.sumologic.com/app-catalog>
 - Search by keyword: Use app catalog to find apps matching your technology
-- Integration docs: https://www.sumologic.com/help/docs/integrations/
+- Integration docs: <https://www.sumologic.com/help/docs/integrations/>
 
 **Example Flow:**
+
 1. Use LogDiscoveryPattern to find logs (e.g., CloudTrail logs)
 2. Use export_installed_apps to see if AWS CloudTrail app is installed
 3. If installed, navigate directly to app dashboards and searches
 4. If not installed, suggest admin install from app catalog
 
 **Notes:**
+
 - Similar async pattern to export_global_folder and export_admin_recommended_folder
 - InstalledApps is a top-level library location like Global and Admin Recommended
 - Each app folder typically contains: Overview dashboard, detailed dashboards, saved searches
 - Apps are pre-configured with optimal queries and visualizations for their technology
 
-**API Reference:** https://api.sumologic.com/docs/#operation/getInstalledAppsFolderAsync
+**API Reference:** <https://api.sumologic.com/docs/#operation/getInstalledAppsFolderAsync>
 
 ---
 
 ### 23. `list_installed_apps`
+
 List all installed Sumo Logic apps with optional filtering (lightweight alternative to export_installed_apps).
 
 **Parameters:**
+
 - `filter_name` (str, optional) - Filter apps by name (substring match, case-insensitive)
 - `search_term` (str, optional) - Search app names
 - `instance` (str, default='default') - Instance name
 
 **Returns:** JSON array of installed apps with:
+
 - App UUID
 - App name (e.g., "AWS CloudTrail", "Apache", "Kubernetes")
 - App manifest version
@@ -630,10 +724,12 @@ List all installed Sumo Logic apps with optional filtering (lightweight alternat
 - `_metadata` (if filters applied)
 
 **Filtering Examples:**
+
 - `filter_name="AWS"` - Find all AWS-related apps
 - `search_term="kubernetes"` - Search for Kubernetes apps
 
 **Use Cases:**
+
 - **Quick discovery**: Faster than exporting full folder structure
 - **App availability check**: See if specific app is installed (use filter for fast search)
 - **Log discovery integration**: Check for relevant apps after finding logs
@@ -643,26 +739,30 @@ List all installed Sumo Logic apps with optional filtering (lightweight alternat
 This endpoint may require admin permissions in some organizations. If it fails with permission error, use export_installed_apps instead which works with regular user permissions.
 
 **App Discovery Flow:**
+
 1. Phase 1: Use LogDiscoveryPattern to find logs (e.g., 'cloudtrail')
 2. Phase 2: Use list_installed_apps to see if AWS CloudTrail app exists
 3. If found: Use export_installed_apps to get full app structure
-4. If not found: Suggest installation from https://www.sumologic.com/app-catalog
+4. If not found: Suggest installation from <https://www.sumologic.com/app-catalog>
 
 **App Catalog:**
-- Browse apps: https://www.sumologic.com/app-catalog
-- Search by keyword: Find apps matching your logs/technology
-- Integration guides: https://www.sumologic.com/help/docs/integrations/
 
-**API Reference:** https://api.sumologic.com/docs/#operation/listAppsV2
+- Browse apps: <https://www.sumologic.com/app-catalog>
+- Search by keyword: Find apps matching your logs/technology
+- Integration guides: <https://www.sumologic.com/help/docs/integrations/>
+
+**API Reference:** <https://api.sumologic.com/docs/#operation/listAppsV2>
 
 ---
 
 ## Content ID Utilities (3)
 
 ### 24. `convert_content_id_hex_to_decimal`
+
 Convert hex content ID to decimal format for web UI URLs.
 
 **Parameters:**
+
 - `hex_id` (str) - Hex content ID (e.g., "00000000005E5403")
 
 **Returns:** Hex ID, decimal ID, and formatted string
@@ -670,15 +770,18 @@ Convert hex content ID to decimal format for web UI URLs.
 **Example:** `00000000005E5403` → `6181891`
 
 **Use Cases:**
+
 - Generate web UI URLs
 - Display user-friendly IDs
 
 ---
 
 ### 25. `convert_content_id_decimal_to_hex`
+
 Convert decimal content ID to hex format for API calls.
 
 **Parameters:**
+
 - `decimal_id` (str) - Decimal content ID (e.g., "6181891")
 
 **Returns:** Hex ID, decimal ID, and formatted string
@@ -686,15 +789,18 @@ Convert decimal content ID to hex format for API calls.
 **Example:** `6181891` → `00000000005E5403`
 
 **Use Cases:**
+
 - Convert web UI IDs to API format
 - Normalize ID input
 
 ---
 
 ### 26. `get_content_web_url`
+
 Generate web UI URL for a content item with proper handling for different content types.
 
 **Parameters:**
+
 - `content_id` (str) - Content ID (hex or decimal)
 - `content_type` (str, optional) - Content type (Dashboard, Search, Folder, etc.) to optimize URL generation
 - `instance` (str, default='default') - Instance name
@@ -702,17 +808,20 @@ Generate web UI URL for a content item with proper handling for different conten
 **Returns:** URL, hex ID, decimal ID, content type, instance
 
 **URL Formats:**
+
 - Library content (folders, searches, etc.): `https://service.au.sumologic.com/library/6181891`
 - Dashboards: `https://service.au.sumologic.com/dashboard/<dashboard_id>`
 - Custom subdomain: `https://mycompany.au.sumologic.com/library/6181891`
 
 **Use Cases:**
+
 - Share content links with correct URL format
 - Open content in browser
 - Generate shareable URLs for folders, searches, dashboards
 - Automatically handles dashboard vs library content URLs
 
 **Notes:**
+
 - If subdomain is configured in `.env` (e.g., `SUMO_SUBDOMAIN=mycompany`), URLs will use custom subdomain
 - Tool automatically detects if content is a dashboard and uses appropriate URL format
 - For dashboards, fetches the dashboard ID needed for proper URL generation
@@ -720,9 +829,11 @@ Generate web UI URL for a content item with proper handling for different conten
 ---
 
 ### 27. `build_search_web_url`
+
 Build a web UI URL to open a log search query with pre-filled query and time range.
 
 **Parameters:**
+
 - `query` (str) - Sumo Logic search query to open
 - `start_time` (str, optional, default='-1h') - Start time (e.g., '-1h', '-24h', '2024-01-01T00:00:00', ISO format)
 - `end_time` (str, optional, default='-1s') - End time (e.g., '-1s', 'now', '2024-01-01T23:59:59', ISO format)
@@ -733,12 +844,14 @@ Build a web UI URL to open a log search query with pre-filled query and time ran
 **Example:** `https://service.au.sumologic.com/log-search/create?query=...&startTime=-1h&endTime=-1s`
 
 **Use Cases:**
+
 - Share search queries with team members
 - Open searches from other tools (Slack, email, documentation)
 - Create bookmarks for frequently-used searches
 - Generate URLs for saved search queries
 
 **Time Range Examples:**
+
 - Last hour: `start_time='-1h', end_time='-1s'`
 - Last 24 hours: `start_time='-24h', end_time='now'`
 - Specific date range: `start_time='2024-01-01T00:00:00', end_time='2024-01-01T23:59:59'`
@@ -748,54 +861,66 @@ Build a web UI URL to open a log search query with pre-filled query and time ran
 ## Field Management Tools (3)
 
 ### 28. `list_custom_fields`
+
 List all custom fields defined in the organization.
 
 **Parameters:**
+
 - `instance` (str, default='default') - Instance name
 
 **Returns:** Array of custom field objects with:
+
 - Field name and key
 - Data type
 - Field ID
 
 **Use Cases:**
+
 - Discover available custom fields for query building
 - Audit custom field usage
 
 ---
 
 ### 29. `list_field_extraction_rules`
+
 List all field extraction rules (FERs) for pre-parsing logs.
 
 **Parameters:**
+
 - `limit` (int, default=100) - Maximum results
 - `instance` (str, default='default') - Instance name
 
 **Returns:** Array of FER objects with:
+
 - Rule name and scope
 - Parse expression
 - Enabled status
 
 **Use Cases:**
+
 - Audit FER configuration
 - Discover which fields are extracted at ingest time
 
 ---
 
 ### 30. `get_field_extraction_rule`
+
 Get detailed information about a specific field extraction rule.
 
 **Parameters:**
+
 - `rule_id` (str) - FER ID
 - `instance` (str, default='default') - Instance name
 
 **Returns:** Complete FER details including:
+
 - Parse expression
 - Scope filter
 - Field list
 - Enabled status
 
 **Use Cases:**
+
 - Inspect FER configuration
 - Debug field extraction issues
 
@@ -804,9 +929,11 @@ Get detailed information about a specific field extraction rule.
 ## Collectors & Sources Tools (2)
 
 ### 31. `get_sumo_collectors`
+
 Get list of Sumo Logic collectors with pagination and optional client-side filtering.
 
 **Parameters:**
+
 - `limit` (int, default=100) - Maximum results per page
 - `offset` (int, default=0) - Pagination offset for retrieving results beyond the limit
 - `filter_name` (str, optional) - Filter collectors by name (substring match, case-insensitive)
@@ -817,16 +944,19 @@ Get list of Sumo Logic collectors with pagination and optional client-side filte
 **Returns:** Array of collector objects with optional `_metadata` if filtered
 
 **Pagination Examples:**
+
 - First 100 collectors: `limit=100, offset=0`
 - Next 100 collectors: `limit=100, offset=100`
 - Collectors 200-299: `limit=100, offset=200`
 
 **Filtering Examples:**
+
 - `filter_name="prod"` - Find collectors with "prod" in name
 - `filter_alive=True` - Only show active collectors
 - `search_term="aws"` - Search across name, description, hostname
 
 **Use Cases:**
+
 - Large orgs with 100s of collectors - use pagination to retrieve all
 - Filter to reduce response size for >1MB results
 - Finding specific collector types before operations
@@ -835,9 +965,11 @@ Get list of Sumo Logic collectors with pagination and optional client-side filte
 ---
 
 ### 32. `get_sumo_sources`
+
 Get sources for a specific Sumo Logic collector.
 
 **Parameters:**
+
 - `collector_id` (int) - Collector ID
 - `instance` (str, default='default') - Instance name
 
@@ -848,9 +980,11 @@ Get sources for a specific Sumo Logic collector.
 ## Users & Roles Tools (2)
 
 ### 33. `get_sumo_users`
+
 Get list of Sumo Logic users.
 
 **Parameters:**
+
 - `limit` (int, default=100) - Maximum results
 - `instance` (str, default='default') - Instance name
 
@@ -859,9 +993,11 @@ Get list of Sumo Logic users.
 ---
 
 ### 34. `get_sumo_roles_v2`
+
 Get list of roles using the v2 Roles API.
 
 **Parameters:**
+
 - `limit` (int, default=100) - Maximum results
 - `instance` (str, default='default') - Instance name
 
@@ -872,9 +1008,11 @@ Get list of roles using the v2 Roles API.
 ## Dashboards & Monitors Tools (2)
 
 ### 35. `get_sumo_dashboards`
+
 Get list of Sumo Logic dashboards with pagination, mode filtering, and client-side filtering.
 
 **Parameters:**
+
 - `limit` (int, default=100) - Maximum results per page (1-100)
 - `mode` (str, default='allViewableByUser') - Filter mode:
   - `'allViewableByUser'`: All dashboards user can view (default)
@@ -886,45 +1024,53 @@ Get list of Sumo Logic dashboards with pagination, mode filtering, and client-si
 - `instance` (str, default='default') - Instance name
 
 **Returns:**
+
 - `dashboards`: Array of dashboard objects
 - `next`: Pagination token (if more results available)
 - `_metadata`: Filtering statistics (if client-side filters applied)
 
 **Pagination Workflow:**
+
 1. Call without `token` to get first page
 2. Check if `next` field exists in response
 3. Pass `next` value as `token` parameter for next page
 4. Repeat until `next` is absent (reached end)
 
 **Mode Examples:**
+
 - `mode='allViewableByUser'` - All dashboards you can view (default)
 - `mode='createdByUser'` - Only your dashboards
 
 **Filtering Examples:**
+
 - `filter_name="AWS"` - Find dashboards with "AWS" in title
 - `search_term="security"` - Find "security" in title or description
 - `mode='createdByUser', filter_name='test'` - Combine mode + client filter
 
 **Performance:**
+
 - Token-based pagination recommended for >100 dashboards
 - Client-side filtering reduces response size (3.2MB → smaller)
 - Mode filtering happens server-side (fast)
 - Client-side filters applied after API response
 
 **Use Cases:**
+
 - Dashboard discovery in large organizations
 - Finding your own dashboards (use mode='createdByUser')
 - Paginating through 100+ dashboards
 - Finding dashboards by topic before viewing
 
-**API Reference:** https://api.sumologic.com/docs/#operation/listDashboards
+**API Reference:** <https://api.sumologic.com/docs/#operation/listDashboards>
 
 ---
 
 ### 36. `search_sumo_monitors`
+
 Search for monitors and monitor folders.
 
 **Parameters:**
+
 - `query` (str) - Search query (e.g., "Test", "name:*error*")
 - `limit` (int, default=100) - Maximum results
 - `offset` (int, default=0) - Pagination offset
@@ -933,6 +1079,7 @@ Search for monitors and monitor folders.
 **Returns:** Array of matching monitors
 
 **Query Examples:**
+
 - `'Test'` - Search for monitors containing 'Test'
 - `'createdBy:000000000000968B'` - Search by creator ID
 - `'monitorStatus:Normal'` - Search by status
@@ -943,9 +1090,11 @@ Search for monitors and monitor folders.
 ## System Tools (2)
 
 ### 37. `get_sumo_partitions`
+
 Get list of partitions.
 
 **Parameters:**
+
 - `limit` (int, default=100) - Maximum results
 - `instance` (str, default='default') - Instance name
 
@@ -954,14 +1103,17 @@ Get list of partitions.
 ---
 
 ### 38. `list_scheduled_views`
+
 Get list of scheduled views with pagination.
 
 **Parameters:**
+
 - `limit` (int, default=100) - Maximum number of results (1-1000)
 - `token` (str, optional) - Pagination token from previous response's 'next' field
 - `instance` (str, default='default') - Instance name
 
 **Returns:** JSON with scheduled views array containing:
+
 - `id` - View ID
 - `indexName` - View name (used in queries with `_view=name`)
 - `query` - View query definition
@@ -974,6 +1126,7 @@ Get list of scheduled views with pagination.
 - `next` - Pagination token for next page (if more results)
 
 **Use Cases:**
+
 - **Query acceleration**: Find views that pre-aggregate data for your use case
 - **Schema discovery**: See output fields available in each view
 - **Performance optimization**: Replace raw log queries with view queries (much faster for long time ranges)
@@ -982,11 +1135,13 @@ Get list of scheduled views with pagination.
 
 **Query Performance:**
 Scheduled views run every 1 minute, pre-computing aggregates with 1m timeslice. They're ideal for:
+
 - Dashboard panels querying days to weeks of data
 - Scheduled reports requiring aggregate data
 - Queries that would otherwise scan TBs of raw logs
 
 **View Query Syntax:**
+
 - `_view=view_name` - Query specific view
 - `_view=pattern*` - Query versioned views (e.g., `_view=apache_status_code_1m_*`)
 - Filter with `field=value` expressions (no keywords)
@@ -994,20 +1149,24 @@ Scheduled views run every 1 minute, pre-computing aggregates with 1m timeslice. 
 
 **Versioning Pattern:**
 Views are often versioned since queries can't be edited:
+
 - `apache_status_code_1m_v1` (original)
 - `apache_status_code_1m_v2` (updated version)
 - Use wildcard: `_view=apache_status_code_1m_*` to query all versions
 
 **Advanced Patterns:**
+
 - **Scheduled views**: Auto-created, 1m timeslice, aggregate data
 - **Ad-hoc views**: Custom timeslice (1h, 1d), created via scheduled search "save to index" or save operator
 - **Layered views**: Scheduled view (1m) → hourly aggregation (1h) for multi-tier reporting
 
 **Cost Notes:**
+
 - **Tiered customers**: 0 scan cost for aggregate views, continuous tier cost for view ingestion
 - **Flex customers**: Scan charges apply but much lower than raw logs due to pre-aggregation
 
 **Example Output:**
+
 ```json
 {
   "data": [{
@@ -1022,12 +1181,13 @@ Views are often versioned since queries can't be edited:
 }
 ```
 
-**API Reference:** https://api.sumologic.com/docs/#tag/scheduledViewManagement
-**Help Reference:** https://www.sumologic.com/help/docs/manage/scheduled-views/
+**API Reference:** <https://api.sumologic.com/docs/#tag/scheduledViewManagement>
+**Help Reference:** <https://www.sumologic.com/help/docs/manage/scheduled-views/>
 
 ---
 
 ### 39. `list_sumo_instances`
+
 List all configured Sumo Logic instances.
 
 **Parameters:** None
@@ -1039,44 +1199,52 @@ List all configured Sumo Logic instances.
 ## Account Management Tools (6)
 
 ### 40. `get_account_status`
+
 Get account status including subscription, plan type, and usage information.
 
 **Parameters:**
+
 - `instance` (str, default='default') - Instance name
 
 **Returns:** Account details including:
+
 - Plan type (Trial, Essentials, Enterprise Operations, etc.)
 - Total credits and usage
 - Subscription period (start/end dates)
 - Account creation date
 - Organization ID
 
-**API Reference:** https://api.sumologic.com/docs/#operation/getStatus
+**API Reference:** <https://api.sumologic.com/docs/#operation/getStatus>
 
 ---
 
 ### 41. `get_usage_forecast`
+
 Get usage forecast for specified number of days based on recent consumption patterns.
 
 **Parameters:**
+
 - `number_of_days` (int) - Number of days to forecast (1-365, typically 7, 30, or 90)
 - `instance` (str, default='default') - Instance name
 
 **Returns:** Forecasted usage including:
+
 - Forecasted total credits
 - Forecasted continuous ingest
 - Forecasted frequent ingest
 - Forecasted storage
 - Forecasted metrics ingest
 
-**API Reference:** https://api.sumologic.com/docs/#operation/getUsageForecast
+**API Reference:** <https://api.sumologic.com/docs/#operation/getUsageForecast>
 
 ---
 
 ### 42. `export_usage_report`
+
 Export detailed usage report for a date range (async operation). Returns download URL for CSV report.
 
 **Parameters:**
+
 - `start_date` (str) - Start date in YYYY-MM-DD format
 - `end_date` (str) - End date in YYYY-MM-DD format
 - `group_by` (str, default='day') - Grouping period: 'day', 'week', or 'month'
@@ -1089,18 +1257,21 @@ Export detailed usage report for a date range (async operation). Returns downloa
 **Returns:** Job status and S3 presigned download URL (valid for 10 minutes)
 
 **Notes:**
+
 - This is an async operation that polls for completion
 - Download URL expires after 10 minutes
 - CSV includes daily/weekly/monthly usage breakdowns by product line
 
-**API Reference:** https://api.sumologic.com/docs/#operation/exportUsageReport
+**API Reference:** <https://api.sumologic.com/docs/#operation/exportUsageReport>
 
 ---
 
 ### 43. `get_estimated_log_search_usage`
+
 Get estimated data volume that would be scanned for a log search query in Infrequent Data Tier and Flex.
 
 **Parameters:**
+
 - `query` (str) - Log search query/scope (e.g., "_sourceCategory=prod/app" or "_view=my_view")
 - `from_time` (str, default='-1h') - Start time (ISO8601, epoch ms, or relative like '-1h', '-24h', '-7d')
 - `to_time` (str, default='now') - End time (ISO8601, epoch ms, or relative like 'now')
@@ -1109,6 +1280,7 @@ Get estimated data volume that would be scanned for a log search query in Infreq
 - `instance` (str, default='default') - Instance name
 
 **Returns:** Detailed breakdown including:
+
 - Total estimated data to scan (formatted)
 - Per-partition/view breakdown with:
   - Data tier info (Continuous, Frequent, Infrequent)
@@ -1118,30 +1290,35 @@ Get estimated data volume that would be scanned for a log search query in Infreq
 - Interval time type
 
 **Use Cases:**
+
 - Estimate query costs before running expensive queries in Infrequent/Flex tiers
 - Refine search scope to reduce scanned data
 - Understand which partitions/views contribute to scan volume
 - Budget planning for per-query pricing models
 
 **Time Format Examples:**
+
 - Relative: "-1h", "-24h", "-7d", "-1w", "now"
 - ISO: "2024-01-01T00:00:00Z"
 - Epoch ms: "1704067200000"
 
 **Notes:**
+
 - In Infrequent Data Tier and Flex, you pay per query based on data scanned
 - Use this endpoint to estimate costs before running queries
 - The `by_view=True` option provides detailed partition/view breakdown
 - Empty partition names are displayed as "sumologic_default"
 
-**API Reference:** https://help.sumologic.com/docs/api/log-search-estimated-usage/
+**API Reference:** <https://help.sumologic.com/docs/api/log-search-estimated-usage/>
 
 ---
 
 ### 44. `analyze_data_volume`
+
 Analyze data volume ingestion from the Sumo Logic Data Volume Index for capacity planning and cost analysis.
 
 **Parameters:**
+
 - `dimension` (str, default='sourceCategory') - Metadata dimension to analyze
 - `from_time` (str, default='-24h') - Start time (ISO8601, epoch ms, or relative)
 - `to_time` (str, default='now') - End time
@@ -1156,6 +1333,7 @@ Analyze data volume ingestion from the Sumo Logic Data Volume Index for capacity
 - `instance` (str, default='default') - Instance name
 
 **Dimension Options:**
+
 - `sourceCategory` - Volume by source category (most common)
 - `collector` - Volume by collector
 - `source` - Volume by source
@@ -1164,6 +1342,7 @@ Analyze data volume ingestion from the Sumo Logic Data Volume Index for capacity
 - `view` - Volume by partition/view
 
 **Returns:** JSON with:
+
 - Dimension value (e.g., sourceCategory, collector)
 - Data tier (Continuous, Frequent, Infrequent, CSE)
 - Events count
@@ -1173,6 +1352,7 @@ Analyze data volume ingestion from the Sumo Logic Data Volume Index for capacity
 - State flags: NEW, GONE, COLLECTING (if include_timeshift=True)
 
 **Credit Rates (Standard Tiered):**
+
 - Continuous: 20 credits/GB
 - Frequent: 9 credits/GB
 - Infrequent: 0.4 credits/GB
@@ -1180,6 +1360,7 @@ Analyze data volume ingestion from the Sumo Logic Data Volume Index for capacity
 - Note: Flex customers use different rates
 
 **Use Cases:**
+
 - **Top consumers**: Find which source categories use most ingestion
 - **Trend analysis**: Detect increases/decreases with timeshift comparison
 - **Stopped collection**: Identify collectors that stopped sending data (state=GONE)
@@ -1190,29 +1371,34 @@ Analyze data volume ingestion from the Sumo Logic Data Volume Index for capacity
 **Example Scenarios:**
 
 1. **Find top 10 source categories by ingestion:**
+
    ```
    dimension="sourceCategory", from_time="-24h", sort_by="gbytes", limit=10
    ```
 
 2. **Detect collectors with increasing ingestion (>50%):**
+
    ```
    dimension="collector", include_timeshift=True, timeshift_days=7, timeshift_periods=3
    Filter results where pct_increase_gb > 50
    ```
 
 3. **Find stopped collectors:**
+
    ```
    dimension="collector", include_timeshift=True
    Filter results where state="GONE"
    ```
 
 **Implementation Details:**
+
 - Uses centralized query patterns from `query_patterns.py` module
 - Timeshift pattern includes null-safe math and division-by-zero handling
 - Ensures accurate detection of GONE/NEW/COLLECTING states even with missing historical data
 - Query patterns are unit tested and shared across multiple tools
 
 **Notes:**
+
 - Queries the `sumologic_volume` index with dimension-specific source categories
 - Uses `parse regex multi` for JSON array parsing
 - Timeshift comparison helps detect anomalies and trends
@@ -1221,24 +1407,28 @@ Analyze data volume ingestion from the Sumo Logic Data Volume Index for capacity
 
 **Null Handling:**
 When `include_timeshift=True`, the tool handles edge cases properly:
+
 - **GONE detection**: Sources with no current data (null → 0) but with historical baseline are marked state="GONE"
 - **NEW detection**: Sources with current data but no historical baseline (null → 0) are marked state="NEW"
 - **Division by zero**: When baseline=0, percentage change is 100% if current>0, or 0% if current=0
 - This ensures stopped/low collection scenarios are detected correctly
 
 **Time Format Examples:**
+
 - Relative: "-1h", "-24h", "-7d", "-30d"
 - ISO: "2024-01-01T00:00:00Z"
 - Epoch ms: "1704067200000"
 
-**API Reference:** https://help.sumologic.com/docs/manage/ingestion-volume/data-volume-index/
+**API Reference:** <https://help.sumologic.com/docs/manage/ingestion-volume/data-volume-index/>
 
 ---
 
 ### 45. `analyze_data_volume_grouped`
+
 Advanced data volume analysis with cardinality reduction for large-scale environments (5000+ source categories).
 
 **Parameters:**
+
 - `dimension` (str, default='sourceCategory') - Metadata dimension
 - `from_time` (str, default='-24h') - Start time
 - `to_time` (str, default='now') - End time
@@ -1263,6 +1453,7 @@ Advanced data volume analysis with cardinality reduction for large-scale environ
    - Default 0.1% means anything < 0.1% rolls into "other"
 
 **Returns:** JSON with:
+
 - `dataTier` - Data tier name
 - `dimension` - Dimension type (e.g., "sourcecategory")
 - `value` - Dimension value (truncated or "other")
@@ -1275,6 +1466,7 @@ Advanced data volume analysis with cardinality reduction for large-scale environ
 - `cr/gb` - Credits per GB ratio
 
 **Use Cases:**
+
 - **High-cardinality environments**: Effectively analyze 5000+ source categories
 - **Executive reporting**: Focus on top contributors (>1%), hide noise
 - **Cost optimization**: Identify major credit drivers
@@ -1284,26 +1476,31 @@ Advanced data volume analysis with cardinality reduction for large-scale environ
 **Example Scenarios:**
 
 1. **Top Flex tier consumers (>1% each):**
+
    ```
    tier_filter="Flex", other_threshold_pct=1.0, sort_by="credits"
    ```
 
 2. **Infrequent tier with short names:**
+
    ```
    tier_filter="Infrequent", max_chars=30, other_threshold_pct=0.5
    ```
 
 3. **Production sources only:**
+
    ```
    value_filter="*prod*", other_threshold_pct=0.2
    ```
 
 4. **Kubernetes sources, top 20:**
+
    ```
    value_filter="*k8s*", limit=20, other_threshold_pct=0.5
    ```
 
 **Example Output:**
+
 ```json
 {
   "dataTier": "Flex",
@@ -1320,6 +1517,7 @@ Advanced data volume analysis with cardinality reduction for large-scale environ
 ```
 
 **Notes:**
+
 - Designed for very large deployments (1000s of dimension values)
 - The "other" entry aggregates all small contributors
 - `categories` field shows how many sources rolled into each entry
@@ -1328,24 +1526,28 @@ Advanced data volume analysis with cardinality reduction for large-scale environ
 - Results sorted descending by credits to show top cost drivers first
 
 **Comparison with `analyze_data_volume`:**
+
 - `analyze_data_volume`: Detailed view, all values, supports timeshift
 - `analyze_data_volume_grouped`: High-level view, reduces cardinality, better for large environments
 
-**API Reference:** https://help.sumologic.com/docs/manage/ingestion-volume/data-volume-index/
+**API Reference:** <https://help.sumologic.com/docs/manage/ingestion-volume/data-volume-index/>
 
 ---
 
 ## Utility Tools (1)
 
 ### 46. `get_skill`
+
 Get a skill definition from the skills library. Skills are reusable knowledge artifacts that describe **how to accomplish specific tasks** in Sumo Logic using MCP tools and best practices.
 
 **Parameters:**
+
 - `skill_name` (str) - Skill filename without .md extension (e.g., 'search-write-queries', 'discovery-logs-without-metadata')
 
 **Returns:** Full markdown content of the requested skill, or error with list of available skills if not found
 
 **Skill Categories:**
+
 - `search-*` - Query writing, optimization, views
 - `discovery-*` - Finding logs, schemas, partitions, views
 - `cost-*` - Search costs, data volume, credit analysis
@@ -1355,6 +1557,7 @@ Get a skill definition from the skills library. Skills are reusable knowledge ar
 - `ui-*` - Interactive UI features
 
 **Common Skills:**
+
 - `search-write-queries` - 5-phase query construction pattern (Scope → Parse → Filter → Aggregate → Format)
 - `search-optimize-queries` - Performance and cost optimization techniques
 - `search-optimize-with-views` - Using scheduled views for 10x-100x improvements
@@ -1367,6 +1570,7 @@ Get a skill definition from the skills library. Skills are reusable knowledge ar
 - `ui-navigate-and-search` - Interactive UI investigation
 
 **Use Cases:**
+
 - **Learn best practices**: Get comprehensive guides for common tasks
 - **Query construction**: Load the 5-phase query pattern skill
 - **Cost optimization**: Learn how to reduce search costs using views
@@ -1374,6 +1578,7 @@ Get a skill definition from the skills library. Skills are reusable knowledge ar
 - **Dynamic access**: Fetch latest skill version without restarting
 
 **Example:**
+
 ```json
 {
   "skill_name": "search-write-queries"
@@ -1409,21 +1614,25 @@ See `skills/README.md` for complete list of available skills.
 ## Notes
 
 ### Rate Limiting
+
 - All tools respect the configured rate limit (default: 4 requests/second)
 - Rate limiting is enforced per tool call
 
 ### Instance Configuration
+
 - All tools support multi-instance configuration
 - Default instance is 'default'
 - Configure instances via environment variables (see `.env.example`)
 
 ### Async Export Jobs
+
 - Export tools (`export_content`, `export_global_folder`, `export_admin_recommended_folder`, `export_installed_apps`, `export_usage_report`) use async job pattern
 - Default timeout: 300 seconds (5 minutes)
 - Default poll interval: 2 seconds (content exports) or 5 seconds (usage reports)
 - Usage report downloads expire after 10 minutes
 
 ### Content Library Quirks
+
 - **Personal folder**: Fast synchronous API, returns children directly
 - **Global folder**: Async export, uses `data` array (NOT `children`)
 - **Admin Recommended**: Async export, uses `children` array
@@ -1446,12 +1655,14 @@ The `query_patterns.py` module provides reusable Sumo Logic query building block
 Build and analyze search scopes for optimal partition routing and query performance.
 
 **Methods:**
+
 - `build_scope(partition, metadata, keywords, indexed_fields, use_and)` - Construct complete scope
 - `build_metadata_scope(source_category, collector, source, source_name, source_host)` - Simplified metadata scope
 - `extract_scope_from_query(query)` - Parse scope from full query
 - `analyze_scope(scope)` - Analyze and provide optimization recommendations
 
 **Example:**
+
 ```python
 from query_patterns import ScopePattern
 
@@ -1473,17 +1684,20 @@ analysis = ScopePattern.analyze_scope('error')
 Complete 3-phase log discovery workflow for users who don't know metadata, partitions, log structure, or query patterns.
 
 **Phase 1: Metadata Discovery**
+
 - `build_metadata_discovery_query(search_pattern, time_range, use_volume_index)` - Generate discovery queries
 - Find source categories via data volume index (fast, no scan charge)
 - Discover partitions, collectors, sources for known source category
 - Search audit for queries by other users
 
 **Phase 2: Log Structure Analysis** (template provided)
+
 - Sample logs with/without auto-parse to identify fields
 - Detect log format (JSON, syslog, custom)
 - Distinguish indexed fields from search-time fields
 
 **Phase 3: Use-Case Query Building**
+
 - `build_usecase_query_recommendations(log_format, detected_fields, use_case, has_query_library)` - Get query recommendations
 - Integrates with `search_query_examples` tool (11,000+ real queries)
 - Returns query library searches based on use case and detected fields
@@ -1492,9 +1706,11 @@ Complete 3-phase log discovery workflow for users who don't know metadata, parti
 - Setup instructions if query library not available
 
 **Complete Workflow:**
+
 - `generate_complete_workflow(initial_hint, context, use_case)` - End-to-end discovery workflow
 
 **Example - Phase 1:**
+
 ```python
 from query_patterns import LogDiscoveryPattern
 
@@ -1504,6 +1720,7 @@ queries = LogDiscoveryPattern.build_metadata_discovery_query('cloudtrail')
 ```
 
 **Example - Phase 3:**
+
 ```python
 # Get query recommendations for error use case
 recommendations = LogDiscoveryPattern.build_usecase_query_recommendations(
@@ -1524,6 +1741,7 @@ recommendations = LogDiscoveryPattern.build_usecase_query_recommendations(
 ```
 
 **Use Cases:**
+
 - Developer knows service name but not _sourceCategory
 - User doesn't know which partition/view logs are in
 - Need to understand log structure and available fields
@@ -1531,6 +1749,7 @@ recommendations = LogDiscoveryPattern.build_usecase_query_recommendations(
 - Building queries from scratch without prior Sumo experience
 
 **Query Library Integration:**
+
 - Phase 3 leverages `search_query_examples` tool for relevant patterns
 - Extract `sumologic_query_examples.json.gz` to enable 11,000+ examples
 - Automatic fallback with setup instructions if library unavailable
@@ -1540,11 +1759,13 @@ recommendations = LogDiscoveryPattern.build_usecase_query_recommendations(
 Compare current data with historical baselines using `compare with timeshift` operator.
 
 **Features:**
+
 - Null-safe math for missing historical data
 - Division-by-zero guards
 - State detection: GONE (stopped), NEW (new source), COLLECTING (active)
 
 **Example:**
+
 ```python
 from query_patterns import TimeshiftPattern
 
@@ -1558,6 +1779,7 @@ operators = TimeshiftPattern.compare_with_timeshift('gbytes', days=7, periods=3)
 Null-safe mathematical operations for edge cases.
 
 **Methods:**
+
 - `safe_divide(numerator, denominator, result_field)` - Division with null/zero guards
 - `coalesce(field, default_value)` - Convert nulls to defaults
 - `percentage_change(current, baseline, result_field)` - Calculate % change safely
@@ -1567,6 +1789,7 @@ Null-safe mathematical operations for edge cases.
 Common aggregation and sorting patterns.
 
 **Methods:**
+
 - `volume_by_dimension(dimension, include_tier)` - Standard volume aggregation
 - `top_n(sort_field, limit, direction)` - Top N results
 - `timeslice_aggregation(interval, fields, group_by)` - Time-series aggregations
@@ -1576,15 +1799,18 @@ Common aggregation and sorting patterns.
 Sumo Logic credit rate calculations for cost analysis.
 
 **Standard Rates (credits/GB):**
+
 - Continuous: 20
 - Frequent: 9
 - Infrequent: 0.4
 - CSE: 25
 
 **Methods:**
+
 - `add_credit_calculation(data_field, tier_field, credit_field, rates)` - Calculate credits
 
 **Example:**
+
 ```python
 from query_patterns import CreditCalculation
 
@@ -1611,8 +1837,8 @@ query = '\n'.join(query_parts)
 ```
 
 **Benefits:**
+
 - Centralized, tested query logic
 - Consistent null handling and edge case management
 - Easy to maintain and extend
 - Self-documenting with clear APIs
-

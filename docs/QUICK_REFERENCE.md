@@ -157,6 +157,7 @@ api.au.sumologic.com + subdomain "mycompany"
 ## Common Patterns
 
 ### Simple GET Tool
+
 ```python
 @mcp.tool()
 async def get_simple(instance: str = 'default') -> str:
@@ -169,6 +170,7 @@ async def get_simple(instance: str = 'default') -> str:
 ```
 
 ### Tool with Time Range
+
 ```python
 from datetime import datetime, timedelta, timezone
 
@@ -184,6 +186,7 @@ result = await client.search_logs(
 ```
 
 ### Async Job Tool
+
 ```python
 from .async_export_helper import poll_export_job
 
@@ -228,29 +231,33 @@ chore: update dependencies
 
 ## Common URLs
 
-- **Sumo Logic API Docs**: https://api.sumologic.com/docs/
-- **MCP Protocol**: https://modelcontextprotocol.io/
-- **Project GitHub**: https://github.com/[your-org]/sumologic-python-mcp
-- **FastMCP Docs**: https://github.com/jlowin/fastmcp
+- **Sumo Logic API Docs**: <https://api.sumologic.com/docs/>
+- **MCP Protocol**: <https://modelcontextprotocol.io/>
+- **Project GitHub**: <https://github.com/[your-org]/sumologic-python-mcp>
+- **FastMCP Docs**: <https://github.com/jlowin/fastmcp>
 
 ## Troubleshooting
 
 ### Tool not appearing
+
 - Check `@mcp.tool()` decorator
 - Verify tool returns `str` (JSON)
 - Restart MCP server
 
 ### API authentication fails
+
 - Check `.env` file configuration
 - Verify `SUMO_ACCESS_ID` and `SUMO_ACCESS_KEY`
 - Check endpoint matches region
 
 ### Tests fail
+
 - Run `uv sync` to update dependencies
 - Check `.env` is configured for tests
 - Verify API credentials are valid
 
 ### Documentation out of sync
+
 - Review git log: `git log --oneline docs/mcp-tools-reference.md`
 - Compare tool count in code vs docs
 - Update docs immediately

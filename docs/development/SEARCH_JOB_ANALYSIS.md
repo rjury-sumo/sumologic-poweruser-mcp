@@ -19,6 +19,7 @@
 ### Critical Issues in Current MCP Implementation
 
 #### 1. **Always Uses Messages Endpoint** ❌
+
 ```python
 # Current: Always gets messages
 results_response = await self._request(
@@ -31,6 +32,7 @@ results_response = await self._request(
 **Problem:** Aggregate queries (with `count`, `sum`, `avg`, etc.) return **records**, not messages!
 
 **Impact:**
+
 - Aggregate queries may return empty or incorrect results
 - Performance hit from requesting wrong data type
 - User confusion about missing data
@@ -38,11 +40,13 @@ results_response = await self._request(
 #### 2. **Missing `byReceiptTime` Parameter** ❌
 
 The advanced script supports:
+
 ```python
 'byReceiptTime': by_receipt_time  # Critical for some use cases
 ```
 
 **Impact:** Cannot search by receipt time, which is important for:
+
 - Delayed log ingestion scenarios
 - Troubleshooting ingestion issues
 - Compliance requirements
@@ -50,11 +54,13 @@ The advanced script supports:
 #### 3. **Missing `requiresRawMessages` Parameter** ❌
 
 The advanced script sets this intelligently:
+
 ```python
 requires_raw_messages = args.mode == 'messages'  # False for aggregates!
 ```
 
 **Impact:**
+
 - Aggregate queries may perform poorly
 - Unnecessary data processing
 - Increased API load
@@ -62,6 +68,7 @@ requires_raw_messages = args.mode == 'messages'  # False for aggregates!
 #### 4. **No Relative Time Support** ⚠️
 
 Advanced script supports:
+
 ```python
 "-1h", "-30m", "-2d", "-1w", "now"
 ```
@@ -80,15 +87,17 @@ Current implementation doesn't expose offset/limit parameters.
 
 **Impact:** Large result sets cannot be retrieved in chunks
 
-##3. Detection: How to Know if Query is Aggregate
+## 3. Detection: How to Know if Query is Aggregate
 
 **Aggregate query indicators:**
+
 - Contains: `count`, `sum`, `avg`, `min`, `max`, `pct`, `stddev`
 - Contains: `group by`, `by` clause
 - Contains: `| parse` followed by aggregations
 - Contains: timeslice with aggregations
 
 **Message query indicators:**
+
 - Simple filters only
 - No aggregation operators
 - May have `| fields` but no aggregations
@@ -98,6 +107,7 @@ Current implementation doesn't expose offset/limit parameters.
 #### Phase 1: Critical Fixes (High Priority)
 
 1. **Add Records vs Messages Detection**
+
    ```python
    def detect_query_type(query: str) -> str:
        """Detect if query returns records or messages."""
@@ -112,6 +122,7 @@ Current implementation doesn't expose offset/limit parameters.
    ```
 
 2. **Add Get Records Method**
+
    ```python
    async def get_search_job_records(self, job_id: str, offset: int = 0, limit: int = 10000):
        """Get aggregate records from search job."""
@@ -125,6 +136,7 @@ Current implementation doesn't expose offset/limit parameters.
    ```
 
 3. **Update search_logs to Auto-Detect**
+
    ```python
    async def search_logs(self, query, from_time, to_time, ...):
        # Detect query type
@@ -161,6 +173,7 @@ Current implementation doesn't expose offset/limit parameters.
    ```
 
 4. **Add byReceiptTime Parameter**
+
    ```python
    async def search_logs(
        self,
@@ -183,7 +196,8 @@ Current implementation doesn't expose offset/limit parameters.
 
 #### Phase 2: Enhancements (Medium Priority)
 
-5. **Add Relative Time Parsing**
+1. **Add Relative Time Parsing**
+
    ```python
    def parse_relative_time(time_str: str) -> str:
        """Convert relative time to ISO format."""
@@ -204,7 +218,8 @@ Current implementation doesn't expose offset/limit parameters.
        return time_str  # Return as-is if not relative
    ```
 
-6. **Add Job Creation Tool**
+2. **Add Job Creation Tool**
+
    ```python
    @mcp.tool()
    async def create_sumo_search_job(
@@ -223,7 +238,8 @@ Current implementation doesn't expose offset/limit parameters.
        })
    ```
 
-7. **Add Job Status Tool**
+3. **Add Job Status Tool**
+
    ```python
    @mcp.tool()
    async def get_sumo_search_job_status(
@@ -234,7 +250,8 @@ Current implementation doesn't expose offset/limit parameters.
        # ... implementation ...
    ```
 
-8. **Add Explicit Records/Messages Tools**
+4. **Add Explicit Records/Messages Tools**
+
    ```python
    @mcp.tool()
    async def get_sumo_search_job_results(
@@ -250,9 +267,9 @@ Current implementation doesn't expose offset/limit parameters.
 
 #### Phase 3: Advanced Features (Low Priority)
 
-9. **Add Pagination Support to Main Search**
-10. **Add Progress Callbacks**
-11. **Add Batch Time Range Support**
+1. **Add Pagination Support to Main Search**
+2. **Add Progress Callbacks**
+3. **Add Batch Time Range Support**
 
 ### Tool Descriptions & Hints
 
@@ -359,7 +376,9 @@ Queries with aggregation operators return structured records:
 
 Example:
 ```
-error | count by _sourceHost | sort by _count
+
+error | count by _sourceHost | sort by_count
+
 ```
 
 ### Raw Log Queries (Returns Messages)
@@ -370,7 +389,9 @@ Queries without aggregations return raw log messages:
 
 Example:
 ```
+
 _sourceCategory=prod/app AND error
+
 ```
 
 ### Time Formats
@@ -383,6 +404,7 @@ _sourceCategory=prod/app AND error
 ## Summary of Changes Needed
 
 ### Critical (Must Fix)
+
 - [ ] Add `get_search_job_records()` method
 - [ ] Add query type detection
 - [ ] Update `search_logs()` to use correct endpoint
@@ -390,6 +412,7 @@ _sourceCategory=prod/app AND error
 - [ ] Add `requiresRawMessages` parameter
 
 ### Important (Should Add)
+
 - [ ] Add relative time parsing
 - [ ] Add pagination parameters
 - [ ] Add `create_sumo_search_job` tool
@@ -397,6 +420,7 @@ _sourceCategory=prod/app AND error
 - [ ] Update tool descriptions with examples
 
 ### Nice to Have
+
 - [ ] Add explicit records/messages tools
 - [ ] Add batch time range support
 - [ ] Add progress indicators
@@ -404,6 +428,7 @@ _sourceCategory=prod/app AND error
 ---
 
 **Priority Order:**
+
 1. Fix records vs messages (CRITICAL - queries may be broken)
 2. Add byReceiptTime (HIGH - important use cases)
 3. Add requiresRawMessages (HIGH - performance)

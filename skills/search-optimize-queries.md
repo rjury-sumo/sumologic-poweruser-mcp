@@ -1,16 +1,20 @@
 # Skill: Query Optimization for Performance and Cost
 
 ## Intent
+
 Build efficient Sumo Logic queries that execute quickly, scan minimal data, and minimize costs in Flex/Infrequent tier environments. Transform slow, expensive queries into fast, cost-effective ones.
 
 ## Prerequisites
+
 - Basic knowledge of Sumo Logic query language
 - Understanding of partition/view concepts
 - Access to search logs and audit data
 - Familiarity with your log schema
 
 ## Context
+
 **Use this skill when:**
+
 - Queries are running slowly (>60 seconds)
 - Search costs are high in Flex/Infrequent tier
 - Building new queries from scratch
@@ -18,6 +22,7 @@ Build efficient Sumo Logic queries that execute quickly, scan minimal data, and 
 - Query times out or hits memory limits
 
 **Optimization Priorities:**
+
 1. **Correctness** - Query returns accurate results
 2. **Cost** - Minimize data scanned (Flex/Infrequent tier)
 3. **Speed** - Fast execution for better UX
@@ -29,23 +34,28 @@ Build efficient Sumo Logic queries that execute quickly, scan minimal data, and 
 
 The scope determines which data is scanned. Well-crafted scopes can reduce scan volume by 10x-1000x.
 
-#### Rule 1: Always Include Partition (_index or _view)
+#### Rule 1: Always Include Partition (_index or_view)
+
 **Bad:**
+
 ```
 _sourceCategory=prod/app error
 ```
 
 **Good:**
+
 ```
 _index=prod_logs _sourceCategory=prod/app error
 ```
 
 **Why:**
+
 - Directs query to specific partition
 - Avoids scanning other partitions
 - Can reduce scan from TBs to GBs
 
 **How to Find Partition:**
+
 ```bash
 MCP: explore_log_metadata
   scope: "_sourceCategory=prod/app"
@@ -58,6 +68,7 @@ MCP: explore_log_metadata
 Keyword expressions in scope are processed by backend bloom filters for extremely fast pre-filtering. This technique can reduce scan volume by 10x-1000x by eliminating log blocks that don't contain your keywords.
 
 **Bad (filters after pipe):**
+
 ```
 _index=prod_logs _sourceCategory=prod/app
 | json "status_code" as status_code
@@ -65,6 +76,7 @@ _index=prod_logs _sourceCategory=prod/app
 ```
 
 **Good Option 1 (indexed field with wildcard):**
+
 ```
 _index=prod_logs _sourceCategory=prod/app status_code=5*
 | json "status_code" as status_code
@@ -72,6 +84,7 @@ _index=prod_logs _sourceCategory=prod/app status_code=5*
 ```
 
 **Good Option 2 (high-selectivity keyword):**
+
 ```
 _index=prod_logs _sourceCategory=prod/app 500
 | json "status_code" as status_code
@@ -79,6 +92,7 @@ _index=prod_logs _sourceCategory=prod/app 500
 ```
 
 **Why Option 2 Works:**
+
 - `500` is an unusual, highly selective string
 - Bloom filter eliminates blocks without "500" anywhere in the event
 - May include some false positives (e.g., "user_id=50012"), but the post-pipe `where` filter handles exact matching
@@ -89,13 +103,16 @@ _index=prod_logs _sourceCategory=prod/app 500
 The query engine automatically does this for some `where` filters, but you can be explicit:
 
 **Automatic Push-Down:**
+
 ```
 _index=prod_logs _sourceCategory=prod/app
 | where foo = "bar"
 ```
+
 Engine may add "bar" as keyword automatically.
 
 **Explicit Push-Down (more reliable):**
+
 ```
 _index=prod_logs _sourceCategory=prod/app bar
 | json "foo" as foo
@@ -107,19 +124,23 @@ _index=prod_logs _sourceCategory=prod/app bar
 When a field only exists in a small subset of events:
 
 **Inefficient:**
+
 ```
 _sourceCategory=*cloudtrail*
 | json "errorCode" as errorCode
 | where errorCode = "AccessDenied"
 ```
+
 Scans all CloudTrail events.
 
 **Efficient:**
+
 ```
 _sourceCategory=*cloudtrail* errorcode
 | json "errorCode" as errorCode
 | where errorCode = "AccessDenied"
 ```
+
 Only scans events containing the string "errorcode" (field is only in error events).
 
 **Advanced Technique 3: Extract Keywords from Regex/Matches**
@@ -127,6 +148,7 @@ Only scans events containing the string "errorcode" (field is only in error even
 When using `where matches` with patterns, extract literal strings:
 
 **Inefficient:**
+
 ```
 _index=prod_logs
 | json "url" as url
@@ -134,11 +156,13 @@ _index=prod_logs
 ```
 
 **Efficient:**
+
 ```
 _index=prod_logs foo bar
 | json "url" as url
 | where url matches "*/foo/bar/*"
 ```
+
 Using "foo" and "bar" as keywords (if highly selective) dramatically reduces initial scan.
 
 **Advanced Technique 4: JSON Literal Expression (Cheat Code)**
@@ -146,6 +170,7 @@ Using "foo" and "bar" as keywords (if highly selective) dramatically reduces ini
 For JSON logs with known key-value pairs, use literal string matching:
 
 **Inefficient:**
+
 ```
 _index=prod_logs
 | json "errorCode" as errorCode
@@ -153,6 +178,7 @@ _index=prod_logs
 ```
 
 **Ultra-Efficient (JSON Literal):**
+
 ```
 _index=prod_logs "\"errorCode\":\"AccessDenied\""
 | json "errorCode" as errorCode
@@ -160,11 +186,13 @@ _index=prod_logs "\"errorCode\":\"AccessDenied\""
 ```
 
 **Why This Works:**
+
 - Literal string `"errorCode":"AccessDenied"` matches exact JSON structure in raw event
 - Bloom filter processes this at index level (fastest possible)
 - Only works when the literal string appears in the event exactly as specified
 
 **Pattern Summary:**
+
 - **Indexed fields:** Use field=value or field=wildcard* in scope
 - **High-selectivity strings:** Add unusual literal strings (GUIDs, error codes, specific IDs)
 - **Optional fields:** Add field name as keyword when field only in subset of events
@@ -179,32 +207,38 @@ _index=prod_logs "\"errorCode\":\"AccessDenied\""
 **Performance Hierarchy (Best to Worst):**
 
 **Best: FER Field + Keyword in Scope**
+
 ```
 _index=prod_logs status_code=5* error
 | count by status_code, error_type
 ```
+
 - FER extracts `status_code` at index time
 - Indexed field filter + keyword in scope = maximum bloom filter efficiency
 - No parsing overhead at query time
 
 **Good: Keyword in Scope + Where Filter**
+
 ```
 _index=prod_logs error
 | json "status_code" as status_code
 | where status_code >= 500
 | count by status_code
 ```
+
 - Keyword reduces initial scan via bloom filter
 - Parse/filter at query time (overhead)
 - Better than where-only, but not as fast as FER
 
 **Poor: Where Filter Only (No Keyword)**
+
 ```
 _index=prod_logs
 | json "status_code" as status_code
 | where status_code >= 500
 | count by status_code
 ```
+
 - Scans entire partition
 - Parse all messages
 - Filter after parsing
@@ -217,10 +251,12 @@ _index=prod_logs
 - **Where only**: Last resort when neither FER nor keyword is possible (avoid in production)
 
 **Creating a FER** (Admin Only):
+
 ```
 Scope: _sourceCategory=prod/app
 Parse Expression: json "status_code", "error_type", "user_id"
 ```
+
 After FER is created, these fields are indexed and available without parsing.
 
 **How to Check for FERs:**
@@ -228,6 +264,7 @@ After FER is created, these fields are indexed and available without parsing.
 Use the `list_field_extraction_rules` MCP tool to see available FERs for your data.
 
 #### Rule 4: Scope Selectivity Analysis
+
 Use `ScopePattern.analyze_scope()` pattern from query_patterns.py:
 
 ```python
@@ -240,7 +277,8 @@ analysis = ScopePattern.analyze_scope(scope)
 ```
 
 **Optimization Order:**
-1. Partition specifier (_index, _view)
+
+1. Partition specifier (_index,_view)
 2. Source category (_sourceCategory)
 3. Keywords (high-selectivity terms)
 4. Indexed field filters (field="value")
@@ -262,20 +300,24 @@ Parsing efficiency varies dramatically by operator choice. Use the fastest opera
 **Use parse anchor for structured logs:**
 
 **Good (parse anchor):**
+
 ```
 _index=apache_logs
 | parse "GET * HTTP" as url
 | parse "\" * * \"" as status_code, bytes_sent
 ```
+
 - Uses literal strings as anchors
 - Fast, efficient
 - Works well for structured formats
 
 **Avoid (parse regex without FER):**
+
 ```
 _index=apache_logs
 | parse regex "GET (?<url>.*) HTTP.*\" (?<status>\d+) (?<bytes>\d+)"
 ```
+
 - Much slower than parse anchor
 - Only use when structure is complex/variable
 
@@ -284,26 +326,32 @@ _index=apache_logs
 When you must use `parse regex`:
 
 **Bad (greedy, non-specific):**
+
 ```
 | parse regex "user: (?<user>.*) action"
 ```
+
 - `.*` is greedy, matches too much
 - Non-specific pattern
 
 **Good (specific, constrained):**
+
 ```
 | parse regex "user: (?<user>[a-zA-Z0-9_]+) action"
 ```
+
 - Specific character class
 - Constrained matching
 - Much faster
 
 **Better (use in FER):**
+
 ```
 Admin creates FER with regex
 Scope: _sourceCategory=prod/app
 Parse: parse regex "user: (?<user>[a-zA-Z0-9_]+) action"
 ```
+
 - One-time parse at index time
 - All queries benefit
 - No query-time parsing overhead
@@ -313,6 +361,7 @@ Parse: parse regex "user: (?<user>[a-zA-Z0-9_]+) action"
 When using parse statements, extract literal strings to scope for bloom filter acceleration.
 
 **Inefficient:**
+
 ```
 _index=prod_logs
 | parse "completed * action" as actionName
@@ -320,11 +369,13 @@ _index=prod_logs
 ```
 
 **Efficient:**
+
 ```
 _index=prod_logs completed action
 | parse "completed * action" as actionName
 | count by actionName
 ```
+
 - Keywords "completed" and "action" filter via bloom filter
 - Only events containing both strings are parsed
 - Dramatic performance improvement for optional fields
@@ -332,7 +383,9 @@ _index=prod_logs completed action
 ### Phase 3: Filter Optimization (After the Pipe)
 
 #### Rule 6: Filter Early, Filter Often
+
 **Bad:**
+
 ```
 _index=prod_logs
 | parse "status=*" as status
@@ -341,6 +394,7 @@ _index=prod_logs
 ```
 
 **Good:**
+
 ```
 _index=prod_logs status=500
 | parse "status=*" as status
@@ -349,12 +403,15 @@ _index=prod_logs status=500
 ```
 
 **Why:**
+
 - Keyword in scope reduces scan
 - Where filter before aggregation reduces rows
 - Only aggregate needed fields
 
 #### Rule 7: Avoid Expensive Operations in Scope
+
 **Bad:**
+
 ```
 _index=prod_logs
 | parse regex "user=(?<user>\w+)" multi
@@ -362,6 +419,7 @@ _index=prod_logs
 ```
 
 **Good:**
+
 ```
 _index=prod_logs "john@company.com"
 | parse "user=*" as user
@@ -369,6 +427,7 @@ _index=prod_logs "john@company.com"
 ```
 
 **Why:**
+
 - parse regex is expensive, minimize rows processed
 - Keyword in scope reduces scan
 - Use simple parse when possible (faster than regex)
@@ -376,22 +435,29 @@ _index=prod_logs "john@company.com"
 ### Phase 4: Aggregation Optimization
 
 #### Rule 8: Limit Cardinality in Group By
+
 **Bad:**
+
 ```
 | count by requestId, timestamp, sessionId, traceId
 ```
+
 High cardinality (millions of unique combinations) causes:
+
 - Memory issues
 - Slow execution
 - Large result sets
 
 **Good:**
+
 ```
 | count by service, status_code, region
 ```
+
 Medium cardinality (hundreds to thousands) is optimal.
 
 **Tool to Check Cardinality:**
+
 ```bash
 MCP: profile_log_schema
   scope: "_index=prod_logs"
@@ -403,17 +469,22 @@ MCP: profile_log_schema
 Returns fields with good cardinality for aggregation.
 
 #### Rule 9: Use Timeslice for Time-Series
+
 **Bad:**
+
 ```
 | count by _messagetime
 ```
+
 Every unique timestamp = high cardinality
 
 **Good:**
+
 ```
 | timeslice 5m
 | count by _timeslice
 ```
+
 Bucket into intervals = lower cardinality
 
 #### Rule 10: Aggregate Before Lookup Operations
@@ -421,6 +492,7 @@ Bucket into intervals = lower cardinality
 **Lookup operations** can be expensive when processing large result sets. Always aggregate data before performing lookups to minimize the volume of data being enriched.
 
 **Inefficient:**
+
 ```
 _index=firewall_logs
 | json "src_ip" as src_ip
@@ -428,11 +500,13 @@ _index=firewall_logs
 | where threat_level = "high"
 | count by src_ip, threat_type
 ```
+
 - Looks up every event (potentially millions)
 - Enriches data before filtering
 - Wastes lookups on events that will be filtered out
 
 **Efficient:**
+
 ```
 _index=firewall_logs
 | json "src_ip" as src_ip
@@ -441,17 +515,20 @@ _index=firewall_logs
 | where threat_level = "high"
 | count by src_ip, threat_type
 ```
+
 - Aggregates to unique IPs first (potentially thousands)
 - Only lookups unique values
 - Filters after enrichment on smaller dataset
 - Can be 100x-1000x faster
 
 **Why This Works:**
+
 - Reduces lookup API calls from N events to N unique values
 - Minimizes data transfer for lookup results
 - Filters on smaller enriched dataset
 
 **Pattern:**
+
 ```
 scope
 | extract fields
@@ -461,37 +538,47 @@ scope
 ```
 
 #### Rule 11: Limit Result Set Size
+
 **Bad:**
+
 ```
 | count by field1, field2, field3
 ```
+
 May return 100K rows
 
 **Good:**
+
 ```
 | count by field1, field2, field3
 | top 100 by _count
 ```
+
 Limits memory and output
 
 ### Phase 5: Time Range Optimization
 
 #### Rule 12: Use Shortest Time Range Possible
+
 **Bad:**
+
 ```
 -30d for real-time monitoring dashboard
 ```
 
 **Good:**
+
 ```
 -1h for real-time, -24h for trends, -30d for historical analysis
 ```
 
 **Cost Impact:**
+
 - -1h vs -24h: 24x less data scanned
 - -24h vs -30d: 30x less data scanned
 
 **Estimate Before Querying:**
+
 ```bash
 MCP: get_estimated_log_search_usage
   query: "_index=prod_logs _sourceCategory=prod/app"
@@ -502,24 +589,31 @@ MCP: get_estimated_log_search_usage
 If scan > 100 GB, reconsider time range or scope.
 
 #### Rule 13: Use Receipt Time for Real-Time Data
+
 **Bad:**
+
 ```
 by_receipt_time: false (default)
 ```
+
 May miss data delayed in ingestion
 
 **Good (for real-time):**
+
 ```
 by_receipt_time: true
 ```
+
 Searches by time data was received, not log timestamp
 
 ### Phase 6: Advanced Patterns
 
 #### Pattern 1: Subquery for Pre-Filtering
+
 **Scenario:** Need to find errors for users who had >100 requests
 
 **Inefficient:**
+
 ```
 _index=prod_logs
 | count by user
@@ -528,6 +622,7 @@ _index=prod_logs
 ```
 
 **Efficient:**
+
 ```
 _index=prod_logs
 | where user in (
@@ -541,33 +636,41 @@ _index=prod_logs
 ```
 
 #### Pattern 2: Sampling for Exploration
+
 **Scenario:** Exploring log structure, don't need all data
 
 **Inefficient:**
+
 ```
 _index=prod_logs -24h
 | parse ...
 | count ...
 ```
+
 Scans 500 GB
 
 **Efficient:**
+
 ```
 _index=prod_logs -1h
 | limit 10000
 | parse ...
 | count ...
 ```
+
 Scans 20 GB, same insights
 
 #### Pattern 3: Materialized Results via Scheduled Search
+
 **Scenario:** Dashboard queries same data every 5 minutes
 
 **Inefficient:**
 Each panel queries -24h of raw logs
 
 **Efficient:**
+
 1. Create scheduled search (runs every 15m):
+
    ```
    _index=prod_logs
    | timeslice 5m
@@ -576,6 +679,7 @@ Each panel queries -24h of raw logs
    ```
 
 2. Dashboard queries results index:
+
    ```
    _index=dashboard_results -24h
    | ...
@@ -586,6 +690,7 @@ Each panel queries -24h of raw logs
 ## Query Patterns Library
 
 ### Optimal Query Structure Template
+
 ```
 [partition] [metadata] [keywords] ["indexed_field"="value"]
 | [where filters - high selectivity first]
@@ -597,6 +702,7 @@ Each panel queries -24h of raw logs
 ```
 
 ### Example: Optimized Error Query
+
 ```
 _index=prod_logs _sourceCategory=prod/api error "status_code"="5"
 | parse "status_code=* " as status
@@ -611,6 +717,7 @@ _index=prod_logs _sourceCategory=prod/api error "status_code"="5"
 ```
 
 **Optimizations Applied:**
+
 1. ✅ Partition specified
 2. ✅ Keywords in scope (error, status_code=5)
 3. ✅ Simple parse (not regex)
@@ -622,7 +729,9 @@ _index=prod_logs _sourceCategory=prod/api error "status_code"="5"
 ## Examples
 
 ### Example 1: Transform Slow Query
+
 **Before (90 seconds, scans 2.3 TB):**
+
 ```
 *
 | where status_code = 500
@@ -630,11 +739,13 @@ _index=prod_logs _sourceCategory=prod/api error "status_code"="5"
 ```
 
 **Issues:**
+
 - Scope `*` scans ALL data
 - No partition filter
 - No time optimization
 
 **After (3 seconds, scans 45 GB):**
+
 ```
 _index=prod_logs _sourceCategory=prod/api "status_code"="500"
 | json "user", "status_code" as user, status nodrop
@@ -644,6 +755,7 @@ _index=prod_logs _sourceCategory=prod/api "status_code"="500"
 ```
 
 **Improvements:**
+
 - Added partition _index=prod_logs (100x reduction)
 - Added keyword status_code=500 in scope (2x reduction)
 - Limited results to top 100 (memory optimization)
@@ -651,17 +763,21 @@ _index=prod_logs _sourceCategory=prod/api "status_code"="500"
 **Result:** 30x faster, 51x less data scanned
 
 ### Example 2: Dashboard Optimization
+
 **Before:** 12-panel dashboard, each panel queries -24h every 5 minutes
+
 - Panels × Queries/day: 12 × 288 = 3,456 queries/day
 - Scan per query: ~50 GB
 - Total scan/day: 172 TB
 
 **After Optimization:**
+
 1. Reduced refresh rate: 5m → 15m (3x reduction)
 2. Reduced time range on 8 panels: -24h → -4h (6x reduction)
 3. Added partition scoping to all panels (5x reduction)
 
 **Result:**
+
 - Queries/day: 12 × 96 = 1,152 (3x fewer)
 - Scan per query: ~10 GB (5x less via scoping)
 - Scan/day: 11.5 TB (15x reduction)
@@ -669,7 +785,9 @@ _index=prod_logs _sourceCategory=prod/api "status_code"="500"
 **Cost Impact:** $3,096/month → $207/month (15x savings at $0.018/GB)
 
 ### Example 3: Finding Optimization Opportunities
+
 **Step 1:** Find expensive queries
+
 ```bash
 MCP: analyze_search_scan_cost
   from_time: "-7d"
@@ -680,6 +798,7 @@ MCP: analyze_search_scan_cost
 ```
 
 **Step 2:** Analyze query scope
+
 ```bash
 MCP: analyze_search_scan_cost
   from_time: "-7d"
@@ -695,46 +814,58 @@ Filter results where `scope` doesn't contain `_index=` or `_view=`
 ## Common Anti-Patterns
 
 ### Anti-Pattern 1: The Kitchen Sink
+
 ```
 *
 | parse everything
 | count by every possible field
 ```
+
 **Fix:** Specific scope, targeted parsing, focused aggregation
 
 ### Anti-Pattern 2: The Regex Hammer
+
 ```
 | parse regex complex_multi_line_pattern
 ```
+
 **Fix:** Use simple parse when possible, json operator for JSON, csv for CSV
 
 ### Anti-Pattern 3: The Where After Aggregation
+
 ```
 | count by field1, field2, field3
 | where field1 = "specific_value"
 ```
+
 **Fix:** Filter BEFORE aggregation:
+
 ```
 | where field1 = "specific_value"
 | count by field1, field2, field3
 ```
 
 ### Anti-Pattern 4: The Unlimited Result Set
+
 ```
 | count by high_cardinality_field
 ```
+
 Returns 1M rows, OOM error
 
 **Fix:**
+
 ```
 | count by high_cardinality_field
 | top 1000 by _count
 ```
 
 ### Anti-Pattern 5: The Brute Force Join
+
 ```
 | join user_id [search other_index ...]
 ```
+
 Joins are expensive
 
 **Fix:** Use lookup tables, or denormalize data at ingest time if possible
@@ -742,7 +873,8 @@ Joins are expensive
 ## Quick Reference: Optimization Rules Summary
 
 **Scope Optimization (Phase 1):**
-1. Always include partition (_index or _view)
+
+1. Always include partition (_index or_view)
 2. Add keyword expressions for bloom filters (including JSON literals)
 3. Prefer FER fields over where filters (FER + keyword > keyword + where > where only)
 4. Analyze scope selectivity
@@ -768,7 +900,7 @@ Joins are expensive
 
 Before committing a query to production:
 
-- [ ] Scope includes partition (_index or _view)
+- [ ] Scope includes partition (_index or_view)
 - [ ] Scope includes high-selectivity keywords (or JSON literals for known fields)
 - [ ] Using FER fields instead of where filters when possible
 - [ ] Checked for available FERs with `list_field_extraction_rules`
@@ -785,6 +917,7 @@ Before committing a query to production:
 - [ ] Query completes in <30 seconds
 
 For dashboards specifically:
+
 - [ ] Refresh rate is appropriate (not faster than needed)
 - [ ] Considered scheduled search for pre-aggregation
 - [ ] Each panel's time range is justified
@@ -794,6 +927,7 @@ For dashboards specifically:
 The `search_helpers` module provides utilities to help build optimized queries:
 
 ### Build Scope Expression
+
 ```python
 from search_helpers import build_scope_expression
 
@@ -807,6 +941,7 @@ scope = build_scope_expression(
 ```
 
 ### Suggest Scope from Discovery
+
 ```python
 from search_helpers import suggest_scope_from_discovery
 
@@ -817,6 +952,7 @@ suggested_scope = suggest_scope_from_discovery(metadata_results)
 ```
 
 ### Validate Query Structure
+
 ```python
 from search_helpers import validate_query_structure
 
@@ -832,6 +968,7 @@ validation = validate_query_structure(query)
 ```
 
 ### Common Query Patterns
+
 ```python
 from search_helpers import get_common_query_patterns
 
@@ -844,6 +981,7 @@ patterns = get_common_query_patterns()
 ```
 
 ### Operator Categories Reference
+
 ```python
 from search_helpers import get_operator_category_info
 
@@ -857,12 +995,14 @@ operators = get_operator_category_info()
 ```
 
 ## Related Skills
+
 - [Writing Queries](./search-write-queries.md) - Complete query construction guide
 - [UI Navigation](./ui-navigate-and-search.md) - Interactive query building
 - [Log Discovery](./discovery-logs-without-metadata.md) - Find right partitions and scope
 - [Search Cost Analysis](./cost-analyze-search-costs.md) - Measure optimization impact
 
 ## MCP Tools Used
+
 - `explore_log_metadata` - Find partitions and source categories for scope
 - `profile_log_schema` - Check field cardinality for aggregation planning
 - `get_estimated_log_search_usage` - Estimate scan volume before running query
@@ -873,6 +1013,7 @@ operators = get_operator_category_info()
 - `list_custom_fields` - See custom fields defined in your organization
 
 ## API References
+
 - [Query Language Reference](https://help.sumologic.com/docs/search/)
 - [Best Practices for Searches](https://www.sumologic.com/help/docs/search/get-started-with-search/build-search/best-practices-search/)
 - [Optimize Search Performance](https://help.sumologic.com/docs/search/optimize-search-performance/)
@@ -889,6 +1030,7 @@ operators = get_operator_category_info()
 **Estimated Impact:** 10x-100x improvement in speed and cost
 
 **Changelog v2.0:**
+
 - Added Rule 3: Prefer FERs over where filters (performance hierarchy)
 - Added Rule 5: Parse operator selection (FER > parse anchor > parse regex)
 - Added Rule 10: Aggregate before lookup operations
