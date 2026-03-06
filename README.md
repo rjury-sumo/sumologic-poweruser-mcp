@@ -619,6 +619,9 @@ uv run pytest -v
 
 # Run specific test file
 uv run pytest tests/test_module.py -v
+
+# Run unit tests only (fast, no API credentials needed)
+uv run pytest tests/test_*.py --ignore=tests/integration --ignore=tests/utilities --ignore=tests/debug -v
 ```
 
 ### Run with Coverage
@@ -626,6 +629,15 @@ uv run pytest tests/test_module.py -v
 ```bash
 uv run pytest --cov=src --cov-report=html
 ```
+
+### GitHub Actions CI/CD
+
+The project uses GitHub Actions with two test strategies:
+
+- **Push to main/develop**: Fast unit tests only (~1-2 minutes)
+- **Pull requests**: Full integration tests with API access (~5-10 minutes)
+
+**Setting up integration tests for PRs:** See [docs/GITHUB_ACTIONS_SETUP.md](docs/GITHUB_ACTIONS_SETUP.md) for instructions on configuring repository secrets for Sumo Logic API access.
 
 ### Development Workflow
 

@@ -32,6 +32,31 @@ uv sync
 
 ## 3. Configure Credentials
 
+### Get Access Credentials
+
+**🔒 Recommended: Use Service Account with View-Only Permissions**
+
+For production use, create a dedicated service account:
+
+1. Go to **Administration** > **Users and Roles** > **Service Accounts**
+2. Create new service account: `MCP Server` or `AI Assistant`
+3. Generate access key for the service account
+4. Assign a role with **view-only permissions** (no manage/create/delete)
+   - View Collectors, Fields, Users, Content, Dashboards, etc.
+   - See [docs/GITHUB_ACTIONS_SETUP.md](docs/GITHUB_ACTIONS_SETUP.md) for detailed permission list
+
+**Why service accounts?**
+- Purpose-built for automation
+- No MFA conflicts
+- Independent from user accounts
+- Minimal permissions reduce security risk
+
+**📖 Reference:** [Sumo Logic Service Accounts](https://www.sumologic.com/help/docs/manage/security/service-accounts/)
+
+**Alternative:** If service accounts are not available, use a user access key from **Administration** > **Security** > **Access Keys**.
+
+### Configure Environment
+
 ```bash
 # Copy the example environment file
 cp .env.example .env
@@ -43,8 +68,8 @@ nano .env
 
 **Minimum configuration in `.env`:**
 ```bash
-SUMO_ACCESS_ID=your_access_id_here
-SUMO_ACCESS_KEY=your_access_key_here
+SUMO_ACCESS_ID=your_service_account_access_id_here
+SUMO_ACCESS_KEY=your_service_account_access_key_here
 SUMO_ENDPOINT=https://api.sumologic.com
 ```
 

@@ -7,8 +7,10 @@ on:
     branches: [ main, develop ]
 
 jobs:
-  test:
+  # Fast unit tests for push events
+  unit-tests:
     runs-on: ubuntu-latest
+    if: github.event_name == 'push'
     strategy:
       matrix:
         python-version: ["3.10", "3.11", "3.12"]
@@ -30,9 +32,47 @@ jobs:
       run: |
         uv sync --all-extras
 
-    - name: Run tests with coverage
+    - name: Run unit tests only
       run: |
-        uv run pytest --cov=src --cov-report=xml --cov-report=term
+        uv run pytest tests/test_*.py --ignore=tests/integration --ignore=tests/utilities --ignore=tests/debug -v
+
+  # Full test suite for pull requests
+  integration-tests:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
+      with:
+        enable-cache: true
+
+    - name: Install dependencies
+      run: |
+        uv sync --all-extras
+
+    - name: Create test .env file
+      run: |
+        echo "SUMO_ACCESS_ID=${{ secrets.SUMO_ACCESS_ID }}" >> .env
+        echo "SUMO_ACCESS_KEY=${{ secrets.SUMO_ACCESS_KEY }}" >> .env
+        echo "SUMO_ENDPOINT=${{ secrets.SUMO_ENDPOINT }}" >> .env
+        if [ -n "${{ secrets.SUMO_SUBDOMAIN }}" ]; then
+          echo "SUMO_SUBDOMAIN=${{ secrets.SUMO_SUBDOMAIN }}" >> .env
+        fi
+
+    - name: Run full test suite with coverage
+      run: |
+        uv run pytest --cov=src --cov-report=xml --cov-report=term -v
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
