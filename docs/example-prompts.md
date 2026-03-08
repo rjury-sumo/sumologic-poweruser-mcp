@@ -436,6 +436,164 @@ This document provides example prompts for using the Sumo Logic MCP tools effect
 
 ---
 
+## Virtual Sumo Logic Consultant (Architecture & Best Practices)
+
+The MCP server includes a **skills library** that acts as a virtual Technical Account Engineer (TAE). Beyond running queries and retrieving data, you can ask for architecture advice, design reviews, trade-off guidance, and Sumo Logic best practices. The assistant will consult the relevant skill knowledge base before advising.
+
+This capability covers the full range of TAE topics: collection architecture, partition design, scheduled views, alerting strategy, dashboard design, cost optimisation, field extraction rules, and admin monitoring.
+
+---
+
+### Architecture Advice & Design Reviews
+
+**Prompt:** "How should I design my Sumo Logic partition strategy? I have about 200GB/day from Kubernetes, AWS CloudTrail, and application logs."
+
+**What it does:** Loads the `admin-partition-design` skill, applies the seven rules of partition design, recommends use-case-based grouping, and explains how partition structure affects query performance and cost.
+
+---
+
+**Prompt:** "Review my current partition setup and tell me if it's sensible" *(followed by describing or listing partitions)*
+
+**What it does:** Evaluates the design against best practices — consistent metadata fields, appropriate granularity, scan reduction potential — and flags anti-patterns like mixed metadata or overly large default partitions.
+
+---
+
+**Prompt:** "I want to build a complete monitoring and alerting strategy for my platform. Where do I start?"
+
+**What it does:** Loads `alerting-monitors`, `admin-alerting-and-monitoring`, and `consulting-guide` to walk through the four-layer architecture framework, recommend alert types per use case, and provide a setup checklist.
+
+---
+
+**Prompt:** "What's the best way to get Kubernetes logs into Sumo Logic and what source category naming convention should I use?"
+
+**What it does:** Loads `data-collection-patterns` to compare OpenTelemetry (recommended), Installed Collector, and hosted approaches, then explains the `env/technology/role` naming convention.
+
+---
+
+**Prompt:** "We're deploying Sumo Logic for the first time. What should we set up on day one versus what can wait?"
+
+**What it does:** Loads `consulting-guide` and surfaces the new deployment checklist: audit policies, source category naming, partition design, core FERs, admin alerts, and scheduled views — sequenced by priority and effort.
+
+---
+
+### Trade-Off & Decision Questions
+
+**Prompt:** "Should I use Anomaly detection or Outlier detection for my error rate monitor?"
+
+**What it does:** Loads `alerting-time-compare-anomaly` and the `consulting-guide` trade-off table comparing Anomaly (ML-based, single series, lower false-positive rate) vs Outlier (per-entity comparison, statistical) and recommends based on the use case.
+
+---
+
+**Prompt:** "Should my data be on Continuous tier or Infrequent tier?"
+
+**What it does:** Explains the Continuous vs Infrequent trade-off: query frequency, dashboard usage, monitor scan costs, and ingest price difference — helping the user choose based on access patterns.
+
+---
+
+**Prompt:** "Is it better to use a Scheduled Search or a Monitor for my alert?"
+
+**What it does:** Loads `alerting-monitors` and presents the key differences: stateful alerting, per-entity grouping, detection methods, and why Monitors are the modern preferred approach over Scheduled Searches.
+
+---
+
+**Prompt:** "Should I parse my JSON fields with a Field Extraction Rule or at search time?"
+
+**What it does:** Loads `admin-field-extraction-rules` and explains the performance hierarchy — FER-extracted index-time fields vs search-time parsing — including the 342x speedup case study for numeric `where` comparisons.
+
+---
+
+**Prompt:** "I'm getting a lot of noisy alerts. How do I reduce alert fatigue without missing real issues?"
+
+**What it does:** Loads `alerting-monitors` to explain alert grouping, anomaly detection sensitivity controls, wait times, and `compare with timeshift` for dynamic thresholds as alternatives to static thresholds.
+
+---
+
+### Performance & Cost Troubleshooting
+
+**Prompt:** "My Sumo Logic bill is too high. Help me understand what's driving costs and how to reduce them."
+
+**What it does:** Loads `consulting-guide` and `cost-analyze-search-costs`, then uses `analyze_search_scan_cost` and `analyze_data_volume` to identify the top cost drivers — whether it's scan costs from poorly-scoped queries, high ingest volume, or under-optimised dashboards.
+
+---
+
+**Prompt:** "Why are my Flex tier search costs so high? I keep getting charged for large scans."
+
+**What it does:** Loads `search-optimize-queries` to diagnose missing `_index=` scope, absent keywords, and lack of scheduled views, then checks actual scan data with `analyze_search_scan_cost`.
+
+---
+
+**Prompt:** "My searches are slow even though I have partitions set up. What am I missing?"
+
+**What it does:** Loads `search-optimize-queries` and checks for bloom filter usage, query rewriting conditions, push-down optimisation, and FER availability — explains which layer the bottleneck is likely at.
+
+---
+
+**Prompt:** "How can I make this query faster?" *(paste a slow query)*
+
+**What it does:** Analyses the query against the SKEFE framework, identifies missing scope, keyword, FER, or compute optimisations, and rewrites it with explanations.
+
+---
+
+### Admin Setup & Operational Health
+
+**Prompt:** "What admin monitoring should I set up to make sure my Sumo Logic environment is healthy?"
+
+**What it does:** Loads `admin-alerting-and-monitoring` and provides the complete setup: enable three audit policies, install recommended apps, and implement five alert templates (ingest spike/drop, collection stopped, rate limiting, high scan costs, unhealthy collection events).
+
+---
+
+**Prompt:** "I want to be alerted if a data source stops sending logs. How do I set that up?"
+
+**What it does:** Loads `admin-alerting-and-monitoring` and provides the collection-stopped alert query using `_index=sumologic_volume` with `compare timeshift` and GONE state detection.
+
+---
+
+**Prompt:** "One of my collectors is showing as unhealthy. How do I diagnose and fix it?"
+
+**What it does:** Loads `audit-system-health`, runs a live query for health-change events via `search_system_events`, extracts the error and tracker ID, and explains common causes and remediation steps.
+
+---
+
+**Prompt:** "Someone complained that Sumo Logic was rate-limiting their ingest yesterday. How do I confirm this and prevent it in future?"
+
+**What it does:** Searches the audit index for rate-limiting events, explains what triggers rate limiting, and describes how to request a temporary rate limit increase from Customer Success for planned high-ingest events.
+
+---
+
+### Scheduled Views & Acceleration
+
+**Prompt:** "How should I design scheduled views to accelerate my security dashboards?"
+
+**What it does:** Loads `search-scheduled-views` and explains the Base Camp model, the threat intel caching pattern (pre-computing `threatip` + `geoip` lookups), and how to layer 1m → 1h → 1d views for different time-range queries.
+
+---
+
+**Prompt:** "I've been told to 'add a scheduled view' to fix a slow dashboard. What does that mean and how do I do it?"
+
+**What it does:** Explains what a scheduled view is, why it makes dashboards faster (pre-aggregation), shows a concrete before/after query transformation, and provides the steps to create a view in the Sumo Logic UI.
+
+---
+
+**Prompt:** "What's the right way to query a scheduled view? My counts look wrong."
+
+**What it does:** Loads `search-optimize-with-views` and explains the most common mistake: using `| count` on a view (which counts rows, not events) instead of `| sum(_count)`. Provides corrected query with explanation.
+
+---
+
+### Dashboards & Visualisation
+
+**Prompt:** "What type of dashboard should I build for my operations team vs my security team?"
+
+**What it does:** Loads `dashboards-overview` and maps team types to the four dashboard archetypes (History, Snapshot, Investigation, Business), explaining what each is optimised for.
+
+---
+
+**Prompt:** "My time series panel isn't showing data. What am I doing wrong?"
+
+**What it does:** Loads `dashboards-panel-types` and diagnoses the most common causes: missing `timeslice` operator, `count` used without `transpose` for multi-series, or time range too short for the timeslice granularity.
+
+---
+
 ## Skills Library Access
 
 **Prompt:** "Show me the best practices for writing Sumo Logic queries"
@@ -446,7 +604,7 @@ This document provides example prompts for using the Sumo Logic MCP tools effect
 
 **Prompt:** "How do I optimize slow and expensive queries?"
 
-**What it does:** Uses `get_skill` with `skill_name='search-optimize-queries'` for optimization techniques.
+**What it does:** Uses `get_skill` with `skill_name='search-optimize-queries'` for the SKEFE framework, bloom filter tokenisation rules, query rewriting, and push-down techniques.
 
 ---
 
@@ -458,7 +616,13 @@ This document provides example prompts for using the Sumo Logic MCP tools effect
 
 **Prompt:** "How do scheduled views work and when should I use them?"
 
-**What it does:** Uses `get_skill` with `skill_name='search-optimize-with-views'` for view optimization patterns.
+**What it does:** Uses `get_skill` with `skill_name='search-optimize-with-views'` for view optimization patterns including direct replacement, re-aggregation, and dimension collapsing.
+
+---
+
+**Prompt:** "Load the Sumo Logic architecture consulting guide"
+
+**What it does:** Uses `get_skill` with `skill_name='consulting-guide'` to access the full virtual TAE reference including the four-layer architecture framework, 10+ question scenarios, and key trade-off tables.
 
 ---
 
@@ -497,12 +661,21 @@ This document provides example prompts for using the Sumo Logic MCP tools effect
 
 ## Common Use Case Scenarios
 
+### "I Need Architecture Advice" *(Virtual TAE)*
+
+1. "How should I design my partitions?" → `get_skill('admin-partition-design')` + `get_sumo_partitions`
+2. "Should I use Anomaly or Outlier detection?" → `get_skill('alerting-time-compare-anomaly')`
+3. "How do I reduce my Sumo Logic bill?" → `get_skill('consulting-guide')` + `analyze_search_scan_cost` + `analyze_data_volume`
+4. "Review my setup and tell me what to improve" → `get_skill('consulting-guide')` + gather context with `get_account_status`, `get_sumo_partitions`, `analyze_data_volume`
+5. "We're deploying Sumo Logic — what do we do first?" → `get_skill('consulting-guide')` for the new deployment checklist
+
 ### "I'm New to Sumo Logic"
 
 1. "What instances are configured?" → `list_sumo_instances`
 2. "Show me my personal folder" → `get_personal_folder`
 3. "What apps are installed?" → `list_installed_apps`
 4. "Find example queries for [my technology]" → `search_query_examples`
+5. "Explain how Sumo Logic search works" → `get_skill('search-log-search-basics')`
 
 ### "I Need to Find Logs"
 
@@ -516,23 +689,40 @@ This document provides example prompts for using the Sumo Logic MCP tools effect
 2. "What scheduled views are available?" → `list_scheduled_views`
 3. "Estimate query cost before running" → `get_estimated_log_search_usage`
 4. "What's driving my ingestion costs?" → `analyze_data_volume_grouped`
+5. "How do I fix expensive queries structurally?" → `get_skill('search-optimize-queries')`
 
 ### "I Need to Troubleshoot"
 
-1. "Why is my dashboard slow?" → Export dashboard, analyze queries
+1. "Why is my dashboard slow?" → Export dashboard, analyze queries, `get_skill('search-optimize-with-views')`
 2. "Are my collectors healthy?" → `search_system_events` with health use case
 3. "Which monitors are noisy?" → `search_system_events` with monitor use case
 4. "Who changed this content?" → `search_audit_events`
+5. "Why is my data not arriving?" → `get_skill('audit-system-health')` + `search_system_events`
 
 ### "I Need to Build Queries"
 
-1. "Show me best practices" → `get_skill` for search-write-queries
+1. "Show me best practices" → `get_skill('search-write-queries')`
 2. "Find similar queries" → `search_query_examples`
 3. "What fields are available?" → `profile_log_schema`
 4. "Give me examples for [use case]" → `search_query_examples` with filters
 
+### "I Need to Set Up Alerting"
+
+1. "How do monitors work?" → `get_skill('alerting-monitors')`
+2. "Set up admin health alerts" → `get_skill('admin-alerting-and-monitoring')`
+3. "Alert when data stops arriving" → `get_skill('admin-alerting-and-monitoring')` collection stop template
+4. "Dynamic threshold for weekly-cyclic traffic" → `get_skill('alerting-time-compare-anomaly')`
+
 ---
 
-**Version:** 1.0
-**Last Updated:** 2026-03-06
+**Version:** 2.0
+**Last Updated:** 2026-03-09
 **Related:** [MCP Tools Reference](mcp-tools-reference.md), [Skills Library](../skills/README.md)
+
+**Changelog v2.0:**
+
+- Added "Virtual Sumo Logic Consultant" section with 20+ architecture, trade-off, troubleshooting, and admin setup prompts
+- Added "I Need Architecture Advice" to Common Use Case Scenarios
+- Added "I Need to Set Up Alerting" to Common Use Case Scenarios
+- Expanded Skills Library Access section with new skills and consulting-guide entry
+- Updated existing scenario sections with skills-library shortcuts

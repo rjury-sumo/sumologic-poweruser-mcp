@@ -5528,37 +5528,113 @@ async def get_skill(
     Skills are reusable knowledge artifacts that describe **how to accomplish specific tasks**
     in the Sumo Logic platform using MCP tools and best practices.
 
+    This tool also supports a **virtual Technical Account Engineer (TAE)** role: use skills
+    proactively when users ask architecture questions, design reviews, or "should I use X or Y?"
+    questions — not only when performing data tasks.
+
     **Skill Categories:**
-    - `search-*` - Query writing, optimization, views
+    - `consulting-guide` - Meta-skill: TAE consulting approach, question taxonomy, architecture framework
+    - `search-*` - Query writing, optimization, scheduled views, indexes/partitions, Copilot
+    - `alerting-*` - Monitors, detection methods, time compare, anomaly detection
+    - `dashboards-*` - Dashboard types, panel types, transpose patterns
+    - `data-collection-*` - Collection patterns and source category naming
     - `discovery-*` - Finding logs, schemas, partitions, views
     - `cost-*` - Search costs, data volume, credit analysis
-    - `audit-*` - Audit indexes, user activity, system health
+    - `audit-*` - Audit indexes, user activity, system health + admin alert templates
     - `content-*` - Content library navigation, URLs
-    - `admin-*` - Collectors, users, field extraction
+    - `admin-*` - Partition design, FERs, admin alerting, collectors
     - `ui-*` - Interactive UI features
 
-    **Common Skills:**
-    - `search-write-queries` - 5-phase query construction pattern
-    - `search-optimize-queries` - Performance and cost optimization
-    - `search-optimize-with-views` - Using scheduled views
-    - `discovery-logs-without-metadata` - Find logs when metadata unknown
-    - `discovery-scheduled-views` - Inventory and use scheduled views
-    - `cost-analyze-search-costs` - Flex/Infrequent tier cost analysis
-    - `audit-user-activity` - Audit events and user tracking
-    - `audit-system-health` - System events and monitoring
-    - `content-library-navigation` - Browse and export content
-    - `ui-navigate-and-search` - Interactive UI investigation
+    **All Available Skills (fetch before advising on these topics):**
+
+    Consultation & Architecture:
+    - `consulting-guide` - Use for any open-ended, "how should I", or architecture question
+      Triggers: "how should I set up X", "what's the best way to Y", "should I use X or Y",
+                "architecture review", "design my partitions/alerting/collection"
+
+    Search & Query:
+    - `search-log-search-basics` - Core pipeline, metadata fields, parse operators
+      Triggers: "how does search work", "what is _sourceCategory", "how do I parse", new user questions
+    - `search-write-queries` - Complete 5-phase query construction guide
+      Triggers: writing any new Sumo Logic query
+    - `search-optimize-queries` - SKEFE framework, bloom filter, query rewriting, search audit
+      Triggers: "query is slow", "too expensive", "scans too much", "reduce scan", "performance"
+    - `search-indexes-partitions` - Data tiers, finding which partition holds data
+      Triggers: "_index=", "_view=", "which partition", "Infrequent tier", "Flex tier", "data tier"
+    - `search-optimize-with-views` - Transform slow queries using scheduled views (user guide)
+      Triggers: "dashboard is slow", "use a view", "scheduled view query", "sum(_count)"
+    - `search-scheduled-views` - Admin view design, Base Camp model, multi-layer architecture
+      Triggers: "create a view", "design a view", "view patterns", "multi-layer", "1m view"
+    - `search-copilot` - Mo AI Copilot tips and workflow
+      Triggers: "Copilot", "Mo", "AI query generation", "natural language query"
+    - `ui-navigate-and-search` - Field Browser, Log Inspector, histogram, UI workflow
+      Triggers: "Field Browser", "Log Inspector", "histogram", "UI investigation"
+
+    Alerting & Monitoring:
+    - `alerting-monitors` - Monitor types (Logs/Metrics/SLO), detection, alert grouping
+      Triggers: "create a monitor", "set up an alert", "monitor vs scheduled search",
+                "alert grouping", "Anomaly monitor", "SLO"
+    - `alerting-time-compare-anomaly` - Dynamic thresholds, time compare, anomaly vs outlier
+      Triggers: "anomaly detection", "dynamic threshold", "week-over-week", "compare with timeshift",
+                "outlier", "seasonality", "relative alerting"
+
+    Dashboards:
+    - `dashboards-overview` - Four dashboard types, App Catalog, template variables
+      Triggers: "what dashboard should I build", "dashboard types", "template variable", "drill-down"
+    - `dashboards-panel-types` - Panel types, time series, transpose, honeycomb, map
+      Triggers: "panel type", "time series panel", "transpose", "honeycomb", "geoip map",
+                "single value", "chart type", "timeslice required"
+
+    Data Collection:
+    - `data-collection-patterns` - 7 collection patterns, decision guide, source category naming
+      Triggers: "how to collect data", "collection architecture", "source category naming",
+                "OpenTelemetry", "HTTPS source", "Installed Collector", "C2C", "hosted collector"
+
+    Discovery:
+    - `discovery-logs-without-metadata` - Multi-phase discovery when metadata unknown
+      Triggers: "don't know where data is", "find my logs", "what source category is my data"
+    - `discovery-scheduled-views` - Inventory views, understand schemas, versioned view patterns
+      Triggers: "what views exist", "find a view", "view schema", "reduceOnlyFields"
+
+    Cost Analysis:
+    - `cost-analyze-search-costs` - Flex/Infrequent tier scan cost breakdown by user/query
+      Triggers: "high scan costs", "reduce credits", "who is scanning the most", "infrequent cost"
+
+    Audit & Admin Monitoring:
+    - `audit-user-activity` - User authentication, content changes, CSE audit events
+      Triggers: "who logged in", "audit user", "content changes", "user activity"
+    - `audit-system-health` - Collector health, monitor alerts + admin alert templates
+      Triggers: "collector unhealthy", "data not arriving", "ingest monitoring",
+                "ingest spike alert", "rate limiting alert", "admin alerts setup"
+    - `admin-alerting-and-monitoring` - 5 complete admin alert query templates
+      Triggers: "set up admin alerting", "ingest spike", "collection stopped", "rate limit alert",
+                "scan cost alert", "data volume monitoring", "audit policy"
+
+    Administration & Architecture:
+    - `admin-partition-design` - Seven partition design rules, scan reduction analysis
+      Triggers: "partition design", "how many partitions", "organise indexes", "scan reduction",
+                "monolithic partition", "query rewriting", "CSE partition", "Flex partition"
+    - `admin-field-extraction-rules` - FER patterns, histogram/stripe case study (342x speedup)
+      Triggers: "field extraction rules", "FER", "index-time field", "parse at ingest",
+                "speed up where filter", "stripe pattern", "histogram speedup"
+
+    Content Management:
+    - `content-library-navigation` - Browse and export dashboards/searches, URL generation
+      Triggers: "find a dashboard", "export content", "library path", "shareable link"
 
     **Returns:**
     Full markdown content of the requested skill, or error if not found.
+    When skill not found, the error response lists all available skill names.
 
     **Example:**
     ```
+    get_skill("consulting-guide")
     get_skill("search-write-queries")
+    get_skill("admin-partition-design")
     ```
 
     **Skill Index:**
-    See `skills/README.md` for complete list of available skills.
+    See `skills/README.md` for complete list with descriptions.
     """
     try:
         # Get the skills directory (relative to this file)

@@ -59,57 +59,155 @@ sumologic-python-mcp/
 
 ## Skills Reference
 
-Before performing common tasks, consult the relevant skill in `skills/`. Skills capture **how to accomplish tasks** using MCP tools and Sumo Logic best practices.
+Before performing common tasks, consult the relevant skill in `skills/`. Skills capture **how to accomplish tasks** using MCP tools and Sumo Logic best practices. This project acts as a **virtual Technical Account Engineer (TAE)** — use skills proactively for both data tasks *and* architecture advice, design reviews, and best-practice guidance.
+
+**Quick Access:** Use the `get_skill` MCP tool to fetch skill content dynamically. See [skills/README.md](skills/README.md) for the full index.
+
+---
+
+### Consultation & Architecture Advice
+
+Read these when users ask open-ended, design, or "should I" questions rather than specific data tasks.
+
+- **When a user asks any open-ended, architecture, or "how should I" question about Sumo Logic**: Read [skills/consulting-guide.md](skills/consulting-guide.md)
+  - Question taxonomy mapping common questions to the right skills
+  - Architecture framework (four layers: Collection → Partitions → Views → Monitoring)
+  - Key trade-off tables and decision frameworks
+  - Consulting approach: when to advise vs. run queries
+
+---
 
 ### Query & Search Tasks
+
+- **When a user is new to Sumo Logic search, asks about metadata fields, parse operators, or the search pipeline**: Read [skills/search-log-search-basics.md](skills/search-log-search-basics.md)
+  - Five-phase pipeline, metadata fields reference, parse/json/regex operators
+  - Good for onboarding, explaining search concepts, answering "how does X work?"
 
 - **Before writing Sumo Logic queries**: Read [skills/search-write-queries.md](skills/search-write-queries.md)
   - 5-phase query construction pattern (Scope → Parse → Filter → Aggregate → Format)
   - Dashboard panel patterns and complete examples
-- **Before optimizing slow/expensive queries**: Read [skills/search-optimize-queries.md](skills/search-optimize-queries.md)
-  - Scope optimization techniques for 10x-100x cost reduction
-  - Anti-patterns to avoid
-- **Before using scheduled views**: Read [skills/search-optimize-with-views.md](skills/search-optimize-with-views.md)
-  - Transform raw log queries to use pre-aggregated views
-  - Achieve dramatic performance and cost improvements
-- **For interactive UI investigation**: Read [skills/ui-navigate-and-search.md](skills/ui-navigate-and-search.md)
-  - Field Browser, Log Inspector, histogram features
-  - Iterative workflow patterns
+
+- **When queries are slow, timing out, scan too much data, or user asks about search performance/cost**: Read [skills/search-optimize-queries.md](skills/search-optimize-queries.md)
+  - SKEFE framework, bloom filter tokenisation rules, query rewriting, push-down, pushdown hack
+  - Search audit queries to find expensive queries; anti-patterns to avoid
+  - Trigger phrases: "query is slow", "too expensive", "scans too much", "how do I speed up", "reduce scan"
+
+- **When user asks about partitions, indexes, `_index=`, `_view=`, data tiers, or which partition their data is in**: Read [skills/search-indexes-partitions.md](skills/search-indexes-partitions.md)
+  - Enterprise Suite vs Flex tier behaviour, four methods to find data location
+  - Trigger phrases: "what partition", "which index", "Infrequent tier", "Flex tier", "_index=", "_view="
+
+- **Before using or recommending scheduled views (for users who want to query them)**: Read [skills/search-optimize-with-views.md](skills/search-optimize-with-views.md)
+  - Transform raw log queries to pre-aggregated view queries
+  - Transformation patterns, pitfalls, admin reference for view design
+  - Trigger phrases: "dashboard is slow", "scheduled search takes too long", "use a view"
+
+- **When advising admins on creating scheduled views, view design, or multi-layer view architecture**: Read [skills/search-scheduled-views.md](skills/search-scheduled-views.md)
+  - Base Camp model, aggregate reporting and threat intel caching patterns
+  - Multi-layer 1m → 1h → 1d architecture
+  - Trigger phrases: "create a view", "design a view", "how do views work", "view patterns"
+
+- **When user asks about Mo Copilot or AI-assisted query generation**: Read [skills/search-copilot.md](skills/search-copilot.md)
+  - Workflow tips, scope-first approach, prompt examples, limitations
+
+- **For interactive UI investigation using the Sumo Logic web interface**: Read [skills/ui-navigate-and-search.md](skills/ui-navigate-and-search.md)
+  - Field Browser, Log Inspector, histogram, iterative workflow patterns
+
+---
+
+### Alerting & Monitoring Tasks
+
+- **When user asks about monitors, alerts, detection methods, or "how do I alert on X"**: Read [skills/alerting-monitors.md](skills/alerting-monitors.md)
+  - Monitor types (Logs/Metrics/SLO), detection (Static/Anomaly/Outlier)
+  - Alert grouping, `{{ResultsJson.field}}` notification variables, Alert List
+  - Trigger phrases: "create a monitor", "set up an alert", "monitor vs scheduled search", "alert grouping"
+
+- **When user asks about dynamic thresholds, weekly seasonality, anomaly detection, or time-based alerting**: Read [skills/alerting-time-compare-anomaly.md](skills/alerting-time-compare-anomaly.md)
+  - `compare with timeshift` patterns, anomaly vs outlier comparison
+  - Trigger phrases: "anomaly detection", "dynamic threshold", "week-over-week", "compare with timeshift", "outlier"
+
+---
+
+### Dashboard Tasks
+
+- **When user asks about dashboard design, types of dashboards, or what dashboard to build**: Read [skills/dashboards-overview.md](skills/dashboards-overview.md)
+  - Four dashboard types (History/Snapshot/Investigation/Business), App Catalog, template variables
+
+- **When user asks about panel types, time series charts, honeycomb, transpose, or chart configuration**: Read [skills/dashboards-panel-types.md](skills/dashboards-panel-types.md)
+  - Categorical vs time series (timeslice required), transpose pattern, map/honeycomb/single value
+  - Trigger phrases: "add a panel", "time series panel", "chart type", "transpose", "honeycomb"
+
+---
+
+### Data Collection Tasks
+
+- **When user asks how to get data into Sumo Logic, collection architecture, or source category naming**: Read [skills/data-collection-patterns.md](skills/data-collection-patterns.md)
+  - 7 collection patterns (Installed Collector, HTTPS Source, C2C, OpenTelemetry, etc.)
+  - Decision table, source category naming conventions
+  - Trigger phrases: "how to collect", "set up collection", "source category", "OpenTelemetry", "HTTPS source"
+
+---
 
 ### Discovery Tasks
 
-- **Before helping users find logs**: Read [skills/discovery-logs-without-metadata.md](skills/discovery-logs-without-metadata.md)
-  - Multi-phase discovery when metadata is unknown
-  - Collector/partition/schema exploration
-- **Before working with scheduled views**: Read [skills/discovery-scheduled-views.md](skills/discovery-scheduled-views.md)
-  - Inventory views, understand schemas, match to use cases
-  - Query patterns for versioned views
+- **Before helping users find logs when metadata is unknown**: Read [skills/discovery-logs-without-metadata.md](skills/discovery-logs-without-metadata.md)
+  - Multi-phase discovery: collector/partition/schema exploration
+  - Trigger phrases: "don't know where data is", "find my logs", "what source category"
+
+- **Before working with scheduled views (discovery phase)**: Read [skills/discovery-scheduled-views.md](skills/discovery-scheduled-views.md)
+  - Inventory views, understand schemas (`reduceOnlyFields`, `indexedFields`), versioned view patterns
+
+---
 
 ### Cost Analysis Tasks
 
-- **Before analyzing search costs**: Read [skills/cost-analyze-search-costs.md](skills/cost-analyze-search-costs.md)
-  - Flex/Infrequent tier scan cost breakdown
-  - User/query cost ranking
+- **Before analyzing search costs or answering "why is Sumo Logic expensive?"**: Read [skills/cost-analyze-search-costs.md](skills/cost-analyze-search-costs.md)
+  - Flex/Infrequent tier scan cost breakdown by user and query
+  - Trigger phrases: "high scan costs", "reduce credits", "who is scanning the most", "infrequent tier cost"
 
-### Audit & Compliance Tasks
+---
 
-- **Before searching audit indexes**: Read [skills/audit-user-activity.md](skills/audit-user-activity.md) or [skills/audit-system-health.md](skills/audit-system-health.md)
-  - Audit events vs system events vs search audit
-  - Pre-built use cases and query patterns
+### Audit & Admin Monitoring Tasks
+
+- **Before searching audit indexes or tracking user actions**: Read [skills/audit-user-activity.md](skills/audit-user-activity.md)
+  - Audit events vs system events vs search audit, login tracking, content changes
+
+- **Before monitoring system health, collector events, or setting up admin alerts**: Read [skills/audit-system-health.md](skills/audit-system-health.md)
+  - Collector/source health monitoring, monitor alert analysis, admin alert templates
+  - Includes: ingest spike/drop, collection stop, rate limiting, infrequent scan cost, unhealthy events
+  - Trigger phrases: "collector unhealthy", "data not arriving", "ingest monitoring", "admin alerts"
+
+- **When advising admins on operational alerting setup or asking about data volume monitoring**: Read [skills/admin-alerting-and-monitoring.md](skills/admin-alerting-and-monitoring.md)
+  - Audit policy setup, 5 complete alert query templates with full Sumo Logic query code
+  - Trigger phrases: "admin alerting", "ingest spike alert", "rate limiting alert", "monitor for data loss"
+
+---
+
+### Administration & Architecture Tasks
+
+- **When asked about partition design, partition strategy, or "how should I organise my data"**: Read [skills/admin-partition-design.md](skills/admin-partition-design.md)
+  - Seven rules of partition design, scan reduction analysis (5x–1100x improvement)
+  - CSE/Flex partition considerations
+  - Trigger phrases: "partition design", "how many partitions", "organise indexes", "scan reduction", "query rewriting"
+
+- **When asked about Field Extraction Rules (FERs), index-time parsing, or search performance via fields**: Read [skills/admin-field-extraction-rules.md](skills/admin-field-extraction-rules.md)
+  - Four FER patterns (Speed/JSON, Convenience/Complex, Routing, Integration-Injected)
+  - Histogram/stripe case study (342x speedup on numeric `where` comparisons)
+  - Trigger phrases: "field extraction", "FER", "index-time field", "parse at ingest", "search is slow on numeric"
+
+---
 
 ### Content Management Tasks
 
-- **Before navigating content library**: Read [skills/content-library-navigation.md](skills/content-library-navigation.md)
-  - Export dashboards, searches, folders
-  - Path resolution and URL generation
+- **Before navigating content library, exporting dashboards or searches**: Read [skills/content-library-navigation.md](skills/content-library-navigation.md)
+  - Export dashboards, searches, folders; path resolution and URL generation
+
+---
 
 ### Development Tasks
 
 - **Before adding new MCP tools**: Review patterns in existing skills to understand tool usage
 - **After adding tools**: Update related skills per "Skills Library Maintenance" section below
 - **For skill overview**: See [skills/README.md](skills/README.md) index
-
-**Quick Access:** Use the `get_skill` MCP tool to fetch skill content dynamically.
 
 ## Development Workflow
 

@@ -134,6 +134,12 @@ Links to official documentation
 
 ## Skill Index
 
+### Meta-Skills (Start Here)
+
+| Skill | Category | Description | MCP Tools |
+|-------|----------|-------------|-----------|
+| **[Consulting Guide — Virtual TAE](./consulting-guide.md)** | **Meta** | **Architecture framework, question taxonomy, trade-off tables, TAE consulting approach** | **Yes** |
+
 ### Search & Query
 
 | Skill | Category | Description | MCP Tools |
@@ -212,6 +218,17 @@ When adding new tools or capabilities to the MCP server:
 See [CLAUDE.md](../CLAUDE.md) for developer guidelines on keeping skills synchronized with code.
 
 ## Skill Summaries
+
+### Entry Point
+
+**[Consulting Guide — Virtual TAE](./consulting-guide.md)** - Start here for advice, design, and architecture questions
+
+- Question taxonomy: maps 10+ common question types to the right skill(s)
+- Four-layer architecture framework (Collection → Partitions → Acceleration → Monitoring)
+- Key trade-off tables: monitors vs scheduled search, anomaly vs outlier, Continuous vs Infrequent, partition vs no partition
+- Decision frameworks for: alerting setup, data collection, cost reduction, partition design
+- MCP tools for context gathering before advising
+- First steps checklist for new deployments
 
 ### Core Query Skills
 
@@ -329,7 +346,7 @@ See [CLAUDE.md](../CLAUDE.md) for developer guidelines on keeping skills synchro
 
 ---
 
-**Version:** 2.0.0
+**Version:** 2.1.0
 **Last Updated:** 2026-03-09
 **Maintained by:** sumologic-python-mcp project
 
@@ -341,3 +358,9 @@ See [CLAUDE.md](../CLAUDE.md) for developer guidelines on keeping skills synchro
 - Enhanced search-optimize-with-views.md: added Admin Reference view architecture patterns
 - Enhanced audit-system-health.md: added admin audit policy setup + 5 alert templates (v1.1)
 - Sources: SumoLogic Logs Basics Training (August 2025); Sumo Logic Architecture For Log Search Performance (February 2025); Admin Indexes, Apps and Alerts Playbook (Sumo Logic Customer Success)
+
+**Changelog v2.1:**
+
+- Added `consulting-guide.md` — virtual TAE meta-skill with question taxonomy, four-layer architecture framework, and trade-off tables
+- Updated CLAUDE.md Skills Reference with all 22 skills and trigger conditions
+- Updated `get_skill` MCP tool description with all skills and trigger phrases
