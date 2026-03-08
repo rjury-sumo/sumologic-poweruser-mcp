@@ -608,9 +608,96 @@ _view=app_status_1m | sum(_count) by status | timeslice 1h | where _sum > 1000
 - For <1 hour queries, raw logs may be fine
 - Balance optimization effort vs actual gain
 
+## Admin Reference: View Architecture Patterns
+
+This section provides context on how Scheduled Views are designed, using the "Base Camp" model from Sumo Logic architecture training. Understanding view design helps you request new views from admins or create them yourself.
+
+### The "Base Camp" Mental Model
+
+Querying a large time range of raw data is like climbing a mountain in one go — hard. Scheduled Views are base camps: you cache the work done at each stage so subsequent queries start higher.
+
+```
+Raw data               → 10s of millions of rows/day
+↓ 1-minute view        → 1,440 rows/facet/day
+↓ 1-hour view (save-to-index) → 24 rows/facet/day
+↓ 1-day view           → 1 row/facet/day
+```
+
+A 90-day query against a 1-day view touches only 90 rows per facet versus millions of raw events.
+
+### View Design Pattern 1: Aggregate Reporting
+
+Use when dashboard panels need time series or categorical breakdowns over large data sets.
+
+```
+// View definition (runs every 1 minute, stores 1 row per status per minute):
+_sourceCategory=Labs/Apache/Access
+| parse "HTTP/1.1\" * " as status_code
+| timeslice 1m
+| count by status_code, _timeslice
+
+// Stored as view "apache_status" — 1 row/status/minute vs millions of raw events
+```
+
+Query the view by summing pre-aggregated counts (not counting):
+```
+_view=apache_status
+| timeslice 1h
+| sum(_count) as requests by status_code, _timeslice
+| transpose row _timeslice column status_code
+```
+
+### View Design Pattern 2: Caching Heavy Compute Work
+
+Use when queries involve expensive operations — `parse regex multi`, threat intel lookups (`threatip`), geo-IP resolution (`geoip`) — that are slow and costly to rerun on every refresh.
+
+The view pre-computes and stores only positive matches with all enrichment computed at write time:
+
+```
+// View definition for threat intel caching:
+_sourceCategory=Labs/AWS/WAF
+| json field=_raw "httpRequest.clientIp" as src_ip
+| where ispublicip(src_ip)
+| threatip src_ip
+| where !(isempty(malicious_confidence))     // Only keep positive threat matches
+| timeslice 1m
+| count by _timeslice, src_ip, action, malicious_confidence, actor
+| lookup asn, organization from asn://default on ip=src_ip
+| geoip src_ip
+```
+
+Additional benefits: geo-IP and threat intel values are captured at event time (not query time), preserving historical forensic state as feeds change.
+
+### Multi-Layer View Architecture
+
+For very long time ranges, build views on views using save-to-index scheduled searches:
+
+```
+1m view  →  pre-aggregated at 1m granularity (1440 rows/facet/day)
+   ↓ save-to-index scheduled search (hourly)
+1h view  →  summarises 1m view (24 rows/facet/day)
+   ↓ save-to-index scheduled search (daily)
+1d view  →  summarises 1h view (1 row/facet/day)
+```
+
+90-day reports against the 1d view touch 90 rows/facet instead of billions of raw events.
+
+### View Creation (Admin)
+
+1. Navigate to **Manage Data → Logs → Scheduled Views**
+2. Click **+ Add**, enter a lowercase descriptive name
+3. Paste the view definition query (must be an aggregate query with `timeslice 1m`)
+4. Set start time and retention period
+5. Enable the required output fields in **Manage Data → Logs → Fields**
+
+See [`search-scheduled-views.md`](./search-scheduled-views.md) for full admin view design guidance.
+
+---
+
 ## Related Skills
 
 - [Discovery: Scheduled Views](./discovery-scheduled-views.md) - Finding available views and their schemas
+- [Scheduled Views for Acceleration](./search-scheduled-views.md) - Admin view design and creation patterns
 - [Cost: Analyze Scan Costs](./cost-analyze-scan-costs.md) - Measuring cost impact of optimization
 - [Search: Build Aggregate Queries](./search-build-aggregate-queries.md) - Understanding aggregation patterns
 - [Discovery: Log Metadata](./discovery-log-metadata.md) - Understanding raw log structure before optimizing

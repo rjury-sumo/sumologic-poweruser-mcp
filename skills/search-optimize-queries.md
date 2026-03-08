@@ -870,6 +870,133 @@ Joins are expensive
 
 **Fix:** Use lookup tables, or denormalize data at ingest time if possible
 
+## Platform Engine Optimisations
+
+Understanding these built-in engine features explains *why* certain patterns are much faster — and helps you write queries that leverage them effectively.
+
+### Bloom Filter Tokenisation Rules
+
+All ingested log events are full-text indexed using a bloom filter. Keywords in the scope (before the first `|`) are evaluated against this index to skip non-matching events before any decompression or parsing.
+
+Tokenisation rules:
+- Tokens are alphanumeric strings bounded by space or punctuation: `foo`, `1234abcd`, `10.2.3.4`, `user@abc.com`, `abc.com`
+- Keywords are **case-insensitive**: `foo`, `FOO`, and `Foo` are equivalent
+- Boolean operators: space = AND, use `OR`/`NOT` with brackets: `(error OR fatal) NOT debug`
+- Wildcards: `bar*`, `b?r`, `*/cart/*`, `*.php`
+- Exact phrases in quotes: `"some words all together"`, `"\"key\":\"value\""`
+
+Use 1–2 highly discriminating keywords that eliminate most unwanted events.
+
+### Query Rewriting
+
+If the search scope matches a partition's routing expression, the Sumo Logic engine **automatically rewrites the query** to restrict scanning to only that partition — even without an explicit `_index=` in the scope.
+
+This is why `_sourceCategory=prod/waf/*` on a customer with a `waf_logs` partition scoped to `_sourceCategory=prod/waf*` effectively behaves as if `_index=waf_logs` were added.
+
+**Key requirement:** Query rewriting works best when all partitions use the **same metadata field** (e.g., all scoped by `_sourceCategory`). Mixed metadata across partitions (some by `_collector`, others by `_sourceCategory`) degrades rewriting and forces users to specify `_index=` explicitly.
+
+### Push-Down Optimisation (Automatic)
+
+For `where field = "value"` equality filters, the engine automatically infers `value` as an additional keyword and applies the bloom filter at retrieval time — converting a compute-time filter into a retrieval-time filter for free.
+
+```
+// User writes:
+_sourceCategory=prod/app
+| json "status" as status
+| where status = "critical"
+
+// Engine automatically adds "critical" as bloom filter keyword
+```
+
+**Limitation:** Push-down only works for `where field = "value"` equality. It does **not** trigger for `where field matches "..."` (regex/wildcard patterns).
+
+### The Pushdown Hack — Manual Push-Down for `matches`
+
+Since push-down doesn't trigger for `where matches`, you can emulate it by explicitly adding literal keyword fragments to the scope:
+
+```
+// Slow — regex match runs at compute time on all retrieved events:
+_sourceCategory=abc
+| json "url" as url
+| where url matches "*/checkout/*"
+
+// Fast — keyword pre-filters in retrieval phase, then regex confirms:
+_sourceCategory=abc checkout
+| json "url" as url
+| where url matches "*/checkout/*"
+```
+
+The same applies to rare optional JSON fields — add the field name as a keyword when only a small fraction of events contain it:
+
+```
+// Only a small % of logs contain "errorDescription" — add it as keyword:
+_sourceCategory=abc errorDescription "replication failed"
+| json "errorDescription" as errorDescription
+| where errorDescription matches /(?i)replication failed .*/
+```
+
+---
+
+## Measuring Performance: Search Audit
+
+Use the search audit view to identify slow, expensive, or poorly-scoped queries across your organisation.
+
+```
+// The search audit view (requires Search Audit policy to be enabled):
+_view=sumologic_search_usage_per_query
+```
+
+Key fields: `user_name`, `query_type`, `data_scanned_bytes`, `execution_duration_ms`, `scanned_partition_count`, `scanned_bytes_breakdown` (by tier), `query`, `content_name`.
+
+Red flags: scan > 1 TB per query, runtime > 5 minutes, scanning > 3 partitions, high billable scan in Infrequent/Flex tiers.
+
+**Top scanners by total bytes:**
+
+```
+_view=sumologic_search_usage_per_query
+| where data_scanned_bytes > (1 * 1G)
+| (query_end_time - query_start_time)/1000 as range_s
+| execution_duration_ms / 1000 as duration_s
+| if(execution_duration_ms > 1000 * 30, 1, 0) as slow
+| if(status_message = "Finished successfully", 0, 1) as fail
+| count_distinct(query) as unique_queries,
+  max(scanned_partition_count) as max_partitions,
+  avg(scanned_partition_count) as avg_partitions,
+  count_distinct(user_name) as users,
+  sum(duration_s) as total_sec,
+  count as searches,
+  sum(data_scanned_bytes) as bytes_scanned,
+  sum(slow) as %"slow > 30s",
+  sum(fail) as %"fail/cancelled"
+  by user_name, query_type
+| sort bytes_scanned
+| bytes_scanned / 1024/1024/1024 as scan_gb
+```
+
+**Infrequent scan with credit estimate:**
+
+```
+_view=sumologic_search_usage_per_query
+analytics_tier=*infrequent*
+| json field=scanned_bytes_breakdown "Infrequent" as scan_inf nodrop
+| ((query_end_time - query_start_time) /1000 / 60 /60/24) as range_days
+| parse regex field=query "(?i)(?<scope>(?:_datatier|_index|_view) *= *[a-zA-Z]+)" nodrop
+| count as queries,
+  sum(data_scanned_bytes) as total_bytes,
+  pct(range_days, 50, 95),
+  avg(scanned_partition_count) as partitions,
+  sum(scan_inf) as infreq_scan
+  by user_name, scope
+| limit 100
+| round(infreq_scan/1G, 2) as inf_scan_gb
+| round(inf_scan_gb * 0.016, 2) as scan_credits
+| sort scan_credits
+```
+
+MCP tools: `run_search_audit_query`, `analyze_search_scan_cost` (for Flex/Infrequent tier breakdown by user/query).
+
+---
+
 ## Quick Reference: Optimization Rules Summary
 
 **Scope Optimization (Phase 1):**
@@ -1007,6 +1134,7 @@ operators = get_operator_category_info()
 - `profile_log_schema` - Check field cardinality for aggregation planning
 - `get_estimated_log_search_usage` - Estimate scan volume before running query
 - `analyze_search_scan_cost` - Measure actual costs and identify expensive queries
+- `run_search_audit_query` - Analyse which queries are expensive (search audit view)
 - `search_query_examples` - Find optimized query patterns and examples
 - `list_field_extraction_rules` - Discover available FERs for your data
 - `get_field_extraction_rule` - Get details of specific FER configuration
@@ -1023,8 +1151,8 @@ operators = get_operator_category_info()
 
 ---
 
-**Version:** 2.0.0
-**Last Updated:** 2026-03-06
+**Version:** 2.1.0
+**Last Updated:** 2026-03-09
 **Domain:** Search & Performance
 **Complexity:** Intermediate to Advanced
 **Estimated Impact:** 10x-100x improvement in speed and cost
@@ -1040,3 +1168,10 @@ operators = get_operator_category_info()
 - Renumbered all rules for logical flow (13 rules total)
 - Added FER-related MCP tools to reference
 - Enhanced checklist with FER and parse optimization items
+
+**Changelog v2.1:**
+
+- Added Platform Engine Optimisations section (bloom filter tokenisation rules, query rewriting, push-down, pushdown hack)
+- Added Measuring Performance: Search Audit section with two example queries
+- Added `run_search_audit_query` to MCP Tools Used
+- Source: Sumo Logic Architecture For Log Search Performance (February 2025)

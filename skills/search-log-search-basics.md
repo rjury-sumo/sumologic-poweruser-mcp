@@ -1,0 +1,281 @@
+# Skill: Sumo Logic Log Search Basics
+
+## Intent
+
+Understand and apply Sumo Logic's core log search pipeline — from scoping with metadata and keywords, through search-time field parsing, to filtering and aggregation — to turn raw logs into actionable insights.
+
+## Prerequisites
+
+- Access to a Sumo Logic instance with log data
+- Basic understanding of what log data looks like (structured JSON, Apache-style, syslog, etc.)
+- Familiarity with the log sources you want to query (source categories, indexes)
+
+## Context
+
+**Use this skill when:**
+
+- Starting a new investigation or troubleshooting session
+- Building a search query from scratch
+- Teaching someone the fundamentals of Sumo Logic search
+- Preparing queries for dashboards or monitors
+
+**Don't use this when:**
+
+- Querying metrics (different language and tools)
+- Working with traces (use APM/tracing UI)
+- You already have an established query and just need to tune performance (see `search-performance-best-practices`)
+
+## The Log Search Pipeline
+
+Sumo Logic queries are a **pipeline** of stages separated by `|`. Each stage transforms or filters the data flowing through it. There are over 120 search operators.
+
+```
+<scope: metadata + keywords>
+| parse <fields from raw log>
+| where <filter on field values>
+| aggregate <count / sum / avg etc.>
+| format <sort / limit / fields>
+```
+
+### Complete Example
+
+```
+_sourceCategory=Labs/Apache/Access "Mozilla"
+| parse "GET * HTTP/1.1\" * " as url, status_code
+| where status_code matches "5*"
+| count by status_code
+| sort by _count
+| limit 3
+```
+
+---
+
+## Stage 1 — Scope (Before the First Pipe)
+
+The scope is everything **before** the first `|`. It is the most important part for performance and cost. It tells Sumo which partitions to scan and which raw log events to retrieve.
+
+### Metadata Fields
+
+Metadata is attached to every log event at ingest time and is stored in the index alongside the data. Using metadata in scope significantly speeds up searches.
+
+| Field | Description |
+|---|---|
+| `_sourceCategory` | Category assigned to the source at configuration time. Most important for scoping. |
+| `_index` / `_view` | Partition (index) where the logs are stored. Same field, two aliases. |
+| `_collector` | Name of the collector that received the log. |
+| `_source` | Name of the source within a collector. |
+| `_sourceHost` | Hostname of the source machine. |
+| `_sourceName` | File path or source name (e.g., `/var/log/app.log`). |
+
+**Best practice:** Always include `_sourceCategory` or `_index` in every search scope. This is the single most effective way to reduce scan and improve speed.
+
+```
+// Good — scoped to specific category
+_sourceCategory=Labs/Apache/Error
+
+// Good — scoped to index and category
+_index=prod_logs _sourceCategory=app/service
+
+// Poor — scans everything
+error exception
+```
+
+### Keywords
+
+Keywords are free-text terms that further filter events retrieved from the index using a bloom filter (very fast pre-filtering). Place 1–2 keywords after your metadata scope to reduce retrieved events before any parsing occurs.
+
+```
+_sourceCategory=prod/app "OutOfMemoryError"
+_sourceCategory=prod/app (error OR exception)
+_sourceCategory=prod/app "access denied"
+```
+
+**Keyword syntax rules:**
+
+- Keywords are **not case-sensitive**
+- Wildcards: `fatal*`, `*denied*`, `fo?bar`
+- Exact phrase: `"access denied"`
+- Boolean: `(error OR warn*) AND NOT debug`
+- Implicit AND: spaces between terms
+
+---
+
+## Stage 2 — Parse (Extract Fields at Search Time)
+
+Sumo Logic uses **Schema on Read**: you extract fields from the raw log text when you need them, not at ingest time. This is flexible but slower than index-time fields.
+
+### Auto-Parsing (JSON)
+
+JSON-structured logs are **automatically parsed** — all top-level JSON keys become available as fields without any `parse` statement.
+
+```
+// JSON log: {"level":"ERROR","message":"timeout","user_id":"abc123"}
+// After auto-parse you can reference: level, message, user_id directly
+_sourceCategory=prod/app
+| where level = "ERROR"
+```
+
+### `parse` — Anchor-Based Parsing
+
+Use two anchor strings around the value you want to capture. Simple and fast.
+
+```
+| parse "GET * HTTP/1.1\" * " as url, status_code
+| parse "Invalid arguments passed in * on line *" as path, line
+| parse "User: * Action: *" as username, action
+```
+
+### `parse regex` — Regex Extraction
+
+Use for complex patterns or when anchor-based parsing is not possible. Add `nodrop` to avoid filtering out events that don't match.
+
+```
+| parse regex field=_raw " \[(?<log_level>[a-z]+)\] " nodrop
+| parse regex field=_raw "\[client (?<src_ip>\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})" nodrop
+| parse regex field=_raw " \[(?<module>[a-z-_]+):(?<log_level>[a-z]+)\] " nodrop
+```
+
+### `json` — Explicit JSON Extraction
+
+More explicit and performant than auto-parsing for production queries. Supports nested paths.
+
+```
+| json field=_raw "errorCode" as error_code
+| json field=_raw "userIdentity.arn" as user_arn nodrop
+| json "log","stream"
+```
+
+**`nodrop` keyword:** Prevents a log event from being discarded if the field doesn't exist. Always use `nodrop` for optional or inconsistently present fields.
+
+---
+
+## Stage 3 — Filter (Narrow on Field Values)
+
+Filter after parsing when you need field-level precision. Keywords in the scope phase are preferred for performance; `where` clauses are for post-parse filtering.
+
+```
+| where status_code matches "5*"
+| where duration_ms > 1000
+| where log_level = "ERROR"
+| where error_code in ("AccessDenied", "ThrottlingException")
+| where !isEmpty(user_id)
+```
+
+**Note:** `where` clauses using string comparisons **are case-sensitive**.
+
+---
+
+## Stage 4 — Aggregate (Compute Insights)
+
+Aggregation transforms log events into summarised results for charts and alerts.
+
+### Categorical (No Time Dimension)
+
+```
+// Count by field — most common pattern
+| count by status_code
+| sort _count desc
+
+// Multiple dimensions
+| count by error_code, service_name
+| sort _count desc
+
+// Top N shorthand
+| top 10 error_code by _count
+```
+
+### Time Series
+
+```
+// Simple time series
+| timeslice 5m
+| count by _timeslice
+
+// Multi-series (requires transpose for charting)
+| timeslice 5m
+| count by _timeslice, log_level
+| transpose row _timeslice column log_level
+```
+
+### Statistical
+
+```
+| avg(duration_ms) as avg_ms, max(duration_ms) as max_ms, pct(duration_ms, 95) as p95_ms by service
+```
+
+---
+
+## Stage 5 — Format (Shape the Output)
+
+```
+| sort _count desc
+| limit 25
+| fields error_code, error_message, _count
+| fields - unwanted_column
+```
+
+---
+
+## Reading the UI
+
+After running a search you will see:
+
+- **Histogram** — distribution of events across the time range
+- **Messages tab** — raw log events matching your scope
+- **Field Browser** — discovered fields available for filtering and aggregation
+- **Log Message Inspector** — click any message to see all its fields and their values; the `_view` field shown here is the partition/index
+
+You can click any field value in the Field Browser or inspector to add it directly to your query scope.
+
+---
+
+## Common Patterns
+
+### Apache / Web Access Logs
+
+```
+_sourceCategory=Labs/Apache/Access
+| parse "* * * * \"* * *\" * *" as src_ip, ident, user, time, method, url, protocol, status, bytes
+| where status >= 400
+| count by status
+| sort _count desc
+```
+
+### JSON App Logs — Error Count by Level
+
+```
+_sourceCategory=prod/app
+| json "level" as log_level
+| count by log_level
+| sort _count desc
+```
+
+### Time Series Error Rate
+
+```
+_sourceCategory=Labs/Apache/Error
+| parse regex field=_raw " \[(?<log_level>[a-z]+)\] " nodrop
+| where log_level = "crit"
+| timeslice
+| count by _timeslice
+```
+
+---
+
+## Related Skills
+
+- [Search Performance Best Practices](./search-performance-best-practices.md)
+- [Indexes and Partitions](./search-indexes-partitions.md)
+- [AI Copilot](./search-copilot.md)
+
+## API References
+
+- [Log Operators Cheat Sheet](https://help.sumologic.com/docs/search/search-cheat-sheets/log-operators/)
+- [Parse Operators](https://help.sumologic.com/docs/search/search-query-language/parse-operators/)
+- [Getting Started with Search](https://help.sumologic.com/docs/search/get-started-with-search/)
+
+---
+
+**Version:** 1.0.0
+**Last Updated:** 2026-03-09
+**Source:** SumoLogic Logs Basics Training (August 2025)

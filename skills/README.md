@@ -19,11 +19,30 @@ Skills are organized by domain:
 
 ### Search & Query (`search-*.md`, `ui-*.md`)
 
+- **Log search basics**: Core pipeline, metadata fields, parse operators
 - **Writing queries**: Complete 5-phase construction guide
-- **Query optimization**: Performance and cost optimization with views
+- **Query optimization**: Performance and cost optimization (SKEFE framework, bloom filter, query rewriting)
+- **Scheduled views**: Admin view design and creation patterns
+- **Optimize with views**: Transform slow queries using scheduled views
+- **Indexes and partitions**: Data tiers, finding data locations
+- **Mo Copilot**: AI-assisted query generation
 - **UI navigation**: Interactive investigation techniques
-- Metrics querying
-- Search cost analysis
+
+### Alerting (`alerting-*.md`)
+
+- Monitor types and design (Logs, Metrics, SLO)
+- Time compare and anomaly detection
+- Alert grouping and notification variables
+
+### Dashboards (`dashboards-*.md`)
+
+- Dashboard design patterns (four types)
+- Panel types and query patterns (categorical, time series, honeycomb, map)
+
+### Data Collection (`data-collection-*.md`)
+
+- 7 collection patterns and selection guide
+- Source category naming conventions
 
 ### Data Discovery (`discovery-*.md`)
 
@@ -44,7 +63,7 @@ Skills are organized by domain:
 
 - Searching audit indexes
 - User activity tracking
-- System health monitoring
+- System health monitoring + admin alert templates
 - Compliance reporting
 
 ### Content Management (`content-*.md`)
@@ -58,8 +77,9 @@ Skills are organized by domain:
 
 - Collector management
 - User and role management
-- Field extraction rules
-- Partition configuration
+- Field extraction rules (FER patterns, histogram/stripe)
+- Partition design (7 rules, scan reduction analysis)
+- Admin alerting foundation (ingest, rate limiting, scan cost alerts)
 
 ## Using Skills
 
@@ -114,22 +134,71 @@ Links to official documentation
 
 ## Skill Index
 
+### Search & Query
+
+| Skill | Category | Description | MCP Tools |
+|-------|----------|-------------|-----------|
+| **[Log Search Basics](./search-log-search-basics.md)** | **Search** | **Core pipeline, metadata fields, parse operators** | **No** |
+| **[Writing Queries](./search-write-queries.md)** | **Search** | **Complete query construction guide (5 phases)** | **Yes** |
+| [Query Optimization](./search-optimize-queries.md) | Search | SKEFE framework, bloom filter, query rewriting, search audit | Yes |
+| [Scheduled Views — Admin Design](./search-scheduled-views.md) | Search | View patterns, creation, multi-layer architecture | Yes |
+| [Optimize with Views — User Guide](./search-optimize-with-views.md) | Search | Transform slow queries using scheduled views | Yes |
+| [Indexes and Partitions](./search-indexes-partitions.md) | Search | Data tiers, finding which partition holds your data | No |
+| [Mo AI Copilot](./search-copilot.md) | Search | Natural language query generation tips | No |
+| **[UI Navigation](./ui-navigate-and-search.md)** | **Search** | **Interactive UI features for investigation** | **No** |
+
+### Alerting & Dashboards
+
+| Skill | Category | Description | MCP Tools |
+|-------|----------|-------------|-----------|
+| [Monitors](./alerting-monitors.md) | Alerting | Monitor types, detection methods, alert grouping | Yes |
+| [Time Compare & Anomaly](./alerting-time-compare-anomaly.md) | Alerting | Dynamic threshold alerting, anomaly vs outlier | Yes |
+| [Dashboard Design](./dashboards-overview.md) | Dashboards | Four dashboard types, App Catalog, drill-down | Yes |
+| [Panel Types & Patterns](./dashboards-panel-types.md) | Dashboards | Categorical, time series, honeycomb, map, transpose | No |
+
+### Data Collection
+
+| Skill | Category | Description | MCP Tools |
+|-------|----------|-------------|-----------|
+| [Collection Patterns](./data-collection-patterns.md) | Collection | 7 patterns, selection guide, source category naming | Yes |
+
+### Discovery
+
 | Skill | Category | Description | MCP Tools |
 |-------|----------|-------------|-----------|
 | [Log Discovery](./discovery-logs-without-metadata.md) | Discovery | Find logs when you don't know metadata | Yes |
 | [Scheduled Views Discovery](./discovery-scheduled-views.md) | Discovery | Find and understand scheduled views | Yes |
+
+### Cost Analysis
+
+| Skill | Category | Description | MCP Tools |
+|-------|----------|-------------|-----------|
 | [Search Cost Analysis](./cost-analyze-search-costs.md) | Cost | Analyze Flex/Infrequent tier search costs | Yes |
 | [Data Volume Analysis](./cost-analyze-data-volume.md) | Cost | Track ingestion and identify cost drivers | Yes |
-| **[Writing Queries](./search-write-queries.md)** | **Search** | **Complete query construction guide (5 phases)** | **Yes** |
-| [Query Optimization](./search-optimize-queries.md) | Search | Build efficient, cost-effective queries | Yes |
-| [Optimize with Views](./search-optimize-with-views.md) | Search | Transform slow queries using scheduled views | Yes |
-| **[UI Navigation](./ui-navigate-and-search.md)** | **Search** | **Interactive UI features for investigation** | **No** |
+
+### Audit & Compliance
+
+| Skill | Category | Description | MCP Tools |
+|-------|----------|-------------|-----------|
 | [Audit User Activity](./audit-user-activity.md) | Audit | Track authentication and user actions | Yes |
-| [Monitor System Health](./audit-system-health.md) | Audit | Monitor collectors and alerts | Yes |
+| [Monitor System Health](./audit-system-health.md) | Audit | Collector health + admin alert templates | Yes |
+
+### Content Management
+
+| Skill | Category | Description | MCP Tools |
+|-------|----------|-------------|-----------|
 | [Navigate Content Library](./content-library-navigation.md) | Content | Browse and export dashboards/searches | Yes |
 | [Generate Web URLs](./content-generate-urls.md) | Content | Create shareable links to content | Yes |
+
+### Administration
+
+| Skill | Category | Description | MCP Tools |
+|-------|----------|-------------|-----------|
 | [Manage Collectors](./admin-collector-management.md) | Admin | List and inspect collectors/sources | Yes |
-| [Field Extraction](./admin-field-extraction.md) | Admin | Work with custom fields and FERs | Yes |
+| [Field Extraction](./admin-field-extraction.md) | Admin | Work with custom fields and FERs (legacy) | Yes |
+| **[Field Extraction Rules](./admin-field-extraction-rules.md)** | **Admin** | **FER patterns, histogram/stripe case study (342x speedup)** | **Yes** |
+| **[Partition Design](./admin-partition-design.md)** | **Admin** | **7 rules, scan reduction analysis, CSE/Flex considerations** | **Yes** |
+| **[Admin Alerting & Monitoring](./admin-alerting-and-monitoring.md)** | **Admin** | **5 alert templates: ingest, collection, rate limit, scan cost, health** | **Yes** |
 
 ## Maintenance
 
@@ -146,10 +215,16 @@ See [CLAUDE.md](../CLAUDE.md) for developer guidelines on keeping skills synchro
 
 ### Core Query Skills
 
-**[Writing Queries](./search-write-queries.md)** - Start here for query construction
+**[Log Search Basics](./search-log-search-basics.md)** - Start here for query fundamentals
 
-- 5-phase pattern: Scope → Parse → Filter → Aggregate → Format
-- Complete examples for each phase
+- Five-phase pipeline: Scope → Parse → Filter → Aggregate → Format
+- Metadata fields: `_sourceCategory`, `_index`/`_view`, `_collector`, `_source`, `_sourceHost`
+- Parse operators: `parse`, `parse regex`, `json`, `nodrop`
+- Useful for onboarding and reference
+
+**[Writing Queries](./search-write-queries.md)** - Complete query construction guide
+
+- 5-phase pattern with examples for each phase
 - Dashboard panel patterns
 - Integrates with MCP tools
 
@@ -162,38 +237,107 @@ See [CLAUDE.md](../CLAUDE.md) for developer guidelines on keeping skills synchro
 
 **[Query Optimization](./search-optimize-queries.md)** - Make queries faster and cheaper
 
-- Scope optimization techniques
-- Cost reduction strategies (10x-100x improvements)
-- Anti-patterns to avoid
-- Uses MCP tools for analysis
+- SKEFE framework (SourceCategory, Keywords, Extracted Fields, Filter Early)
+- Platform engine optimisations: bloom filter tokenisation, query rewriting, push-down, pushdown hack
+- Anti-patterns to avoid; search audit measurement queries
+- 10x–100x improvement potential
 
-**[Optimize with Views](./search-optimize-with-views.md)** - Transform slow queries to use scheduled views
+**[Optimize with Views — User Guide](./search-optimize-with-views.md)** - Transform slow queries to use scheduled views
 
 - Replace raw log queries with pre-aggregated view queries
-- Achieve 10x-100x performance improvements
-- Dramatically reduce scan costs (especially Flex/Infrequent)
-- Patterns for direct replacement, re-aggregation, dimension collapsing
+- 10x–100x performance improvements, dramatic scan cost reduction
+- Patterns: direct replacement, re-aggregation, dimension collapsing, weighted averages
+- Admin reference: view design patterns and multi-layer architecture
 
-**Combined Workflow:**
+**[Scheduled Views — Admin Design](./search-scheduled-views.md)** - Admin view creation guide
+
+- "Base Camp" mental model for multi-layer views
+- Pattern 1: Aggregate reporting (apache_status example)
+- Pattern 2: Caching heavy compute (threat intel + geoip)
+- Multi-layer architecture (1m → 1h → 1d)
+
+**Combined Query Workflow:**
 
 1. Use **UI Navigation** to explore and build queries interactively
-2. Apply **Writing Queries** patterns for proper structure
-3. Optimize with **Query Optimization** techniques
+2. Apply **Log Search Basics** and **Writing Queries** for proper structure
+3. Optimize with **Query Optimization** techniques (SKEFE + platform features)
 4. If slow/expensive: Use **Optimize with Views** to find scheduled view alternatives
-5. Execute via MCP tools for automation
+5. If admin: Design new views using **Scheduled Views — Admin Design**
+6. Execute via MCP tools for automation
+
+### Alerting Skills
+
+**[Monitors](./alerting-monitors.md)** - Build production-grade alerting
+
+- Monitor types: Logs, Metrics, SLO
+- Detection: Static, Anomaly, Outlier
+- Alert grouping, `{{ResultsJson.field}}` notification variables
+- Alert List and Alert Response Page
+
+**[Time Compare & Anomaly](./alerting-time-compare-anomaly.md)** - Dynamic threshold alerting
+
+- `compare with timeshift` patterns for weekly-cyclic traffic
+- Anomaly vs Outlier: when to use each
+- Per-entity comparison; dashboard time compare panels
+
+### Dashboard Skills
+
+**[Dashboard Design](./dashboards-overview.md)** - Four dashboard types
+
+- History, Snapshot, Investigation, Business dashboards
+- App Catalog, Content Library, template variables, drill-down features
+
+**[Panel Types & Patterns](./dashboards-panel-types.md)** - Panel implementation guide
+
+- Categorical (pie/bar/table — no timeslice needed)
+- Time series (requires `timeslice` + `transpose` for multi-series)
+- Single value, honeycomb, map (`geoip`), text panels
+
+### Admin Skills
+
+**[Partition Design](./admin-partition-design.md)** - Seven rules of good partition design
+
+- Consistent metadata field across all partitions (enables query rewriting)
+- Use-case grouping, simple names, keep default partition < 10% of ingest
+- Scan reduction analysis: 5x–1100x improvement possible
+- CSE/Flex partition considerations
+
+**[Field Extraction Rules](./admin-field-extraction-rules.md)** - FER patterns and case studies
+
+- Pattern 1: Speed — pre-parse JSON fields (5–10x faster)
+- Pattern 2: Convenience — pre-parse complex formats (Apache, IIS)
+- Pattern 3: Routing — compute tag fields for partition routing
+- Histogram/stripe case study: 342x speedup on numeric `where` comparisons
+
+**[Admin Alerting & Monitoring](./admin-alerting-and-monitoring.md)** - Operational alerting foundation
+
+- Enable audit policies (audit index, data volume index, search audit)
+- Alert 1: Ingest spike/drop (time compare 7d 3 avg, credits-based)
+- Alert 2: Collection stop (GONE/COLLECTING state detection)
+- Alert 3: Rate limiting (`_index=sumologic_audit "rate limit"`)
+- Alert 4: High infrequent scan credits
+- Alert 5: Unhealthy collection events (system events index)
+- Data volume scheduled view for large organisations
 
 ### Discovery Skills
 
 **[Scheduled Views Discovery](./discovery-scheduled-views.md)** - Find and understand scheduled views
 
-- Inventory all available views in organization
-- Understand view schemas and field availability
-- Match views to use cases
-- Query patterns for versioned views
-- Cost optimization opportunities
+- Inventory all available views with `list_scheduled_views`
+- Understand view schemas (`reduceOnlyFields`, `indexedFields`)
+- Match views to use cases; query versioned views with wildcards
 
 ---
 
-**Version:** 1.1.0
-**Last Updated:** 2026-03-06
+**Version:** 2.0.0
+**Last Updated:** 2026-03-09
 **Maintained by:** sumologic-python-mcp project
+
+**Changelog v2.0:**
+
+- Added 12 new skills from Sumo Logic training materials (August 2025 + February 2025)
+- New skills: log-search-basics, indexes-partitions, copilot, scheduled-views (admin), alerting-monitors, alerting-time-compare-anomaly, dashboards-overview, dashboards-panel-types, data-collection-patterns, admin-partition-design, admin-field-extraction-rules, admin-alerting-and-monitoring
+- Enhanced search-optimize-queries.md: added Platform Engine Optimisations + Search Audit sections (v2.1)
+- Enhanced search-optimize-with-views.md: added Admin Reference view architecture patterns
+- Enhanced audit-system-health.md: added admin audit policy setup + 5 alert templates (v1.1)
+- Sources: SumoLogic Logs Basics Training (August 2025); Sumo Logic Architecture For Log Search Performance (February 2025); Admin Indexes, Apps and Alerts Playbook (Sumo Logic Customer Success)

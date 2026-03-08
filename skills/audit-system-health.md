@@ -25,6 +25,148 @@ Monitor Sumo Logic system health using audit indexes to track collector/source h
 2. **Monitor Alert Analysis** - Identify noisy or frequently alerting monitors
 3. **Alert Timeline Tracking** - Understand alert patterns over time
 
+## Admin Setup: Required Audit Policies
+
+Before creating admin alerts, ensure these three policies are enabled in **Admin → Security → Policies**:
+
+| Policy | Index | Purpose |
+|---|---|---|
+| **Audit Index** | `_index=sumologic_audit` / `_index=sumologic_audit_events` | User actions, health events, CSE insights |
+| **Data Volume Index** | `_index=sumologic_volume` | Ingest GB and credits by dimension and tier |
+| **Search Audit** | `_view=sumologic_search_usage_per_query` | All search queries with scan stats |
+
+**Recommended admin apps:** Data Volume App v2 (includes tier breakdown), Audit App, Search Audit App, Enterprise Audit Apps (enterprise plan).
+
+---
+
+## Admin Alert Templates
+
+### Alert: Ingest Spike or Drop by Source Category
+
+Detects anomalies in data volume using time compare against a 3-week average. Schedule hourly or daily.
+
+```
+_index=sumologic_volume _sourceCategory=sourcecategory_and_tier_volume
+| parse regex "(?<data>\{[^\{]+\})" multi
+| json field=data "field","dataTier","sizeInBytes" as sourceCategory, dataTier, bytes
+| bytes/1Gi as gbytes
+| sum(gbytes) as gbytes by dataTier, sourceCategory
+
+// Standard credit rates — verify against your contract:
+| 20 as credit_rate
+| if(dataTier = "CSE",      25,   credit_rate) as credit_rate
+| if(dataTier = "Infrequent", 0.4, credit_rate) as credit_rate
+| if(dataTier = "Frequent",   9,   credit_rate) as credit_rate
+| gbytes * credit_rate as credits
+
+// Compare with average of same time over last 3 weeks:
+| compare timeshift 7d 3 avg
+
+// Handle new or removed categories:
+| if(isNull(gbytes), "GONE", "") as state
+| if(isNull(gbytes), 0, gbytes) as gbytes
+| if(isNull(gbytes_21d_avg), "NEW", state) as state
+| if(isNull(gbytes_21d_avg), 0, gbytes_21d_avg) as gbytes_21d_avg
+| ((gbytes - gbytes_21d_avg) / gbytes) * 100 as pct_increase
+
+// Trigger condition — tune for your environment:
+| where (pct_increase > 50 or state = "NEW") and (credits > 20 or gbytes > 1)
+```
+
+The `state` field flags `NEW` (no historical baseline) and `GONE` (was sending, now stopped).
+
+### Alert: Stopped or Low Collection
+
+Detects source categories or collectors that have significantly reduced or stopped sending data.
+
+```
+_index=sumologic_volume _sourceCategory=collector_and_tier_volume
+| parse regex "(?<data>\{[^\{]+\})" multi
+| json field=data "field","dataTier","sizeInBytes" as fieldvalue, dataTier, bytes
+| bytes/1Gi as gbytes
+| sum(gbytes) as gbytes by dataTier, fieldvalue
+| 20 as credit_rate
+| if(dataTier = "Infrequent", 0.4, credit_rate) as credit_rate
+| if(dataTier = "Frequent",   9,   credit_rate) as credit_rate
+| gbytes * credit_rate as credits
+| compare timeshift 7d 3 avg
+| if(isNull(gbytes), "GONE", "COLLECTING") as state
+| if(isNull(gbytes), 0, gbytes) as gbytes
+| if(isNull(gbytes_21d_avg), 0, gbytes_21d_avg) as gbytes_21d_avg
+| ((gbytes - gbytes_21d_avg) / gbytes) * 100 as pct_increase
+// Trigger: alert on stopped (GONE) or significant drop:
+| where (pct_increase < -50 or state = "GONE")
+```
+
+Switch `_sourceCategory=sourcecategory_and_tier_volume` for source-category-level alerting.
+
+### Alert: Rate Limiting (Throttling)
+
+Alerts when your account is being rate-limited due to exceeding the sustained ingest rate. Rate limiting can cause data loss.
+
+```
+_index=sumologic_audit _sourceCategory=account_management
+_sourceName=VOLUME_QUOTA "rate limit"
+```
+
+Rate limit = sum of contracted ingest GB × multiplier (~8x). For known high-ingest events (Black Friday, product launches), request a higher rate limit from Customer Success in advance.
+
+### Alert: High Infrequent Scan Credits
+
+Alerts when users generate excessive scan costs on the Infrequent tier. Requires Search Audit policy enabled.
+
+```
+_view=sumologic_search_usage_per_query
+analytics_tier=*infrequent*
+| json field=scanned_bytes_breakdown "Infrequent" as scan_inf
+| ((query_end_time - query_start_time) / 1000 / 60) as range_minutes
+| count as queries,
+  sum(retrieved_message_count) as retrieved_events,
+  avg(range_minutes) as range_minutes,
+  avg(scanned_partition_count) as partitions,
+  sum(scan_inf) as scan_inf
+  by user_name, query
+
+// Typical Infrequent credit rate — verify against your contract:
+| (scan_inf / 1024 / 1024 / 1024) * 0.016 as credits
+| fields -scan_inf
+| credits / queries as cr_per_query
+| total credits as credits_total_user by user_name
+| total credits as total_credits
+| sort cr_per_query
+
+// Tune thresholds for your environment:
+| 100 as cr_max_user
+| 500 as cr_max_org
+| where credits_total_user > cr_max_user or total_credits > cr_max_org
+```
+
+Use results to identify users with high scan and investigate their queries for missing `_index=`, excessive time ranges, or absent keywords.
+
+### Data Volume Scheduled View (Large Organisations)
+
+For organisations with 3,000+ source categories, raw data volume queries using `parse regex multi` become slow. Create a scheduled view to pre-compute volume data:
+
+```
+// Scheduled View definition — name: dv_by_sourcecategory_v1
+_index=sumologic_volume _sourceCategory=sourcecategory_and_tier_volume
+| parse regex "(?<element>\{[^\}]+})" multi
+| json field=element "field", "dataTier", "sizeInBytes", "count" as name, uom, bytes, events
+| timeslice 1m
+| bytes/1Gi as units
+| if(uom = "CSE", 25, 20) as rate
+| if(uom = "Infrequent", 0.4, rate) as rate
+| if(uom = "Frequent", 9, rate) as rate
+| "gbytes" as unit
+| units * rate as credits
+| sum(credits) as credits, sum(units) as units
+  by _timeslice, uom, unit, rate
+```
+
+Queries and alerts against `_view=dv_by_sourcecategory_v1` run **10x–100x faster** over long time ranges.
+
+---
+
 ## Approach
 
 ### Use Case 1: Collector and Source Health Monitoring
@@ -370,10 +512,15 @@ Monitor "Database Connection Pool" has 50 alerts, all <2 minutes duration.
 - [User Activity Audit](./audit-user-activity.md) - Audit user actions
 - [Search Cost Analysis](./cost-analyze-search-costs.md) - Analyze scheduled search costs
 - [Content Library](./content-library-navigation.md) - Navigate to monitors
+- [Admin Alerting and Monitoring](./admin-alerting-and-monitoring.md) - Full admin alert templates (ingest, rate limiting, scan costs)
 
 ## MCP Tools Used
 
-- `search_system_events` - Primary tool with use_case patterns
+- `search_system_events` - Primary tool with use_case patterns for health and alert events
+- `search_legacy_audit` - Query legacy audit index for rate limiting events
+- `analyze_data_volume` - Analyse ingest volume by dimension (data volume index)
+- `analyze_search_scan_cost` - Identify high infrequent scan users
+- `run_search_audit_query` - Run custom search audit queries
 - `get_content_web_url` - Generate URLs to monitors using resourceid
 - `search_audit_events` - For monitor configuration changes
 
@@ -386,7 +533,16 @@ Monitor "Database Connection Pool" has 50 alerts, all <2 minutes duration.
 
 ---
 
-**Version:** 1.0.0
+**Version:** 1.1.0
+**Last Updated:** 2026-03-09
 **Domain:** System Operations & Monitoring
 **Complexity:** Intermediate
 **Estimated Time:** 30 minutes to set up basic health monitoring
+
+**Changelog v1.1:**
+
+- Added Admin Setup: Required Audit Policies section
+- Added Admin Alert Templates: ingest spike/drop, collection stop, rate limiting, high infrequent scan, data volume scheduled view
+- Updated MCP Tools Used with admin alerting tools
+- Added admin-alerting-and-monitoring.md as related skill
+- Source: Admin Indexes, Apps and Alerts Playbook (Sumo Logic Customer Success)
