@@ -2,7 +2,9 @@
 
 🔐 **Secure, read-only** MCP server for Sumo Logic APIs, written with Claude AI assistance.
 
-This Model Context Protocol (MCP) server provides secure, read-only access to Sumo Logic APIs, enabling AI assistants like Claude to search logs, query metrics, and retrieve account information across multiple Sumo Logic instances.
+This Model Context Protocol (MCP) server gives AI assistants like Claude two complementary capabilities: **secure, read-only access to Sumo Logic APIs** for searching logs, querying metrics, and analysing your environment — and **deep platform expertise** to act as a trusted advisor on architecture, design decisions, and best practices. Use it to run queries, or ask it how you *should* structure your data, alerts, and partitions.
+
+Beyond raw data access, this project ships with a **[Skills Library](skills/)** — 23 structured knowledge files that turn your AI assistant into a **virtual Sumo Logic Technical Account Engineer (TAE)**. Ask for architecture advice, partition design reviews, alerting strategies, or cost optimization guidance, and Claude will draw on the same deep product knowledge a TAE would bring.
 
 > **⚡ Quick Start:** See [QUICKSTART.md](QUICKSTART.md) for a 5-minute setup guide using uv!
 >
@@ -67,6 +69,20 @@ This MCP server enables **AI-assisted Sumo Logic workflows** for power users and
 - Design partition strategies based on actual query patterns
 - Monitor search scan costs to validate tier decisions
 
+**5. 🎓 Virtual Technical Account Engineer (Architecture & Best Practices)**
+
+Go beyond data queries — get the same calibre of advice a Sumo Logic TAE would provide:
+
+- **Architecture reviews** - "Should I use partitions or scheduled views for this use case?"
+- **Design guidance** - "How should I structure my source categories for a Kubernetes environment?"
+- **Trade-off analysis** - "Monitors vs scheduled searches — which is right for my alerting needs?"
+- **Best-practice audits** - "Review my current approach and flag any anti-patterns"
+- **New deployment checklists** - Structured guidance on standing up a new Sumo Logic environment
+- **Performance troubleshooting** - Root-cause slow queries and high scan costs
+- **Admin monitoring setup** - Complete templates for ingest monitoring, collection health, and rate limiting alerts
+
+The 23-skill [Skills Library](skills/) covers the full Sumo Logic platform — collection, partitions, scheduled views, FERs, alerting, dashboards, cost analysis, and audit indexes. Ask naturally: *"my dashboard is slow, what should I look at?"* and Claude will diagnose the issue and recommend concrete next steps.
+
 These capabilities are particularly valuable for:
 
 - **Administrators** managing large Sumo Logic deployments
@@ -82,6 +98,7 @@ These capabilities are particularly valuable for:
 - ⚡ **Rate limited** - Configurable per-tool request limits
 - 📊 **Comprehensive API coverage** - Logs, metrics, dashboards, monitors, and more
 - 🔍 **Audit logging** - Track all API operations
+- 🎓 **Virtual TAE Skills Library** - 23 structured knowledge files covering architecture advice, best practices, and platform design guidance across the full Sumo Logic stack
 
 ## Available Tools
 
@@ -703,38 +720,39 @@ uv run sumologic-mcp-server
 uv run python -m sumologic_mcp_server.sumologic_mcp_server
 ```
 
-## Skills Library
+## Skills Library — Virtual TAE
 
-The `skills/` directory contains **portable knowledge artifacts** that teach how to accomplish specific tasks in Sumo Logic using MCP tools and best practices. Skills are designed for use with Claude Code, Claude Desktop, and other AI assistants.
+The `skills/` directory contains **23 structured knowledge files** that transform your AI assistant into a **virtual Sumo Logic Technical Account Engineer**. Skills cover not just *how to use tools*, but deep platform expertise: architecture decisions, partition design, alerting strategy, cost optimization, and operational best practices.
 
-### What are Skills?
+### Virtual TAE Capabilities
 
-Skills capture the **"how-to"** knowledge for working with Sumo Logic:
+Ask naturally — Claude will identify the right skill and provide expert guidance:
 
-- **Query construction patterns** - 5-phase approach (Scope → Parse → Filter → Aggregate → Format)
-- **Discovery workflows** - Finding logs when you don't know metadata
-- **Cost optimization techniques** - Using scheduled views for 10x-100x improvements
-- **Audit patterns** - Searching audit indexes effectively
-- **Best practices** - Common pitfalls and optimization strategies
+| You ask... | Claude consults... |
+|---|---|
+| *"My queries are slow, what should I check?"* | `search-optimize-queries` — SKEFE framework, bloom filter rules, push-down patterns |
+| *"Should I use monitors or scheduled searches?"* | `alerting-monitors` + `consulting-guide` — trade-off table and recommendation |
+| *"How should I design my partitions?"* | `admin-partition-design` — seven design rules, scan reduction analysis |
+| *"My dashboard is slow"* | `search-optimize-with-views` — scheduled view transformation patterns |
+| *"How do I alert on ingest drops?"* | `admin-alerting-and-monitoring` — 5 complete alert query templates |
+| *"How should I structure source categories?"* | `data-collection-patterns` + `consulting-guide` — naming conventions and architecture |
+| *"What's the difference between anomaly and outlier detection?"* | `alerting-time-compare-anomaly` — comparison table and use-case guide |
+| *"Review my Sumo Logic architecture"* | `consulting-guide` — four-layer framework and structured review |
 
-### Available Skills
+### Available Skills (23 total)
 
-| Category | Skills | Description |
-|----------|--------|-------------|
-| **Search & Query** | 4 skills | Writing queries, optimization, scheduled views, UI navigation |
-| **Discovery** | 2 skills | Finding logs without metadata, scheduled view inventory |
-| **Cost Analysis** | 2 skills | Search costs, data volume analysis |
-| **Audit** | 2 skills | User activity, system health monitoring |
-| **Content** | 2 skills | Library navigation, URL generation |
-| **Admin** | 2 skills | Collector management, field extraction |
-
-**Featured Skills:**
-
-- **[search-write-queries.md](skills/search-write-queries.md)** - Complete 5-phase query construction guide
-- **[search-optimize-queries.md](skills/search-optimize-queries.md)** - Performance and cost optimization
-- **[search-optimize-with-views.md](skills/search-optimize-with-views.md)** - Transform queries to use scheduled views
-- **[discovery-logs-without-metadata.md](skills/discovery-logs-without-metadata.md)** - Multi-phase log discovery
-- **[cost-analyze-search-costs.md](skills/cost-analyze-search-costs.md)** - Flex/Infrequent tier analysis
+| Category | Skills |
+|----------|--------|
+| **🎯 Consulting & Architecture** | `consulting-guide` (entry point — start here for advice) |
+| **🔍 Search & Query** | `search-write-queries`, `search-optimize-queries`, `search-indexes-partitions`, `search-optimize-with-views`, `search-scheduled-views`, `search-log-search-basics`, `search-copilot` |
+| **🔔 Alerting & Monitoring** | `alerting-monitors`, `alerting-time-compare-anomaly` |
+| **📊 Dashboards** | `dashboards-overview`, `dashboards-panel-types` |
+| **📥 Data Collection** | `data-collection-patterns` |
+| **🗂️ Discovery** | `discovery-logs-without-metadata`, `discovery-scheduled-views` |
+| **💰 Cost Analysis** | `cost-analyze-search-costs`, `cost-analyze-data-volume` |
+| **🔎 Audit** | `audit-user-activity`, `audit-system-health` |
+| **⚙️ Administration** | `admin-partition-design`, `admin-field-extraction-rules`, `admin-alerting-and-monitoring` |
+| **📚 Content** | `content-library-navigation` |
 
 📖 **[View Complete Skills Index →](skills/README.md)**
 
@@ -744,14 +762,16 @@ Skills capture the **"how-to"** knowledge for working with Sumo Logic:
 Use the `get_skill` tool to fetch skills dynamically:
 
 ```
-get_skill("search-write-queries")
+get_skill("consulting-guide")        # Start here for architecture advice
+get_skill("search-optimize-queries") # Query performance and cost
+get_skill("admin-partition-design")  # Partition strategy guidance
 ```
 
-**With Claude Code:**
-Skills are automatically loaded from the `skills/` directory and referenced in [CLAUDE.md](CLAUDE.md).
+**With Claude Code / Claude Desktop:**
+Skills are automatically loaded when referenced in [CLAUDE.md](CLAUDE.md) — Claude proactively consults the right skill based on your question without you having to ask.
 
 **Standalone:**
-Copy any skill markdown file and provide it as context to your AI assistant.
+Copy any skill markdown file and provide it as context to your AI assistant for portable, reusable expertise.
 
 ### Skill Format
 
@@ -759,7 +779,7 @@ Each skill includes:
 
 - **Intent** - What the skill accomplishes
 - **Prerequisites** - Required knowledge/access
-- **Context** - When to use it
+- **Context** - When to use it (and when not to)
 - **Approach** - Step-by-step methodology with MCP tool calls
 - **Query Patterns** - Reusable code snippets
 - **Examples** - Real-world scenarios
