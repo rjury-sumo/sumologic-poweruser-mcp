@@ -1,0 +1,295 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" font-family="'Segoe UI', Arial, sans-serif">
+  <!-- Background -->
+  <rect width="1200" height="900" fill="#0f1117" rx="12"/>
+
+  <!-- Title -->
+  <text x="600" y="44" text-anchor="middle" font-size="22" font-weight="700" fill="#ffffff">Sumo Logic MCP — Architecture Overview</text>
+  <text x="600" y="66" text-anchor="middle" font-size="13" fill="#8b8fa8">Model Context Protocol integration for AI-driven log analytics and observability</text>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- ROW 1: AI Layer -->
+  <!-- ══════════════════════════════════════════ -->
+
+  <!-- AI Client box -->
+  <rect x="30" y="90" width="1140" height="110" rx="10" fill="#1a1d2e" stroke="#3d4166" stroke-width="1.5"/>
+  <text x="50" y="112" font-size="11" font-weight="700" fill="#8b8fa8" letter-spacing="1.5">AI LAYER</text>
+
+  <!-- Claude -->
+  <rect x="100" y="122" width="160" height="64" rx="8" fill="#d97706" fill-opacity="0.15" stroke="#d97706" stroke-width="1.5"/>
+  <text x="180" y="148" text-anchor="middle" font-size="13" font-weight="700" fill="#fbbf24">Claude</text>
+  <text x="180" y="165" text-anchor="middle" font-size="10" fill="#fcd34d">AI Assistant (Sonnet / Opus)</text>
+  <text x="180" y="179" text-anchor="middle" font-size="10" fill="#fcd34d">Natural language → tool calls</text>
+
+  <!-- Cowork Mode -->
+  <rect x="290" y="122" width="160" height="64" rx="8" fill="#7c3aed" fill-opacity="0.15" stroke="#7c3aed" stroke-width="1.5"/>
+  <text x="370" y="148" text-anchor="middle" font-size="13" font-weight="700" fill="#a78bfa">Cowork Mode</text>
+  <text x="370" y="165" text-anchor="middle" font-size="10" fill="#c4b5fd">Desktop task automation</text>
+  <text x="370" y="179" text-anchor="middle" font-size="10" fill="#c4b5fd">File, browser &amp; app agents</text>
+
+  <!-- Skills Library -->
+  <rect x="480" y="122" width="160" height="64" rx="8" fill="#0891b2" fill-opacity="0.15" stroke="#0891b2" stroke-width="1.5"/>
+  <text x="560" y="148" text-anchor="middle" font-size="13" font-weight="700" fill="#22d3ee">Skills Library</text>
+  <text x="560" y="165" text-anchor="middle" font-size="10" fill="#67e8f9">search-write-queries</text>
+  <text x="560" y="179" text-anchor="middle" font-size="10" fill="#67e8f9">cost-analyze · discovery-*</text>
+
+  <!-- Claude Code / SDK -->
+  <rect x="670" y="122" width="160" height="64" rx="8" fill="#059669" fill-opacity="0.15" stroke="#059669" stroke-width="1.5"/>
+  <text x="750" y="148" text-anchor="middle" font-size="13" font-weight="700" fill="#34d399">Agent SDK</text>
+  <text x="750" y="165" text-anchor="middle" font-size="10" fill="#6ee7b7">Subagent orchestration</text>
+  <text x="750" y="179" text-anchor="middle" font-size="10" fill="#6ee7b7">Plan / Explore / General</text>
+
+  <!-- Plugin System -->
+  <rect x="860" y="122" width="260" height="64" rx="8" fill="#be185d" fill-opacity="0.15" stroke="#be185d" stroke-width="1.5"/>
+  <text x="990" y="148" text-anchor="middle" font-size="13" font-weight="700" fill="#f472b6">Plugin System</text>
+  <text x="990" y="165" text-anchor="middle" font-size="10" fill="#f9a8d4">knowledge-work-plugins</text>
+  <text x="990" y="179" text-anchor="middle" font-size="10" fill="#f9a8d4">cowork-plugin-management · skill bundles</text>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- ROW 2: MCP Protocol Layer -->
+  <!-- ══════════════════════════════════════════ -->
+
+  <rect x="30" y="220" width="1140" height="60" rx="10" fill="#1e293b" stroke="#334155" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text x="50" y="242" font-size="11" font-weight="700" fill="#64748b" letter-spacing="1.5">MCP PROTOCOL (JSON-RPC 2.0)</text>
+  <text x="600" y="254" text-anchor="middle" font-size="12" fill="#94a3b8">Tool calls  ·  Structured results  ·  Instance routing  ·  Auth &amp; credential management</text>
+  <text x="600" y="270" text-anchor="middle" font-size="11" fill="#64748b">mcp__sumologic__&lt;tool_name&gt;  →  instance: "default" | "demo" | "staging"</text>
+
+  <!-- Arrows AI → MCP -->
+  <line x1="180" y1="186" x2="180" y2="220" stroke="#d97706" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <line x1="370" y1="186" x2="370" y2="220" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <line x1="560" y1="186" x2="560" y2="220" stroke="#0891b2" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <line x1="750" y1="186" x2="750" y2="220" stroke="#059669" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <line x1="990" y1="186" x2="990" y2="220" stroke="#be185d" stroke-width="1.5" stroke-dasharray="4,3"/>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- ROW 3: Tool Groups -->
+  <!-- ══════════════════════════════════════════ -->
+
+  <text x="50" y="307" font-size="11" font-weight="700" fill="#8b8fa8" letter-spacing="1.5">MCP TOOL GROUPS</text>
+
+  <!-- Search & Analytics -->
+  <rect x="30" y="315" width="210" height="160" rx="8" fill="#1e3a5f" stroke="#3b82f6" stroke-width="1.5"/>
+  <rect x="30" y="315" width="210" height="26" rx="8" fill="#3b82f6" fill-opacity="0.4"/>
+  <text x="135" y="332" text-anchor="middle" font-size="11" font-weight="700" fill="#93c5fd">🔍 Search &amp; Analytics</text>
+  <text x="45" y="354" font-size="10" fill="#bfdbfe">search_sumo_logs</text>
+  <text x="45" y="370" font-size="10" fill="#bfdbfe">create_sumo_search_job</text>
+  <text x="45" y="386" font-size="10" fill="#bfdbfe">get_sumo_search_job_status</text>
+  <text x="45" y="402" font-size="10" fill="#bfdbfe">get_sumo_search_job_results</text>
+  <text x="45" y="418" font-size="10" fill="#bfdbfe">query_sumo_metrics</text>
+  <text x="45" y="434" font-size="10" fill="#bfdbfe">build_search_web_url</text>
+  <text x="45" y="450" font-size="10" fill="#bfdbfe">get_estimated_log_search_usage</text>
+  <text x="45" y="466" font-size="10" fill="#bfdbfe">explore_log_metadata</text>
+
+  <!-- Cost & Audit -->
+  <rect x="255" y="315" width="210" height="160" rx="8" fill="#1f2937" stroke="#f59e0b" stroke-width="1.5"/>
+  <rect x="255" y="315" width="210" height="26" rx="8" fill="#f59e0b" fill-opacity="0.35"/>
+  <text x="360" y="332" text-anchor="middle" font-size="11" font-weight="700" fill="#fcd34d">💰 Cost &amp; Usage</text>
+  <text x="270" y="354" font-size="10" fill="#fde68a">run_search_audit_query</text>
+  <text x="270" y="370" font-size="10" fill="#fde68a">analyze_search_scan_cost</text>
+  <text x="270" y="386" font-size="10" fill="#fde68a">analyze_data_volume</text>
+  <text x="270" y="402" font-size="10" fill="#fde68a">analyze_data_volume_grouped</text>
+  <text x="270" y="418" font-size="10" fill="#fde68a">analyze_log_volume</text>
+  <text x="270" y="434" font-size="10" fill="#fde68a">get_account_status</text>
+  <text x="270" y="450" font-size="10" fill="#fde68a">get_usage_forecast</text>
+  <text x="270" y="466" font-size="10" fill="#fde68a">export_usage_report</text>
+
+  <!-- Content & Library -->
+  <rect x="480" y="315" width="210" height="160" rx="8" fill="#1a2e1a" stroke="#22c55e" stroke-width="1.5"/>
+  <rect x="480" y="315" width="210" height="26" rx="8" fill="#22c55e" fill-opacity="0.3"/>
+  <text x="585" y="332" text-anchor="middle" font-size="11" font-weight="700" fill="#86efac">📚 Content &amp; Library</text>
+  <text x="495" y="354" font-size="10" fill="#bbf7d0">get_personal_folder</text>
+  <text x="495" y="370" font-size="10" fill="#bbf7d0">get_folder_by_id</text>
+  <text x="495" y="386" font-size="10" fill="#bbf7d0">export_content</text>
+  <text x="495" y="402" font-size="10" fill="#bbf7d0">export_global_folder</text>
+  <text x="495" y="418" font-size="10" fill="#bbf7d0">export_admin_recommended_folder</text>
+  <text x="495" y="434" font-size="10" fill="#bbf7d0">export_installed_apps</text>
+  <text x="495" y="450" font-size="10" fill="#bbf7d0">get_sumo_dashboards</text>
+  <text x="495" y="466" font-size="10" fill="#bbf7d0">get_content_web_url</text>
+
+  <!-- Audit Events -->
+  <rect x="705" y="315" width="210" height="160" rx="8" fill="#2d1b33" stroke="#a855f7" stroke-width="1.5"/>
+  <rect x="705" y="315" width="210" height="26" rx="8" fill="#a855f7" fill-opacity="0.3"/>
+  <text x="810" y="332" text-anchor="middle" font-size="11" font-weight="700" fill="#d8b4fe">🔐 Audit &amp; Events</text>
+  <text x="720" y="354" font-size="10" fill="#e9d5ff">search_legacy_audit</text>
+  <text x="720" y="370" font-size="10" fill="#e9d5ff">search_audit_events</text>
+  <text x="720" y="386" font-size="10" fill="#e9d5ff">search_system_events</text>
+  <text x="720" y="402" font-size="10" fill="#e9d5ff">search_sumo_monitors</text>
+  <text x="720" y="418" font-size="10" fill="#e9d5ff">get_sumo_users</text>
+  <text x="720" y="434" font-size="10" fill="#e9d5ff">get_sumo_roles_v2</text>
+  <text x="720" y="450" font-size="10" fill="#e9d5ff">search_query_examples</text>
+  <text x="720" y="466" font-size="10" fill="#e9d5ff">get_skill</text>
+
+  <!-- Admin & Config -->
+  <rect x="930" y="315" width="240" height="160" rx="8" fill="#1f1f2e" stroke="#ec4899" stroke-width="1.5"/>
+  <rect x="930" y="315" width="240" height="26" rx="8" fill="#ec4899" fill-opacity="0.3"/>
+  <text x="1050" y="332" text-anchor="middle" font-size="11" font-weight="700" fill="#f9a8d4">⚙️ Admin &amp; Config</text>
+  <text x="945" y="354" font-size="10" fill="#fce7f3">get_sumo_collectors / get_sumo_sources</text>
+  <text x="945" y="370" font-size="10" fill="#fce7f3">get_sumo_partitions</text>
+  <text x="945" y="386" font-size="10" fill="#fce7f3">list_scheduled_views</text>
+  <text x="945" y="402" font-size="10" fill="#fce7f3">list_field_extraction_rules</text>
+  <text x="945" y="418" font-size="10" fill="#fce7f3">list_custom_fields</text>
+  <text x="945" y="434" font-size="10" fill="#fce7f3">profile_log_schema</text>
+  <text x="945" y="450" font-size="10" fill="#fce7f3">list_installed_apps</text>
+  <text x="945" y="466" font-size="10" fill="#fce7f3">list_sumo_instances</text>
+
+  <!-- MCP → Tool group arrows -->
+  <line x1="135" y1="280" x2="135" y2="315" stroke="#3b82f6" stroke-width="1.5"/>
+  <polygon points="130,312 135,320 140,312" fill="#3b82f6"/>
+  <line x1="360" y1="280" x2="360" y2="315" stroke="#f59e0b" stroke-width="1.5"/>
+  <polygon points="355,312 360,320 365,312" fill="#f59e0b"/>
+  <line x1="585" y1="280" x2="585" y2="315" stroke="#22c55e" stroke-width="1.5"/>
+  <polygon points="580,312 585,320 590,312" fill="#22c55e"/>
+  <line x1="810" y1="280" x2="810" y2="315" stroke="#a855f7" stroke-width="1.5"/>
+  <polygon points="805,312 810,320 815,312" fill="#a855f7"/>
+  <line x1="1050" y1="280" x2="1050" y2="315" stroke="#ec4899" stroke-width="1.5"/>
+  <polygon points="1045,312 1050,320 1055,312" fill="#ec4899"/>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- ROW 4: Sumo Logic Backend -->
+  <!-- ══════════════════════════════════════════ -->
+
+  <text x="50" y="500" font-size="11" font-weight="700" fill="#8b8fa8" letter-spacing="1.5">SUMO LOGIC PLATFORM</text>
+
+  <!-- Instance selector -->
+  <rect x="30" y="510" width="340" height="82" rx="8" fill="#0c1a2e" stroke="#0ea5e9" stroke-width="2"/>
+  <text x="200" y="530" text-anchor="middle" font-size="12" font-weight="700" fill="#38bdf8">Instance Router</text>
+  <rect x="50" y="540" width="90" height="36" rx="6" fill="#0284c7" fill-opacity="0.25" stroke="#0284c7" stroke-width="1"/>
+  <text x="95" y="557" text-anchor="middle" font-size="11" font-weight="600" fill="#7dd3fc">default</text>
+  <text x="95" y="570" text-anchor="middle" font-size="9" fill="#7dd3fc">Production</text>
+  <rect x="155" y="540" width="90" height="36" rx="6" fill="#0369a1" fill-opacity="0.25" stroke="#0369a1" stroke-width="1"/>
+  <text x="200" y="557" text-anchor="middle" font-size="11" font-weight="600" fill="#bae6fd">staging</text>
+  <text x="200" y="570" text-anchor="middle" font-size="9" fill="#bae6fd">Non-prod</text>
+  <rect x="260" y="540" width="90" height="36" rx="6" fill="#075985" fill-opacity="0.25" stroke="#075985" stroke-width="1"/>
+  <text x="305" y="557" text-anchor="middle" font-size="11" font-weight="600" fill="#e0f2fe">demo</text>
+  <text x="305" y="570" text-anchor="middle" font-size="9" fill="#e0f2fe">Demo / Trial</text>
+
+  <!-- Data Tier Storage -->
+  <rect x="390" y="510" width="360" height="82" rx="8" fill="#0c1f0c" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="570" y="530" text-anchor="middle" font-size="12" font-weight="700" fill="#4ade80">Data Storage Tiers</text>
+  <rect x="405" y="540" width="75" height="36" rx="5" fill="#15803d" fill-opacity="0.25" stroke="#15803d" stroke-width="1"/>
+  <text x="442" y="556" text-anchor="middle" font-size="10" font-weight="600" fill="#86efac">Continuous</text>
+  <text x="442" y="569" text-anchor="middle" font-size="9" fill="#86efac">Hot tier</text>
+  <rect x="490" y="540" width="75" height="36" rx="5" fill="#166534" fill-opacity="0.25" stroke="#166534" stroke-width="1"/>
+  <text x="527" y="556" text-anchor="middle" font-size="10" font-weight="600" fill="#bbf7d0">Frequent</text>
+  <text x="527" y="569" text-anchor="middle" font-size="9" fill="#bbf7d0">Warm tier</text>
+  <rect x="575" y="540" width="80" height="36" rx="5" fill="#14532d" fill-opacity="0.25" stroke="#14532d" stroke-width="1"/>
+  <text x="615" y="556" text-anchor="middle" font-size="10" font-weight="600" fill="#d1fae5">Infrequent</text>
+  <text x="615" y="569" text-anchor="middle" font-size="9" fill="#d1fae5">Cold / pay/scan</text>
+  <rect x="665" y="540" width="75" height="36" rx="5" fill="#1a4731" fill-opacity="0.25" stroke="#065f46" stroke-width="1"/>
+  <text x="702" y="556" text-anchor="middle" font-size="10" font-weight="600" fill="#6ee7b7">Flex</text>
+  <text x="702" y="569" text-anchor="middle" font-size="9" fill="#6ee7b7">Free ingest</text>
+
+  <!-- Indexes & Views -->
+  <rect x="770" y="510" width="400" height="82" rx="8" fill="#1c1a0c" stroke="#ca8a04" stroke-width="1.5"/>
+  <text x="970" y="530" text-anchor="middle" font-size="12" font-weight="700" fill="#fbbf24">Indexes &amp; Views</text>
+  <rect x="785" y="540" width="110" height="36" rx="5" fill="#92400e" fill-opacity="0.2" stroke="#92400e" stroke-width="1"/>
+  <text x="840" y="556" text-anchor="middle" font-size="10" font-weight="600" fill="#fde68a">Partitions</text>
+  <text x="840" y="569" text-anchor="middle" font-size="9" fill="#fde68a">_index routing</text>
+  <rect x="905" y="540" width="110" height="36" rx="5" fill="#78350f" fill-opacity="0.2" stroke="#78350f" stroke-width="1"/>
+  <text x="960" y="556" text-anchor="middle" font-size="10" font-weight="600" fill="#fcd34d">Sched. Views</text>
+  <text x="960" y="569" text-anchor="middle" font-size="9" fill="#fcd34d">Pre-aggregated</text>
+  <rect x="1025" y="540" width="135" height="36" rx="5" fill="#713f12" fill-opacity="0.2" stroke="#713f12" stroke-width="1"/>
+  <text x="1092" y="556" text-anchor="middle" font-size="10" font-weight="600" fill="#fef3c7">Audit Indexes</text>
+  <text x="1092" y="569" text-anchor="middle" font-size="9" fill="#fef3c7">_audit_events · _system</text>
+
+  <!-- Tool group → Backend arrows -->
+  <line x1="135" y1="475" x2="200" y2="510" stroke="#3b82f6" stroke-width="1" stroke-dasharray="3,3" opacity="0.6"/>
+  <line x1="360" y1="475" x2="360" y2="510" stroke="#f59e0b" stroke-width="1" stroke-dasharray="3,3" opacity="0.6"/>
+  <line x1="585" y1="475" x2="570" y2="510" stroke="#22c55e" stroke-width="1" stroke-dasharray="3,3" opacity="0.6"/>
+  <line x1="810" y1="475" x2="900" y2="510" stroke="#a855f7" stroke-width="1" stroke-dasharray="3,3" opacity="0.6"/>
+  <line x1="1050" y1="475" x2="1050" y2="510" stroke="#ec4899" stroke-width="1" stroke-dasharray="3,3" opacity="0.6"/>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- ROW 5: Data Sources -->
+  <!-- ══════════════════════════════════════════ -->
+
+  <text x="50" y="617" font-size="11" font-weight="700" fill="#8b8fa8" letter-spacing="1.5">DATA SOURCES (COLLECTORS)</text>
+
+  <rect x="30" y="627" width="1140" height="70" rx="8" fill="#0f172a" stroke="#1e293b" stroke-width="1.5"/>
+
+  <!-- Source badges -->
+  <rect x="55" y="643" width="120" height="38" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="115" y="659" text-anchor="middle" font-size="10" font-weight="600" fill="#94a3b8">☁️ AWS</text>
+  <text x="115" y="673" text-anchor="middle" font-size="9" fill="#64748b">CloudTrail · SecurityHub</text>
+
+  <rect x="190" y="643" width="120" height="38" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="250" y="659" text-anchor="middle" font-size="10" font-weight="600" fill="#94a3b8">🔒 Security</text>
+  <text x="250" y="673" text-anchor="middle" font-size="9" fill="#64748b">Okta · OCSF · SIEM</text>
+
+  <rect x="325" y="643" width="120" height="38" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="385" y="659" text-anchor="middle" font-size="10" font-weight="600" fill="#94a3b8">⎈ Kubernetes</text>
+  <text x="385" y="673" text-anchor="middle" font-size="9" fill="#64748b">Pods · Nodes · Events</text>
+
+  <rect x="460" y="643" width="120" height="38" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="520" y="659" text-anchor="middle" font-size="10" font-weight="600" fill="#94a3b8">🌐 Web / APM</text>
+  <text x="520" y="673" text-anchor="middle" font-size="9" fill="#64748b">Apache · Nginx · Traces</text>
+
+  <rect x="595" y="643" width="120" height="38" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="655" y="659" text-anchor="middle" font-size="10" font-weight="600" fill="#94a3b8">📦 Applications</text>
+  <text x="655" y="673" text-anchor="middle" font-size="9" fill="#64748b">Custom HTTP · Syslog</text>
+
+  <rect x="730" y="643" width="120" height="38" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="790" y="659" text-anchor="middle" font-size="10" font-weight="600" fill="#94a3b8">📊 Metrics</text>
+  <text x="790" y="673" text-anchor="middle" font-size="9" fill="#64748b">StatsD · Prometheus</text>
+
+  <rect x="865" y="643" width="120" height="38" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="925" y="659" text-anchor="middle" font-size="10" font-weight="600" fill="#94a3b8">🔌 Installed Apps</text>
+  <text x="925" y="673" text-anchor="middle" font-size="9" fill="#64748b">Pre-built integrations</text>
+
+  <rect x="1000" y="643" width="155" height="38" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="1077" y="659" text-anchor="middle" font-size="10" font-weight="600" fill="#94a3b8">📝 Audit &amp; System</text>
+  <text x="1077" y="673" text-anchor="middle" font-size="9" fill="#64748b">sumologic_audit_events</text>
+
+  <!-- Storage → Sources arrow -->
+  <line x1="600" y1="592" x2="600" y2="627" stroke="#334155" stroke-width="1.5"/>
+  <polygon points="595,624 600,631 605,624" fill="#334155"/>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- ROW 6: Key Patterns legend -->
+  <!-- ══════════════════════════════════════════ -->
+
+  <rect x="30" y="718" width="1140" height="160" rx="8" fill="#111827" stroke="#1f2937" stroke-width="1.5"/>
+  <text x="50" y="740" font-size="11" font-weight="700" fill="#8b8fa8" letter-spacing="1.5">KEY PATTERNS &amp; FLOWS</text>
+
+  <!-- Pattern 1 -->
+  <rect x="50" y="750" width="250" height="110" rx="6" fill="#1e3a5f" fill-opacity="0.4" stroke="#3b82f6" stroke-width="1"/>
+  <text x="175" y="768" text-anchor="middle" font-size="11" font-weight="700" fill="#60a5fa">Log Discovery Flow</text>
+  <text x="65" y="785" font-size="9" fill="#93c5fd">1. explore_log_metadata (scope="*")</text>
+  <text x="65" y="799" font-size="9" fill="#93c5fd">2. profile_log_schema → find fields</text>
+  <text x="65" y="813" font-size="9" fill="#93c5fd">3. get_estimated_log_search_usage</text>
+  <text x="65" y="827" font-size="9" fill="#93c5fd">4. search_sumo_logs (scoped query)</text>
+  <text x="65" y="841" font-size="9" fill="#93c5fd">5. build_search_web_url → share link</text>
+  <text x="65" y="855" font-size="9" fill="#93c5fd">Goal: find &amp; query logs efficiently</text>
+
+  <!-- Pattern 2 -->
+  <rect x="320" y="750" width="250" height="110" rx="6" fill="#1f2937" fill-opacity="0.4" stroke="#f59e0b" stroke-width="1"/>
+  <text x="445" y="768" text-anchor="middle" font-size="11" font-weight="700" fill="#fbbf24">Cost Analysis Flow</text>
+  <text x="335" y="785" font-size="9" fill="#fde68a">1. run_search_audit_query (who scans)</text>
+  <text x="335" y="799" font-size="9" fill="#fde68a">2. analyze_search_scan_cost (by user)</text>
+  <text x="335" y="813" font-size="9" fill="#fde68a">3. group_by="user_scope_query" → drill</text>
+  <text x="335" y="827" font-size="9" fill="#fde68a">4. analyze_data_volume (ingest drivers)</text>
+  <text x="335" y="841" font-size="9" fill="#fde68a">5. get_usage_forecast → trend</text>
+  <text x="335" y="855" font-size="9" fill="#fde68a">Goal: identify &amp; reduce scan spend</text>
+
+  <!-- Pattern 3 -->
+  <rect x="590" y="750" width="250" height="110" rx="6" fill="#1a2e1a" fill-opacity="0.4" stroke="#22c55e" stroke-width="1"/>
+  <text x="715" y="768" text-anchor="middle" font-size="11" font-weight="700" fill="#4ade80">Content Navigation Flow</text>
+  <text x="605" y="785" font-size="9" fill="#bbf7d0">1. get_personal_folder → browse tree</text>
+  <text x="605" y="799" font-size="9" fill="#bbf7d0">2. get_sumo_dashboards (filter_name)</text>
+  <text x="605" y="813" font-size="9" fill="#bbf7d0">3. export_content (full definition)</text>
+  <text x="605" y="827" font-size="9" fill="#bbf7d0">4. convert_content_id_hex_to_decimal</text>
+  <text x="605" y="841" font-size="9" fill="#bbf7d0">5. get_content_web_url → share</text>
+  <text x="605" y="855" font-size="9" fill="#bbf7d0">Goal: navigate &amp; share content</text>
+
+  <!-- Pattern 4 -->
+  <rect x="860" y="750" width="285" height="110" rx="6" fill="#2d1b33" fill-opacity="0.4" stroke="#a855f7" stroke-width="1"/>
+  <text x="1002" y="768" text-anchor="middle" font-size="11" font-weight="700" fill="#c084fc">Async Search Flow</text>
+  <text x="875" y="785" font-size="9" fill="#e9d5ff">1. create_sumo_search_job (long query)</text>
+  <text x="875" y="799" font-size="9" fill="#e9d5ff">2. get_sumo_search_job_status (poll)</text>
+  <text x="875" y="813" font-size="9" fill="#e9d5ff">   → wait for "DONE GATHERING RESULTS"</text>
+  <text x="875" y="827" font-size="9" fill="#e9d5ff">3. get_sumo_search_job_results</text>
+  <text x="875" y="841" font-size="9" fill="#e9d5ff">   (offset/limit pagination)</text>
+  <text x="875" y="855" font-size="9" fill="#e9d5ff">Goal: handle large / slow queries</text>
+
+  <!-- Footer -->
+  <text x="600" y="888" text-anchor="middle" font-size="10" fill="#4b5563">Sumo Logic MCP · Multi-instance · Flex &amp; Tiered billing · 50+ tools · Skills library integration</text>
+</svg>
