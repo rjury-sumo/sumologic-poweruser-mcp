@@ -31,7 +31,7 @@ async def main():
             scope_filters=["query_type=Interactive*"],
             instance="default"
         )
-    except:
+    except Exception:
         pass
 
     # Restore

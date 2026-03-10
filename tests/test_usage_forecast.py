@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Unit tests for get_usage_forecast tool."""
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 import json
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from sumologic_poweruser_mcp.sumologic_mcp_server import get_usage_forecast
 

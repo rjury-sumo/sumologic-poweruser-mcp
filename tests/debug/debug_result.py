@@ -25,7 +25,7 @@ async def main():
         data = json.loads(result)
         print("\nPARSED JSON:")
         print(json.dumps(data, indent=2)[:500])
-    except:
+    except Exception:
         print("\nNot valid JSON")
 
 if __name__ == "__main__":
