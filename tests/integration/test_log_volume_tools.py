@@ -4,7 +4,7 @@
 import asyncio
 import json
 
-from src.sumologic_mcp_server.sumologic_mcp_server import analyze_log_volume, profile_log_schema
+from sumologic_poweruser_mcp.sumologic_mcp_server import analyze_log_volume, profile_log_schema
 
 
 async def main():

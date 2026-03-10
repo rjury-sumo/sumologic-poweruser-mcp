@@ -10,7 +10,7 @@ Supports multiple Sumo Logic instances with separate credentials.
 Usage:
     uvx sumologic-mcp-server
     # or
-    python -m sumologic_mcp_server.sumologic_mcp_server
+    python -m sumologic_poweruser_mcp.sumologic_poweruser_mcp
 
 Environment Variables:
     See .env.example for configuration options
@@ -4979,9 +4979,7 @@ async def search_query_examples(
                 "Use query_type='Logs' or 'Metrics' to narrow by type",
             ]
             # Get sample app names
-            sample_apps = sorted(
-                {q.get("app", "") for q in all_queries if q.get("app")}
-            )[:20]
+            sample_apps = sorted({q.get("app", "") for q in all_queries if q.get("app")})[:20]
             response["available_apps_sample"] = sample_apps
 
         return json.dumps(response, indent=2)

@@ -6,7 +6,7 @@ Test the improved search_query_examples tool with scoring and relevance ranking.
 import asyncio
 import json
 
-from src.sumologic_mcp_server.sumologic_mcp_server import search_query_examples
+from sumologic_poweruser_mcp.sumologic_mcp_server import search_query_examples
 
 
 async def test_natural_language_search():

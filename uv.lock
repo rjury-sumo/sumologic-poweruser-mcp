@@ -958,7 +958,7 @@ wheels = [
 ]
 
 [[package]]
-name = "sumologic-mcp-server"
+name = "sumologic-poweruser-mcp"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

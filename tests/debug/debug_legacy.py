@@ -4,7 +4,7 @@
 import asyncio
 import json
 
-from src.sumologic_mcp_server.sumologic_mcp_server import run_search_audit_query
+from src.sumologic_poweruser_mcp.sumologic_poweruser_mcp import run_search_audit_query
 
 
 async def main():

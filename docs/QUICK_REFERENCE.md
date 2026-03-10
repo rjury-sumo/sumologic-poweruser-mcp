@@ -1,6 +1,6 @@
 # Quick Reference Card
 
-Quick lookup for common development tasks in the sumologic-python-mcp project.
+Quick lookup for common development tasks in the sumologic-poweruser-mcp project.
 
 ## Starting a New Feature
 
@@ -62,14 +62,14 @@ async def tool_name(
 
 | What | Where |
 |------|-------|
-| All MCP tools | `src/sumologic_mcp_server/sumologic_mcp_server.py` |
+| All MCP tools | `src/sumologic_poweruser_mcp/sumologic_mcp_server.py` |
 | API client methods | `SumoLogicClient` class (same file, ~line 80-500) |
-| Configuration | `src/sumologic_mcp_server/config.py` |
-| Validation | `src/sumologic_mcp_server/validation.py` |
-| URL generation | `src/sumologic_mcp_server/url_builder.py` |
-| Content ID utils | `src/sumologic_mcp_server/content_id_utils.py` |
-| Async helpers | `src/sumologic_mcp_server/async_export_helper.py` |
-| Query patterns | `src/sumologic_mcp_server/query_patterns.py` |
+| Configuration | `src/sumologic_poweruser_mcp/config.py` |
+| Validation | `src/sumologic_poweruser_mcp/validation.py` |
+| URL generation | `src/sumologic_poweruser_mcp/url_builder.py` |
+| Content ID utils | `src/sumologic_poweruser_mcp/content_id_utils.py` |
+| Async helpers | `src/sumologic_poweruser_mcp/async_export_helper.py` |
+| Query patterns | `src/sumologic_poweruser_mcp/query_patterns.py` |
 | Unit tests | `tests/test_*.py` |
 | Integration tests | `tests/integration/` |
 | Tool documentation | `docs/mcp-tools-reference.md` ← PRIMARY DOCS |
@@ -99,7 +99,7 @@ uv run pytest -v
 uv run pytest tests/test_module.py -v
 
 # Run with coverage
-uv run pytest --cov=src/sumologic_mcp_server --cov-report=html
+uv run pytest --cov=src/sumologic_poweruser_mcp --cov-report=html
 
 # Run specific test
 uv run pytest tests/test_module.py::TestClass::test_method -v
@@ -233,7 +233,7 @@ chore: update dependencies
 
 - **Sumo Logic API Docs**: <https://api.sumologic.com/docs/>
 - **MCP Protocol**: <https://modelcontextprotocol.io/>
-- **Project GitHub**: <https://github.com/[your-org]/sumologic-python-mcp>
+- **Project GitHub**: <https://github.com/[your-org]/sumologic-poweruser-mcp>
 - **FastMCP Docs**: <https://github.com/jlowin/fastmcp>
 
 ## Troubleshooting

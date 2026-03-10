@@ -1,6 +1,21 @@
 # Changelog
 
-## [Unreleased] - 2026-03-05
+## [Unreleased] - 2026-03-10
+
+### Changed
+
+- **Package Renamed**: Project renamed from `sumologic-python-mcp` to `sumologic-poweruser-mcp`
+  - Repository: `sumologic-poweruser-mcp`
+  - Python package: `sumologic-poweruser-mcp`
+  - Module: `sumologic_poweruser_mcp` (imports remain `from sumologic_poweruser_mcp.sumologic_mcp_server`)
+  - CLI command: `sumologic-poweruser-mcp`
+  - **Migration Required**: Users must update Claude Desktop `claude_desktop_config.json` to reference new package name
+
+### Reason for Rename
+
+To avoid confusion with the official Sumo Logic MCP server. This is a community power-user focused implementation with advanced analytics and cost optimization tools.
+
+## [Previous] - 2026-03-05
 
 ### Added
 

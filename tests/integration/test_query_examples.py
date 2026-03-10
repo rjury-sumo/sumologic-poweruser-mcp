@@ -6,7 +6,7 @@ Test script for query examples tool and resource.
 import asyncio
 import json
 
-from src.sumologic_mcp_server.sumologic_mcp_server import query_examples, search_query_examples
+from sumologic_poweruser_mcp.sumologic_mcp_server import query_examples, search_query_examples
 
 
 async def test_tool():

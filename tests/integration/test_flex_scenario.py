@@ -44,7 +44,7 @@ def print_result_summary(title, data):
 
 
 async def main():
-    from sumologic_mcp_server.sumologic_mcp_server import analyze_search_scan_cost
+    from sumologic_poweruser_mcp.sumologic_mcp_server import analyze_search_scan_cost
 
     print("\n" + "🔍" * 40)
     print("FLEX ORGANIZATION FIX DEMONSTRATION")

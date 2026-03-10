@@ -5,7 +5,7 @@ import asyncio
 import json
 import logging
 
-from src.sumologic_mcp_server.sumologic_mcp_server import run_search_audit_query
+from sumologic_poweruser_mcp.sumologic_mcp_server import run_search_audit_query
 
 # Enable debug logging
 logging.basicConfig(level=logging.DEBUG)

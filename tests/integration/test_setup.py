@@ -10,39 +10,39 @@ def test_imports():
     print("Testing imports...")
 
     try:
-        from sumologic_mcp_server import config
+        from sumologic_poweruser_mcp import config  # noqa: F401
         print("✓ config module imported")
     except ImportError as e:
         print(f"✗ Failed to import config: {e}")
-        assert False, f"Failed to import config: {e}"
+        raise AssertionError(f"Failed to import config: {e}") from e
 
     try:
-        from sumologic_mcp_server import exceptions
+        from sumologic_poweruser_mcp import exceptions  # noqa: F401
         print("✓ exceptions module imported")
     except ImportError as e:
         print(f"✗ Failed to import exceptions: {e}")
-        assert False, f"Failed to import exceptions: {e}"
+        raise AssertionError(f"Failed to import exceptions: {e}") from e
 
     try:
-        from sumologic_mcp_server import validation
+        from sumologic_poweruser_mcp import validation  # noqa: F401
         print("✓ validation module imported")
     except ImportError as e:
         print(f"✗ Failed to import validation: {e}")
-        assert False, f"Failed to import validation: {e}"
+        raise AssertionError(f"Failed to import validation: {e}") from e
 
     try:
-        from sumologic_mcp_server import rate_limiter
+        from sumologic_poweruser_mcp import rate_limiter  # noqa: F401
         print("✓ rate_limiter module imported")
     except ImportError as e:
         print(f"✗ Failed to import rate_limiter: {e}")
-        assert False, f"Failed to import rate_limiter: {e}"
+        raise AssertionError(f"Failed to import rate_limiter: {e}") from e
 
     try:
-        from sumologic_mcp_server import sumologic_mcp_server
+        from sumologic_poweruser_mcp import sumologic_mcp_server  # noqa: F401
         print("✓ sumologic_mcp_server module imported")
     except ImportError as e:
         print(f"✗ Failed to import sumologic_mcp_server: {e}")
-        assert False, f"Failed to import sumologic_mcp_server: {e}"
+        raise AssertionError(f"Failed to import sumologic_mcp_server: {e}") from e
 
     assert True
 
@@ -80,7 +80,7 @@ def test_env():
 def main():
     """Run all tests."""
     print("=" * 60)
-    print("Sumo Logic MCP Server - Setup Test")
+    print("Sumo Logic Power User MCP Server - Setup Test")
     print("=" * 60)
 
     imports_ok = test_imports()
@@ -90,7 +90,7 @@ def main():
     if imports_ok and env_ok:
         print("✅ Setup looks good! Ready to run.")
         print("\nTo start the server:")
-        print("  uv run sumologic-mcp-server")
+        print("  uv run sumologic-poweruser-mcp")
         return 0
     elif imports_ok:
         print("⚠ Imports OK, but credentials not configured")

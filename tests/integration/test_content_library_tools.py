@@ -3,7 +3,7 @@
 import asyncio
 import json
 
-from sumologic_mcp_server.sumologic_mcp_server import (
+from sumologic_poweruser_mcp.sumologic_mcp_server import (
     convert_content_id_decimal_to_hex,
     convert_content_id_hex_to_decimal,
     get_content_by_path,

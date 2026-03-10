@@ -1,14 +1,4 @@
-# sumologic-python-mcp
-
-🔐 **Secure, read-only** MCP server for Sumo Logic APIs, written with Claude AI assistance.
-
-This Model Context Protocol (MCP) server gives AI assistants like Claude two complementary capabilities: **secure, read-only access to Sumo Logic APIs** for searching logs, querying metrics, and analysing your environment — and **deep platform expertise** to act as a trusted advisor on architecture, design decisions, and best practices. Use it to run queries, or ask it how you *should* structure your data, alerts, and partitions.
-
-Beyond raw data access, this project ships with a **[Skills Library](skills/)** — 23 structured knowledge files that turn your AI assistant into a **virtual Sumo Logic Technical Account Engineer (TAE)**. Ask for architecture advice, partition design reviews, alerting strategies, or cost optimization guidance, and Claude will draw on the same deep product knowledge a TAE would bring.
-
-> **⚡ Quick Start:** See [QUICKSTART.md](QUICKSTART.md) for a 5-minute setup guide using uv!
->
-> **📦 Package Manager:** This project uses [uv](https://github.com/astral-sh/uv) exclusively. See [UV_MIGRATION.md](UV_MIGRATION.md) if migrating from pip/venv.
+# sumologic-poweruser-mcp
 
 ## Project Status & Scope
 
@@ -20,6 +10,16 @@ This is an **experimental demonstration project** showcasing MCP capabilities wi
 - ⚠️ **Use at your own risk** - no warranties or liability
 - 🤝 **Community-driven** - forks and enhancement suggestions welcome
 - 📝 **Open for contributions** - see [Contributing](#contributing) section
+
+🔐 **Secure, read-only** MCP server for Sumo Logic APIs, written with Claude AI assistance.
+
+This Model Context Protocol (MCP) server gives AI assistants like Claude two complementary capabilities: **secure, read-only access to Sumo Logic APIs** for searching logs, querying metrics, and analysing your environment — and **deep platform expertise** to act as a trusted advisor on architecture, design decisions, and best practices. Use it to run queries, or ask it how you *should* structure your data, alerts, and partitions.
+
+Beyond raw data access, this project ships with a **[Skills Library](skills/)** — 23 structured knowledge files that turn your AI assistant into a **virtual Sumo Logic Technical Account Engineer (TAE)**. Ask for architecture advice, partition design reviews, alerting strategies, or cost optimization guidance, and Claude will draw on the same deep product knowledge a TAE would bring.
+
+> **⚡ Quick Start:** See [QUICKSTART.md](QUICKSTART.md) for a 5-minute setup guide using uv!
+>
+> **📦 Package Manager:** This project uses [uv](https://github.com/astral-sh/uv) exclusively. See [UV_MIGRATION.md](UV_MIGRATION.md) if migrating from pip/venv.
 
 ### 🔒 Read-Only by Design
 
@@ -196,8 +196,8 @@ All tools support an `instance` parameter to target specific Sumo Logic deployme
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/sumologic-python-mcp.git
-cd sumologic-python-mcp
+git clone https://github.com/yourusername/sumologic-poweruser-mcp.git
+cd sumologic-poweruser-mcp
 
 # Create .env file with your credentials
 cp .env.example .env
@@ -217,12 +217,12 @@ docker compose down
 
 ```bash
 # Build the Docker image
-docker build -t sumologic-mcp-server .
+docker build -t sumologic-poweruser-mcp .
 
 # Run the container
 docker run -it --rm \
   --env-file .env \
-  sumologic-mcp-server
+  sumologic-poweruser-mcp
 ```
 
 **Benefits:**
@@ -253,8 +253,8 @@ pip install uv
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/sumologic-python-mcp.git
-cd sumologic-python-mcp
+git clone https://github.com/yourusername/sumologic-poweruser-mcp.git
+cd sumologic-poweruser-mcp
 
 # Install dependencies with uv
 uv sync
@@ -311,17 +311,17 @@ Add to your Claude Desktop configuration file:
         "-i",
         "--rm",
         "--env-file",
-        "/absolute/path/to/sumologic-python-mcp/.env",
-        "sumologic-mcp-server"
+        "/absolute/path/to/sumologic-poweruser-mcp/.env",
+        "sumologic-poweruser-mcp"
       ]
     }
   }
 }
 ```
 
-Replace `/absolute/path/to/sumologic-python-mcp` with your actual project path.
+Replace `/absolute/path/to/sumologic-poweruser-mcp` with your actual project path.
 
-**Note:** Make sure you've built the Docker image first with `docker build -t sumologic-mcp-server .`
+**Note:** Make sure you've built the Docker image first with `docker build -t sumologic-poweruser-mcp .`
 
 ### Option B: Claude Desktop (with uv)
 
@@ -338,14 +338,14 @@ Add to your Claude Desktop configuration file:
     "sumologic": {
       "command": "python3",
       "args": [
-        "/absolute/path/to/sumologic-python-mcp/scripts/run_with_env.py"
+        "/absolute/path/to/sumologic-poweruser-mcp/scripts/run_with_env.py"
       ]
     }
   }
 }
 ```
 
-Replace `/absolute/path/to/sumologic-python-mcp` with your actual project path. The wrapper script will load credentials from your `.env` file.
+Replace `/absolute/path/to/sumologic-poweruser-mcp` with your actual project path. The wrapper script will load credentials from your `.env` file.
 
 > **Note for macOS users**: Using `python3` with `run_with_env.py` is more reliable than the shell script on macOS due to permission restrictions.
 
@@ -356,7 +356,7 @@ Replace `/absolute/path/to/sumologic-python-mcp` with your actual project path. 
   "mcpServers": {
     "sumologic": {
       "command": "uv",
-      "args": ["--directory", "/absolute/path/to/sumologic-python-mcp", "run", "sumologic-mcp-server"],
+      "args": ["--directory", "/absolute/path/to/sumologic-poweruser-mcp", "run", "sumologic-poweruser-mcp"],
       "env": {
         "SUMO_ACCESS_ID": "your_access_id",
         "SUMO_ACCESS_KEY": "your_access_key",
@@ -384,10 +384,10 @@ The MCP server will start automatically when Claude Desktop launches.
 **Method 1: Using Claude CLI with Explicit Credentials (Working Method)**
 
 ```bash
-# Replace /path/to/sumologic-python-mcp with your actual path (use pwd)
+# Replace /path/to/sumologic-poweruser-mcp with your actual path (use pwd)
 # Update credentials with your actual values
 node ~/.vscode/extensions/anthropic.claude-code-*/resources/claude-code/cli.js mcp add-json sumologic \
-  '{"command":"uv","args":["run","--directory","/path/to/sumologic-python-mcp","sumologic-mcp-server"],"env":{"SUMO_ACCESS_ID":"your_access_id","SUMO_ACCESS_KEY":"your_access_key","SUMO_ENDPOINT":"https://api.au.sumologic.com","SUMO_SUBDOMAIN":"your_subdomain"}}' \
+  '{"command":"uv","args":["run","--directory","/path/to/sumologic-poweruser-mcp","sumologic-poweruser-mcp"],"env":{"SUMO_ACCESS_ID":"your_access_id","SUMO_ACCESS_KEY":"your_access_key","SUMO_ENDPOINT":"https://api.au.sumologic.com","SUMO_SUBDOMAIN":"your_subdomain"}}' \
   -s user
 ```
 
@@ -397,7 +397,7 @@ To keep credentials in your `.env` file, use the wrapper script:
 
 ```bash
 node ~/.vscode/extensions/anthropic.claude-code-*/resources/claude-code/cli.js mcp add-json sumologic \
-  '{"command":"python3","args":["/path/to/sumologic-python-mcp/scripts/run_with_env.py"]}' \
+  '{"command":"python3","args":["/path/to/sumologic-poweruser-mcp/scripts/run_with_env.py"]}' \
   -s user
 ```
 
@@ -714,10 +714,10 @@ cp .env.example .env
 # Edit .env with your actual credentials
 
 # Run the server
-uv run sumologic-mcp-server
+uv run sumologic-poweruser-mcp
 
 # Or use Python module directly
-uv run python -m sumologic_mcp_server.sumologic_mcp_server
+uv run python -m sumologic_poweruser_mcp.sumologic_poweruser_mcp
 ```
 
 ## Skills Library — Virtual TAE
@@ -789,10 +789,10 @@ Each skill includes:
 ## Architecture
 
 ```
-sumologic-python-mcp/
-├── src/sumologic_mcp_server/
+sumologic-poweruser-mcp/
+├── src/sumologic_poweruser_mcp/
 │   ├── __init__.py
-│   ├── sumologic_mcp_server.py  # Main server and MCP tools
+│   ├── sumologic_poweruser_mcp.py  # Main server and MCP tools
 │   ├── config.py                 # Configuration management
 │   ├── exceptions.py             # Custom exception classes
 │   ├── validation.py             # Input validation models
@@ -1008,7 +1008,7 @@ See [LICENSE](LICENSE) file for details.
 
 ## Support
 
-- **Issues:** [GitHub Issues](https://github.com/yourusername/sumologic-python-mcp/issues)
+- **Issues:** [GitHub Issues](https://github.com/yourusername/sumologic-poweruser-mcp/issues)
 - **Security:** See [SECURITY.md](SECURITY.md) for vulnerability reporting
 
 ## Acknowledgments

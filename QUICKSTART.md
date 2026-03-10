@@ -23,7 +23,7 @@ pip install uv
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/sumologic-python-mcp.git
+git clone https://github.com/rjury-sumo/sumologic-poweruser-mcp.git
 cd sumologic-python-mcp
 
 # Install all dependencies (uv handles virtualenv automatically)

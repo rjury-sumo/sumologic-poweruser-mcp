@@ -3,7 +3,7 @@
 
 import asyncio
 
-from src.sumologic_mcp_server.sumologic_mcp_server import run_search_audit_query
+from src.sumologic_poweruser_mcp.sumologic_poweruser_mcp import run_search_audit_query
 
 
 async def main():
@@ -19,7 +19,7 @@ async def main():
         raise Exception("Captured query successfully")
 
     # Monkey patch
-    from src.sumologic_mcp_server.sumologic_mcp_server import SumoLogicClient
+    from src.sumologic_poweruser_mcp.sumologic_poweruser_mcp import SumoLogicClient
     original_create = SumoLogicClient.create_search_job
     SumoLogicClient.create_search_job = capture_query
 

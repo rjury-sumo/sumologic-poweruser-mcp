@@ -2,7 +2,7 @@
 
 import json
 
-from src.sumologic_mcp_server.response_filter import (
+from src.sumologic_poweruser_mcp.response_filter import (
     filter_by_custom,
     filter_by_field,
     filter_by_multiple_fields,

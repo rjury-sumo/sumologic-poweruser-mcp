@@ -1,6 +1,6 @@
 """Tests for URL builder utilities."""
 
-from src.sumologic_mcp_server.url_builder import (
+from src.sumologic_poweruser_mcp.url_builder import (
     build_dashboard_url,
     build_library_url,
     build_metrics_search_url,

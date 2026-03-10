@@ -4,7 +4,7 @@ import asyncio
 import json
 from datetime import datetime, timedelta
 
-from sumologic_mcp_server.sumologic_mcp_server import export_usage_report
+from sumologic_poweruser_mcp.sumologic_mcp_server import export_usage_report
 
 
 async def main():

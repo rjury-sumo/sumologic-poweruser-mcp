@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "sumologic-mcp-server"
+name = "sumologic-poweruser-mcp"
 version = "0.1.0"
-description = "Sumo Logic MCP Server - provides read-only access to Sumo Logic APIs through the Model Context Protocol"
+description = "Sumo Logic Power User MCP Server - provides read-only access to Sumo Logic APIs through the Model Context Protocol"
 readme = "README.md"
 license = {file = "LICENSE"}
 authors = [
@@ -35,15 +35,15 @@ dev = [
 ]
 
 [project.scripts]
-sumologic-mcp-server = "sumologic_mcp_server.sumologic_mcp_server:main"
+sumologic-poweruser-mcp = "sumologic_poweruser_mcp.sumologic_mcp_server:main"
 
 [project.urls]
-Homepage = "https://github.com/yourusername/sumologic-python-mcp"
-Repository = "https://github.com/yourusername/sumologic-python-mcp.git"
-Issues = "https://github.com/yourusername/sumologic-python-mcp/issues"
+Homepage = "https://github.com/yourusername/sumologic-poweruser-mcp"
+Repository = "https://github.com/yourusername/sumologic-poweruser-mcp.git"
+Issues = "https://github.com/yourusername/sumologic-poweruser-mcp/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/sumologic_mcp_server"]
+packages = ["src/sumologic_poweruser_mcp"]
 
 [tool.black]
 line-length = 100

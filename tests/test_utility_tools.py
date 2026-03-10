@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from sumologic_mcp_server.sumologic_mcp_server import get_skill
+from sumologic_poweruser_mcp.sumologic_mcp_server import get_skill
 
 
 class TestGetSkill:

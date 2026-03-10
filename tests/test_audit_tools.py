@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.sumologic_mcp_server.audit_helpers import (
+from src.sumologic_poweruser_mcp.audit_helpers import (
     build_enterprise_audit_query,
     build_legacy_audit_query,
     get_audit_use_case_query,

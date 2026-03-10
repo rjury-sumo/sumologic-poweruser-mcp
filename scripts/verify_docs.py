@@ -31,7 +31,7 @@ def get_tools_from_code() -> List[str]:
     Returns:
         List of tool function names
     """
-    code_path = get_project_root() / "src" / "sumologic_mcp_server" / "sumologic_mcp_server.py"
+    code_path = get_project_root() / "src" / "sumologic_poweruser_mcp" / "sumologic_poweruser_mcp.py"
 
     if not code_path.exists():
         print(f"❌ Error: Could not find {code_path}")

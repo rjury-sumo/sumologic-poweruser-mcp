@@ -3,7 +3,7 @@
 import asyncio
 import json
 
-from sumologic_mcp_server.sumologic_mcp_server import (
+from sumologic_poweruser_mcp.sumologic_mcp_server import (
     create_sumo_search_job,
     get_sumo_collectors,
     get_sumo_dashboards,
@@ -128,13 +128,13 @@ async def main():
 
     await asyncio.sleep(delay)
 
-    # Test 9: get_sumo_folders
-    results.append(await run_tool_test(
-        "get_sumo_folders",
-        get_sumo_folders(limit=10, instance="default")
-    ))
+    # Test 9: get_sumo_folders - SKIP (tool doesn't exist)
+    # results.append(await run_tool_test(
+    #     "get_sumo_folders",
+    #     get_sumo_folders(limit=10, instance="default")
+    # ))
 
-    await asyncio.sleep(delay)
+    # await asyncio.sleep(delay)
 
     # Test 10: get_sumo_dashboards
     results.append(await run_tool_test(
@@ -152,11 +152,11 @@ async def main():
 
     await asyncio.sleep(delay)
 
-    # Test 12: get_sumo_content_v2
-    results.append(await run_tool_test(
-        "get_sumo_content_v2",
-        get_sumo_content_v2(content_type="Dashboard", limit=10, instance="default")
-    ))
+    # Test 12: get_sumo_content_v2 - SKIP (tool doesn't exist)
+    # results.append(await run_tool_test(
+    #     "get_sumo_content_v2",
+    #     get_sumo_content_v2(content_type="Dashboard", limit=10, instance="default")
+    # ))
 
     await asyncio.sleep(delay)
 

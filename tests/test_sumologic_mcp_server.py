@@ -5,8 +5,8 @@ from unittest.mock import patch
 
 import pytest
 
-from sumologic_mcp_server.config import SumoInstanceConfig, reset_config
-from sumologic_mcp_server.sumologic_mcp_server import SumoLogicClient, clients, get_sumo_client
+from sumologic_poweruser_mcp.config import SumoInstanceConfig, reset_config
+from sumologic_poweruser_mcp.sumologic_mcp_server import SumoLogicClient, clients, get_sumo_client
 
 
 class TestSumoLogicClient:
@@ -80,7 +80,7 @@ class TestConfig:
     )
     def test_config_loads_default_instance(self):
         """Test that config loads default instance from env vars."""
-        from sumologic_mcp_server.config import get_config
+        from sumologic_poweruser_mcp.config import get_config
 
         reset_config()
 
@@ -104,7 +104,7 @@ class TestConfig:
     )
     def test_config_loads_multiple_instances(self):
         """Test that config loads multiple instances."""
-        from sumologic_mcp_server.config import get_config
+        from sumologic_poweruser_mcp.config import get_config
 
         reset_config()
 
@@ -121,8 +121,8 @@ class TestValidation:
 
     def test_query_validation(self):
         """Test query validation."""
-        from sumologic_mcp_server.exceptions import ValidationError
-        from sumologic_mcp_server.validation import validate_query_input
+        from sumologic_poweruser_mcp.exceptions import ValidationError
+        from sumologic_poweruser_mcp.validation import validate_query_input
 
         # Valid query
         assert validate_query_input("error | count") == "error | count"
@@ -137,8 +137,8 @@ class TestValidation:
 
     def test_time_range_validation(self):
         """Test time range validation."""
-        from sumologic_mcp_server.exceptions import ValidationError
-        from sumologic_mcp_server.validation import validate_time_range
+        from sumologic_poweruser_mcp.exceptions import ValidationError
+        from sumologic_poweruser_mcp.validation import validate_time_range
 
         # Valid ranges
         assert validate_time_range(1) == 1
@@ -153,8 +153,8 @@ class TestValidation:
 
     def test_pagination_validation(self):
         """Test pagination validation."""
-        from sumologic_mcp_server.exceptions import ValidationError
-        from sumologic_mcp_server.validation import validate_pagination
+        from sumologic_poweruser_mcp.exceptions import ValidationError
+        from sumologic_poweruser_mcp.validation import validate_pagination
 
         # Valid pagination
         limit, offset = validate_pagination(100, 0)
@@ -176,7 +176,7 @@ class TestRateLimiter:
     @pytest.mark.asyncio
     async def test_rate_limiter_allows_requests(self):
         """Test that rate limiter allows requests within limit."""
-        from sumologic_mcp_server.rate_limiter import RateLimiter
+        from sumologic_poweruser_mcp.rate_limiter import RateLimiter
 
         limiter = RateLimiter(requests_per_minute=5)
 
@@ -191,7 +191,7 @@ class TestRateLimiter:
     @pytest.mark.asyncio
     async def test_rate_limiter_blocks_excess_requests(self):
         """Test that rate limiter blocks excess requests."""
-        from sumologic_mcp_server.rate_limiter import RateLimiter, RateLimitError
+        from sumologic_poweruser_mcp.rate_limiter import RateLimiter, RateLimitError
 
         limiter = RateLimiter(requests_per_minute=2)
 
@@ -209,7 +209,7 @@ class TestSearchHelpers:
 
     def test_detect_query_type_messages(self):
         """Test detecting message queries (raw logs)."""
-        from sumologic_mcp_server.search_helpers import detect_query_type
+        from sumologic_poweruser_mcp.search_helpers import detect_query_type
 
         # Raw log queries should return 'messages'
         assert detect_query_type("_sourceCategory=apache/access") == "messages"
@@ -218,7 +218,7 @@ class TestSearchHelpers:
 
     def test_detect_query_type_records(self):
         """Test detecting record queries (aggregates)."""
-        from sumologic_mcp_server.search_helpers import detect_query_type
+        from sumologic_poweruser_mcp.search_helpers import detect_query_type
 
         # Aggregate queries should return 'records'
         assert detect_query_type("error | count by _sourceHost") == "records"
@@ -236,7 +236,7 @@ class TestSearchHelpers:
         """Test parsing 'now' relative time."""
         import time
 
-        from sumologic_mcp_server.search_helpers import parse_relative_time
+        from sumologic_poweruser_mcp.search_helpers import parse_relative_time
 
         result = parse_relative_time("now")
         current_time_ms = int(time.time() * 1000)
@@ -247,7 +247,7 @@ class TestSearchHelpers:
         """Test parsing hours relative time."""
         import time
 
-        from sumologic_mcp_server.search_helpers import parse_relative_time
+        from sumologic_poweruser_mcp.search_helpers import parse_relative_time
 
         result = parse_relative_time("-1h")
         expected = int((time.time() - 3600) * 1000)
@@ -262,7 +262,7 @@ class TestSearchHelpers:
         """Test parsing minutes relative time."""
         import time
 
-        from sumologic_mcp_server.search_helpers import parse_relative_time
+        from sumologic_poweruser_mcp.search_helpers import parse_relative_time
 
         result = parse_relative_time("-30m")
         expected = int((time.time() - 1800) * 1000)
@@ -271,7 +271,7 @@ class TestSearchHelpers:
 
     def test_parse_relative_time_passthrough(self):
         """Test that times are converted to epoch milliseconds."""
-        from sumologic_mcp_server.search_helpers import parse_relative_time
+        from sumologic_poweruser_mcp.search_helpers import parse_relative_time
 
         # ISO8601 should be converted to epoch milliseconds (UTC)
         iso_time = "2024-01-15T10:00:00Z"
@@ -298,7 +298,7 @@ class TestSearchJobIntegration:
     @pytest.mark.skipif(not os.getenv("SUMO_ACCESS_ID"), reason="Requires SUMO_ACCESS_ID env var")
     async def test_search_logs_with_aggregate_query(self):
         """Test search_logs with an aggregate query (requires real credentials)."""
-        from sumologic_mcp_server.sumologic_mcp_server import get_sumo_client
+        from sumologic_poweruser_mcp.sumologic_mcp_server import get_sumo_client
 
         client = await get_sumo_client("default")
 
@@ -318,7 +318,7 @@ class TestSearchJobIntegration:
     @pytest.mark.skipif(not os.getenv("SUMO_ACCESS_ID"), reason="Requires SUMO_ACCESS_ID env var")
     async def test_search_logs_with_message_query(self):
         """Test search_logs with a message query (requires real credentials)."""
-        from sumologic_mcp_server.sumologic_mcp_server import get_sumo_client
+        from sumologic_poweruser_mcp.sumologic_mcp_server import get_sumo_client
 
         client = await get_sumo_client("default")
 
@@ -335,7 +335,7 @@ class TestSearchJobIntegration:
     @pytest.mark.skipif(not os.getenv("SUMO_ACCESS_ID"), reason="Requires SUMO_ACCESS_ID env var")
     async def test_create_search_job_and_check_status(self):
         """Test creating a search job and checking its status (requires real credentials)."""
-        from sumologic_mcp_server.sumologic_mcp_server import get_sumo_client
+        from sumologic_poweruser_mcp.sumologic_mcp_server import get_sumo_client
 
         client = await get_sumo_client("default")
 

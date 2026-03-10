@@ -1,13 +1,13 @@
 # Claude Development Guidelines
 
-This document provides guidelines for AI-assisted development (specifically Claude) to ensure consistency, quality, and repeatability in the sumologic-python-mcp project.
+This document provides guidelines for AI-assisted development (specifically Claude) to ensure consistency, quality, and repeatability in the sumologic-poweruser-mcp project.
 
 ## Project Structure
 
 ```
-sumologic-python-mcp/
-├── src/sumologic_mcp_server/     # Main source code
-│   ├── sumologic_mcp_server.py   # Main MCP server with all @mcp.tool() definitions
+sumologic-poweruser-mcp/
+├── src/sumologic_poweruser_mcp/     # Main source code
+│   ├── sumologic_poweruser_mcp.py   # Main MCP server with all @mcp.tool() definitions
 │   ├── config.py                 # Configuration and multi-instance support
 │   ├── validation.py             # Input validation using Pydantic
 │   ├── exceptions.py             # Custom exception classes
@@ -225,7 +225,7 @@ Follow this **EXACT SEQUENCE** for every new tool:
 #### 2. Add API Method to SumoLogicClient
 
 ```python
-# In src/sumologic_mcp_server/sumologic_mcp_server.py
+# In src/sumologic_poweruser_mcp/sumologic_poweruser_mcp.py
 # Add to SumoLogicClient class (~line 80-500)
 
 async def get_new_resource(self, param1: str, param2: int = 100) -> Dict[str, Any]:
@@ -246,7 +246,7 @@ async def get_new_resource(self, param1: str, param2: int = 100) -> Dict[str, An
 #### 3. Implement the MCP Tool
 
 ```python
-# In src/sumologic_mcp_server/sumologic_mcp_server.py
+# In src/sumologic_poweruser_mcp/sumologic_poweruser_mcp.py
 # Add after existing tools in appropriate category section
 
 @mcp.tool()
@@ -350,7 +350,7 @@ uv run pytest tests/test_new_module.py -v
 uv run pytest -v
 
 # Type checking (if implemented)
-uv run mypy src/sumologic_mcp_server/
+uv run mypy src/sumologic_poweruser_mcp/
 ```
 
 #### 7. Update Supporting Documentation
@@ -363,7 +363,7 @@ uv run mypy src/sumologic_mcp_server/
 
 When updating an existing tool:
 
-1. [ ] Update the tool code in `sumologic_mcp_server.py`
+1. [ ] Update the tool code in `sumologic_poweruser_mcp.py`
 2. [ ] **MANDATORY**: Update `docs/mcp-tools-reference.md`
 3. [ ] Update tests if behavior changed
 4. [ ] Add entry to CHANGELOG.md
@@ -581,7 +581,7 @@ except Exception:  # noqa: S110
    - Use `url_builder.py` for web UI URLs
 
 6. **DO NOT** create separate tool files
-   - All tools live in `sumologic_mcp_server.py`
+   - All tools live in `sumologic_poweruser_mcp.py`
    - Helper functions go in separate modules (e.g., `search_helpers.py`)
 
 7. **DO NOT** forget rate limiting
@@ -598,17 +598,17 @@ except Exception:  # noqa: S110
 
 | Code Type | Location | Example |
 |-----------|----------|---------|
-| MCP tool definitions | `sumologic_mcp_server.py` | `@mcp.tool() async def search_sumo_logs()` |
-| API client methods | `SumoLogicClient` class in `sumologic_mcp_server.py` | `async def get_dashboards()` |
+| MCP tool definitions | `sumologic_poweruser_mcp.py` | `@mcp.tool() async def search_sumo_logs()` |
+| API client methods | `SumoLogicClient` class in `sumologic_poweruser_mcp.py` | `async def get_dashboards()` |
 | Validation logic | `validation.py` | `validate_time_range()` |
 | Configuration | `config.py` | `SumoInstanceConfig` |
-| Utility functions | Separate module in `src/sumologic_mcp_server/` | `url_builder.py` |
+| Utility functions | Separate module in `src/sumologic_poweruser_mcp/` | `url_builder.py` |
 | Async helpers | `async_export_helper.py` | `poll_export_job()` |
 | Tests | `tests/test_*.py` | `test_search_logs()` |
 
 ### Module Responsibilities
 
-**sumologic_mcp_server.py**
+**sumologic_poweruser_mcp.py**
 
 - MCP server initialization
 - `SumoLogicClient` class with all API methods
@@ -667,7 +667,7 @@ except Exception:  # noqa: S110
 """Tests for module_name functionality."""
 
 import pytest
-from src.sumologic_mcp_server.module_name import function_name
+from src.sumologic_poweruser_mcp.module_name import function_name
 
 
 class TestFunctionName:

@@ -3,7 +3,7 @@
 import asyncio
 import json
 
-from sumologic_mcp_server.sumologic_mcp_server import explore_log_metadata
+from sumologic_poweruser_mcp.sumologic_mcp_server import explore_log_metadata
 
 
 async def main():
