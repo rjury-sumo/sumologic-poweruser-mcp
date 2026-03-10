@@ -44,9 +44,7 @@ def mock_config():
 @pytest.mark.asyncio
 async def test_usage_forecast_with_explicit_days(mock_client, mock_config):
     """Test get_usage_forecast with explicit number_of_days parameter."""
-    with patch(
-        "sumologic_poweruser_mcp.sumologic_mcp_server._ensure_config_initialized"
-    ), patch(
+    with patch("sumologic_poweruser_mcp.sumologic_mcp_server._ensure_config_initialized"), patch(
         "sumologic_poweruser_mcp.sumologic_mcp_server.get_config", return_value=mock_config
     ), patch(
         "sumologic_poweruser_mcp.sumologic_mcp_server.get_sumo_client",
@@ -72,9 +70,7 @@ async def test_usage_forecast_with_explicit_days(mock_client, mock_config):
 @pytest.mark.asyncio
 async def test_usage_forecast_without_days_default_contract_term(mock_client, mock_config):
     """Test get_usage_forecast without number_of_days (should use contract term default)."""
-    with patch(
-        "sumologic_poweruser_mcp.sumologic_mcp_server._ensure_config_initialized"
-    ), patch(
+    with patch("sumologic_poweruser_mcp.sumologic_mcp_server._ensure_config_initialized"), patch(
         "sumologic_poweruser_mcp.sumologic_mcp_server.get_config", return_value=mock_config
     ), patch(
         "sumologic_poweruser_mcp.sumologic_mcp_server.get_sumo_client",
@@ -100,9 +96,7 @@ async def test_usage_forecast_without_days_default_contract_term(mock_client, mo
 @pytest.mark.asyncio
 async def test_usage_forecast_validates_days_range(mock_client, mock_config):
     """Test that number_of_days is validated to be between 1 and 365."""
-    with patch(
-        "sumologic_poweruser_mcp.sumologic_mcp_server._ensure_config_initialized"
-    ), patch(
+    with patch("sumologic_poweruser_mcp.sumologic_mcp_server._ensure_config_initialized"), patch(
         "sumologic_poweruser_mcp.sumologic_mcp_server.get_config", return_value=mock_config
     ), patch(
         "sumologic_poweruser_mcp.sumologic_mcp_server.get_sumo_client",
@@ -132,9 +126,7 @@ async def test_usage_forecast_validates_days_range(mock_client, mock_config):
 @pytest.mark.asyncio
 async def test_usage_forecast_with_30_days(mock_client, mock_config):
     """Test get_usage_forecast with 30 days."""
-    with patch(
-        "sumologic_poweruser_mcp.sumologic_mcp_server._ensure_config_initialized"
-    ), patch(
+    with patch("sumologic_poweruser_mcp.sumologic_mcp_server._ensure_config_initialized"), patch(
         "sumologic_poweruser_mcp.sumologic_mcp_server.get_config", return_value=mock_config
     ), patch(
         "sumologic_poweruser_mcp.sumologic_mcp_server.get_sumo_client",
