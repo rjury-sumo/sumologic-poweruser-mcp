@@ -50,6 +50,26 @@ _sourceCategory=Labs/Apache/Access "Mozilla"
 
 ---
 
+## The Three Phases of Query Performance
+
+Every Sumo Logic query goes through three phases. Understanding which phase is slow determines how to fix it:
+
+| Phase | What It Does | How to Reduce |
+|---|---|---|
+| **Scan** | Determines which partition(s) to read over the time range | Use `_index=` to target a single partition; good partition design is the foundation |
+| **Retrieval** | Uses bloom filter to identify which events to load | Include keywords or index-time (FER) fields in scope — `status_code=5*` instead of `\| where status_code matches "5*"` |
+| **Compute** | Executes parse, filter, and aggregation operators on retrieved events | Avoid complex regex, unnecessary parsing, high cardinality; move `where` clauses as early as possible |
+
+**Golden rule: Reducing scan has the most impact. Reducing retrieval is second. Reducing compute is third.**
+
+The "Ladder of Acceleration" — from lowest to highest impact:
+1. Add keyword(s) to scope (bloom filter, zero config change)
+2. Add `_index=` or `_sourceCategory=` to scope (reduce scan to one partition)
+3. Use indexed fields from FERs in scope (5–10x faster than search-time parsing)
+4. Back repeated aggregate queries with a scheduled view (50–100x faster)
+
+---
+
 ## Stage 1 — Scope (Before the First Pipe)
 
 The scope is everything **before** the first `|`. It is the most important part for performance and cost. It tells Sumo which partitions to scan and which raw log events to retrieve.
@@ -262,6 +282,40 @@ _sourceCategory=Labs/Apache/Error
 
 ---
 
+## Ingest Lag Detection
+
+Use this query to detect timestamp/timezone issues causing stale data in search:
+
+```
+_sourcecategory=prod/*
+| _format as tz_format
+| _receipttime - _messagetime as lag_ms
+| lag_ms / (1000 * 60) as lag_m
+| values(tz_format) as tz_formats, min(lag_m) as min_lag, avg(lag_m) as avg_lag, max(lag_m) as max_lag by _collector, _source, _sourcecategory
+| sort avg_lag
+| if(avg_lag < 0, "ERROR - future timestamp!", "OK") as status
+| if(avg_lag > 5, "WARN - high lag source", status) as status
+| if(avg_lag > 60, "ERROR - Very high lag time on source ingestion", status) as status
+```
+
+Adjust `_sourcecategory` scope to the sources you want to audit.
+
+---
+
+## Advanced Operators Reference
+
+Sumo Logic has over **120 search operators**. Beyond the pipeline basics, these are frequently valuable:
+
+- **`compare with timeshift`** — compare current values against prior periods (daily/weekly baselines)
+- **`LogReduce`** — ML clustering to group similar log messages and surface patterns in large result sets
+- **`transaction`** / **`transactionize`** — correlate events into multi-event transactions by a key (e.g., user session, request ID)
+- **`subquery`** — use results of one query as input scope for another (correlated search)
+- **`predict`** — time series forecasting
+- **`threatip`** / **`geoip`** — threat intelligence and geolocation enrichment (best cached in a scheduled view for performance)
+- **`lookup`** — enrich events with data from a lookup table
+
+---
+
 ## Related Skills
 
 - [Search Performance Best Practices](./search-performance-best-practices.md)
@@ -276,6 +330,6 @@ _sourceCategory=Labs/Apache/Error
 
 ---
 
-**Version:** 1.0.0
-**Last Updated:** 2026-03-09
-**Source:** SumoLogic Logs Basics Training (August 2025)
+**Version:** 1.1.0
+**Last Updated:** 2026-03-11
+**Source:** SumoLogic Logs Basics Training (August 2025); CIP Onboarding Sessions I & II

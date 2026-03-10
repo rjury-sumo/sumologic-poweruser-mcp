@@ -190,6 +190,27 @@ Click any alert to open its **Alert Response Page**, which provides:
 
 ---
 
+## SLOs — Service Level Objectives
+
+Sumo Logic supports defining and tracking **Service Level Objectives (SLOs)** directly in the platform.
+
+**Key concepts:**
+- **SLI (Service Level Indicator)**: the metric you measure — e.g., "% of 5-minute windows where p99(latency) < 500ms"
+- **SLO**: a target for the SLI — e.g., "SLI ≥ 99.9% in any calendar month"
+- **Error budget**: the acceptable level of unreliability — e.g., 0.1% unreliability = 8 bad 5-minute windows in 30 days
+- **Compliance period**: the window over which compliance is measured (typically 1 month or 7 days)
+
+**SLO monitors in Sumo Logic:**
+- Define SLO on log or metric queries with compliance period and evaluation method (periodic or aggregate)
+- Visualise burn-down and compliance state via the SLO dashboard
+- Generate SLO Monitor alerts when error budget is burning faster than expected
+- Analyse trend across compliance periods by business, application, or service
+- Automate SLO definition via OpenSLO (through the slogen tool)
+
+**Monitor type for SLOs:** Use the **SLO monitor type** in Monitors — this is different from a standard Logs or Metrics monitor. It alerts when the SLO enters a breach or burn-rate state over the compliance period.
+
+---
+
 ## Monitors as Code
 
 Monitors have a dedicated REST API and are fully supported by the **Sumo Logic Terraform provider**. This enables:
@@ -222,6 +243,6 @@ Reference: [Monitors API](https://api.sumologic.com/docs/#tag/monitorsLibraryMan
 
 ---
 
-**Version:** 1.0.0
-**Last Updated:** 2026-03-09
-**Source:** SumoLogic Logs Basics Training (August 2025)
+**Version:** 1.1.0
+**Last Updated:** 2026-03-11
+**Source:** SumoLogic Logs Basics Training (August 2025); CIP Onboarding Sessions I & II

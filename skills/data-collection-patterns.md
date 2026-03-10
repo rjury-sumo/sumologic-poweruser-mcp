@@ -237,8 +237,120 @@ dev/apache/access
 
 - Use lowercase and `/` separators
 - Include environment prefix (`prod`, `dev`, `staging`)
+- Begin with the least-descriptive, highest-level grouping and get more specific with each component
 - Be specific enough to distinguish sources
 - Use wildcards in queries: `_sourceCategory=prod/aws/*`
+
+**Source category serves three purposes simultaneously:**
+1. **Search scoping** — efficiently define the scope of your search with `_sourceCategory=Networking/Firewall/*`
+2. **Partition routing** — route data to specific partitions using source category in the routing expression
+3. **RBAC** — restrict role access with search scope filters like `_sourceCategory=security/*`
+
+---
+
+## Logging Standards — Foundation for Value
+
+Establishing a logging standard for your environment is a prerequisite for good Sumo Logic use. Define this before ingesting at scale:
+
+- **Metadata standards**: agreed source category taxonomy, source names, collector naming
+- **One format per source category**: a source category should define one log format, not multiple variants
+- **Log levels**: well-defined values (`info`, `error`, `warn`, `debug`, `trace`) — do not log `debug` or `trace` in production
+- **PII policy**: define what personal data is acceptable/not acceptable in logs; mask or hash PII using processing rules before ingest
+- **Ownership fields**: define what metadata identifies business dimensions (owner, product, service, environment)
+- **Field naming conventions**: standardise field names for common concepts (e.g., `user_id` not `userid`/`user`/`userId`)
+- **Log size**: keep events below 64KB (Sumo's maximum event size); larger events may need to be split or summarised
+- **Security/data classification**: map log categories to any security or data classification standards you have
+
+---
+
+## Technical Best Practices for Log Ingestion
+
+### Timestamp Handling
+
+Correct timestamp parsing is critical. Sumo parses `_messagetime` from the log event; if parsing fails, it defaults to receipt time, causing ingest lag:
+
+```
+// Detect timestamp/timezone issues on a source
+_sourcecategory=prod/*
+| _format as tz_format
+| _receipttime - _messagetime as lag_ms
+| lag_ms / (1000 * 60) as lag_m
+| values(tz_format) as tz_formats, min(lag_m) as min_lag, avg(lag_m) as avg_lag, max(lag_m) as max_lag by _collector, _source, _sourcecategory
+| sort avg_lag
+| if(avg_lag < 0, "ERROR - future timestamp!", "OK") as status
+| if(avg_lag > 5, "WARN - high lag source", status) as status
+| if(avg_lag > 60, "ERROR - Very high lag time on source ingestion", status) as status
+```
+
+### Multiline Events
+
+Some sources emit log events that span multiple lines (Java stack traces, JSON blocks). Configure multiline parsing at the source level to ensure one event = one log record.
+
+### HTTPS Metadata Headers (for Pipeline Collection)
+
+When POSTing logs via HTTPS from a shared pipeline (Fluentd, Logstash, etc.), use these headers to set correct metadata context per stream:
+
+| Header | Purpose |
+|---|---|
+| `X-Sumo-Category` | Sets `_sourceCategory` for this batch |
+| `X-Sumo-Host` | Sets `_sourceHost` for this batch |
+| `X-Sumo-Fields` | Sets custom fields as `key=value` pairs |
+
+This is critical for shared pipelines where one HTTPS endpoint receives logs from many sources — use headers to preserve the original source context.
+
+### Authentication: Access Tokens vs. Access Keys
+
+- **Use installation tokens** (not access keys) to register installed collectors — they are not tied to a user account and can only be used to register a collector, not to access data
+- **Use dedicated service account users** with restricted roles for API automation — never use a personal user's API keys in automated systems
+
+### Kubernetes Collection
+
+Use **Sumo Logic's native Kubernetes collection** (the Sumo OTel Helm chart), not a generic Fluentd or Logstash plugin. The native collection:
+- Reduces cost per event by **>50%** through smarter batching
+- Automatically creates key metadata fields (namespace, pod, container, etc.)
+- Supports logs, metrics, and traces from a single deployment
+
+---
+
+## Processing Rules — Reduce and Transform Before Ingest
+
+Processing rules are applied at the source level before data is stored. They are your primary tool for **reducing ingest volume** and **masking PII**.
+
+**Types of processing rules:**
+
+| Type | Effect |
+|---|---|
+| **Include** | Keep ONLY events matching a whole-line regex |
+| **Exclude** | Drop events matching a whole-line regex |
+| **Mask** | Replace matched text with `#####` (good for PII like credit card numbers) |
+| **Hash** | Replace matched text with a hash (consistent anonymisation) |
+| **Archive** | Forward matching events to AWS S3 archive instead of ingesting |
+
+**Key differences: Installed vs. Hosted collector rules:**
+
+| Factor | Installed Collector | Hosted Collector |
+|---|---|---|
+| Where evaluated | Client-side (on the host) | Sumo cloud-side |
+| Bandwidth reduction | Yes — filtered data is not sent | No — data is sent then filtered |
+| Counts toward throttle/budget | No (filtered before send) | Yes (at full original size) |
+| CPU cost | Uses host CPU | No host CPU |
+
+**Include/Exclude regex rules:**
+- Rules must be RE2-compliant
+- The regex must match the **entire message** from start to end
+- For multiline messages, add `(?s)` modifiers: `(?s).*EventCode = 5156.*(?s)`
+- Multiple rules are OR-combined for includes/excludes
+- Non-capturing groups: `(?:abc|efg|xyz)` for alternatives
+
+```
+// Exclude all DEBUG events in production
+.*[0-9] \[DEBUG\].*
+
+// Exclude Windows Event Code 5156 (multiline)
+(?s).*EventCode = 5156.*(?s)
+```
+
+**Important:** Excluded data is **permanently gone** — it cannot be recovered from Sumo. Archive rules write to S3 first, allowing future re-ingest if needed. Use mask/hash for PII instead of exclude when you may need the field structure later.
 
 ---
 
@@ -264,6 +376,6 @@ dev/apache/access
 
 ---
 
-**Version:** 1.0.0
-**Last Updated:** 2026-03-09
-**Source:** SumoLogic Logs Basics Training (August 2025)
+**Version:** 1.1.0
+**Last Updated:** 2026-03-11
+**Source:** SumoLogic Logs Basics Training (August 2025); CIP Onboarding Sessions I & II

@@ -322,6 +322,32 @@ Queries and alerts run against `_view=dv_by_sourcecategory_v1` will execute **10
 - `analyze_search_scan_cost` — Identify high scan users (uses search audit view)
 - `run_search_audit_query` — Run custom search audit queries
 
+## Admin Setup Checklist — Content Management Governance
+
+Once core alerting is in place, establish these governance practices to keep the Sumo Logic organisation well-managed as it scales:
+
+**Naming Conventions (agree these before users create content at scale):**
+- **Monitor folders**: use a consistent folder/naming convention (e.g., `[TeamName] - [Description]`, `[Severity] - [Service] - [CheckType]`)
+- **Scheduled views**: use versioned names (`viewname_v1`, `viewname_v2`) for safe updates; include a date or version suffix
+- **Dashboards**: include team/service and purpose in the name
+- **Source categories**: enforce the agreed `env/technology/role` taxonomy via governance documentation and user training
+
+**Admin Recommended Folder:**
+- Create a **Sumo Admin** folder in Admin Recommended with **manage** permissions for admins only
+- Import the following admin apps from the Library into this folder: Data Volume App v2, Audit App, Search Audit App, Infrequent App
+- Use Admin Recommended for any shared searches, dashboards, or scheduled searches that all users should access
+
+**Ongoing Administrative Processes:**
+- Schedule a regular review for users accessing Infrequent tier incorrectly (high scan cost from running dashboards or frequent scheduled searches against Infrequent tier data)
+- Establish a process for new user onboarding training (not just access provisioning)
+- Establish a process for source category and partition name governance — new sources should follow the agreed taxonomy before going live
+- Email yourself the **Weekly Usage Report** from Admin settings to track credit consumption trends
+
+**Support Account and Operations:**
+- Enable a support account user for Sumo Logic Support team access (minimum 1 year; infinite recommended for production orgs)
+- Register at **status.sumologic.com** for platform status notifications
+- Subscribe to the Sumo Logic **RSS feed** for release notes to stay current on new features
+
 ## Related Skills
 
 - [Scheduled Views for Acceleration](./search-scheduled-views.md)
@@ -340,6 +366,6 @@ Queries and alerts run against `_view=dv_by_sourcecategory_v1` will execute **10
 
 ---
 
-**Version:** 1.0.0
-**Last Updated:** 2026-03-09
-**Source:** Admin Indexes, Apps and Alerts Playbook (Sumo Logic Customer Success)
+**Version:** 1.1.0
+**Last Updated:** 2026-03-11
+**Source:** Admin Indexes, Apps and Alerts Playbook (Sumo Logic Customer Success); CIP Onboarding Sessions I & II

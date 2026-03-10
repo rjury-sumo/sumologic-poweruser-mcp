@@ -80,6 +80,15 @@ Skills are organized by domain:
 - Field extraction rules (FER patterns, histogram/stripe)
 - Partition design (7 rules, scan reduction analysis)
 - Admin alerting foundation (ingest, rate limiting, scan cost alerts)
+- RBAC and security architecture (SAML, capabilities, search scope, service accounts, user lifecycle)
+
+### Data Collection (`data-collection-*.md`)
+
+- 7 collection patterns and selection guide
+- Source category naming conventions and logging standards
+- Processing rules (include/exclude/mask/archive)
+- Technical best practices (timestamps, multiline, HTTPS headers)
+- Kubernetes native collection
 
 ## Using Skills
 
@@ -204,7 +213,14 @@ Links to official documentation
 | [Field Extraction](./admin-field-extraction.md) | Admin | Work with custom fields and FERs (legacy) | Yes |
 | **[Field Extraction Rules](./admin-field-extraction-rules.md)** | **Admin** | **FER patterns, histogram/stripe case study (342x speedup)** | **Yes** |
 | **[Partition Design](./admin-partition-design.md)** | **Admin** | **7 rules, scan reduction analysis, CSE/Flex considerations** | **Yes** |
-| **[Admin Alerting & Monitoring](./admin-alerting-and-monitoring.md)** | **Admin** | **5 alert templates: ingest, collection, rate limit, scan cost, health** | **Yes** |
+| **[Admin Alerting & Monitoring](./admin-alerting-and-monitoring.md)** | **Admin** | **5 alert templates: ingest, collection, rate limit, scan cost, health; governance checklist** | **Yes** |
+| **[RBAC & Security Architecture](./admin-rbac-security.md)** | **Admin** | **SAML/SSO, role design, search scope, service accounts, user lifecycle** | **Yes** |
+
+### Data Collection
+
+| Skill | Category | Description | MCP Tools |
+|-------|----------|-------------|-----------|
+| **[Collection Patterns](./data-collection-patterns.md)** | **Collection** | **7 patterns, logging standards, processing rules, technical best practices** | **Yes** |
 
 ## Maintenance
 

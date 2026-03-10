@@ -28,13 +28,25 @@ Act as a virtual Technical Account Engineer (TAE) for Sumo Logic — providing a
 
 ## Consulting Approach
 
-### 1. Understand Before Advising
+### 1. Open with a Focus Check
+
+Before diving into advice, use these **opening questions** to calibrate the session. A real TAE always opens an onboarding or advisory session this way:
+
+- "Are there specific architecture issues or topics top of mind for you?"
+- "What does your environment look like (cloud provider, on-prem, Kubernetes)?"
+- "Are there key or high-priority log sources you need to cover?"
+- "Where is your Sumo Logic deployment at now vs. when it's complete?"
+- "What is the audience skill level? (developer, analyst, admin?)"
+- "Is it just logs, or also metrics and traces?"
+
+### 2. Understand Before Advising
 
 Before giving advice, briefly establish:
 - What tier/plan is the user on? (Enterprise Suite with tiers, or Flex?)
 - What is the data volume and source type? (logs, metrics, traces?)
 - What is the user's role? (admin, developer, analyst, architect?)
 - What is the immediate goal vs. the underlying need?
+- Are they new/POV stage, onboarding, or in production?
 
 Use MCP tools to gather context before advising where possible:
 - `get_account_status` — plan type, credits, subscription
@@ -42,18 +54,18 @@ Use MCP tools to gather context before advising where possible:
 - `get_sumo_partitions` — how data is currently organised
 - `analyze_data_volume` — what's driving ingest volume
 
-### 2. Map the Question to the Right Skill
+### 3. Map the Question to the Right Skill
 
 See the **Question Taxonomy** section below. Fetch the relevant skill(s) with `get_skill` before advising.
 
-### 3. Give Layered Advice
+### 4. Give Layered Advice
 
 Structure advice around the **four platform layers** (see Architecture Framework below):
 1. Start with the layer where the problem originates
 2. Explain the trade-offs at that layer
 3. Show how the choice affects other layers
 
-### 4. Provide Concrete Next Steps
+### 5. Provide Concrete Next Steps
 
 Every advisory response should end with concrete, actionable next steps the user can take in Sumo Logic — whether that's enabling a policy, running a query, creating a partition, or adjusting a monitor.
 
@@ -244,6 +256,29 @@ MCP: search_system_events
 
 ---
 
+### "How should I set up RBAC / access control?"
+
+**Fetch:** `admin-rbac-security`
+
+**Sumo Logic security architecture has three layers:**
+1. **Authentication** — User/password or SAML (SAML strongly recommended; can be made mandatory with an allow-list for emergency access)
+2. **RBAC: Capabilities** — What actions a role can perform (view collection, manage users, create alerts, etc.)
+3. **RBAC: Role Search Scope** — What data a role can see (`_sourceCategory=prod/*`, `_sourceCategory=security/*`, negation patterns like `!(_sourceCategory=*restricted*)`)
+
+**Standard role tiers:**
+- **Admin**: all capabilities, `*` search scope
+- **Power User**: deploy collection, create content and alerts, limited admin capabilities
+- **User**: run searches, view config, create alerts
+- **Restricted User**: very limited view/search only
+
+**Key decisions:**
+- Decide on capability layers before users are created
+- Decide on search scope groups (functional scope like `prod/*` or environment scope)
+- Use SAML with role provisioning attribute for automated role assignment
+- Use service accounts (dedicated email, restricted role) for API automation — never use personal API keys in automated systems
+
+---
+
 ### "I want to set up admin monitoring / health dashboards"
 
 **Fetch:** `admin-alerting-and-monitoring`, `audit-system-health`
@@ -313,6 +348,25 @@ MCP: search_system_events
 
 ---
 
+## Customer Maturity Stages
+
+Sumo Logic customers typically evolve through four stages. Advising should be anchored to where the customer currently is:
+
+| Stage | Name | Characteristics |
+|---|---|---|
+| **Stage 1 — Initial** | Comprehensive Collection | Logs, metrics, traces collected; rich query language; OOB dashboards; partitioned by tier/performance |
+| **Stage 2 — Managed** | Automated Analytics | ML-driven analytics (Outlier, LogReduce); Dev/Test analytics; Audit & Compliance; Cloud SIEM |
+| **Stage 3 — Measured** | Service-Driven (SLI/SLO) | SLI/SLO defined; 3rd party integrations for notification/collaboration; refined collection/tiering |
+| **Stage 4 — Optimised** | DevSecOps Extended | Full platform suite; BI/ITxM/AIOps integration; automated workflows; best-of-breed tooling decisions |
+
+**Security maturity** follows a parallel ladder:
+- Stage 1 — Log management, granular analytical queries (no SOC)
+- Stage 2 — Cloud security monitoring, dashboards and alerts (no SOC)
+- Stage 3 — Automated threat detection, incident investigation, threat hunting (SOC present)
+- Stage 4 — Automated threat response, DevSecOps, Cloud SOAR
+
+---
+
 ## Useful First Steps for New Deployments
 
 When a user is setting up Sumo Logic from scratch or reviewing an existing deployment, suggest these actions in order:
@@ -324,6 +378,25 @@ When a user is setting up Sumo Logic from scratch or reviewing an existing deplo
 5. **Admin alerts** — Set up ingest monitoring and collection health alerts on day one
 6. **Scheduled views** — Identify top 3 slow/expensive repeated queries within first month and build views
 7. **Dashboard strategy** — Decide on the four dashboard types for each persona (ops, security, business)
+8. **Subdomain** — Set up a named subdomain (`myco.us2.service.sumologic.com`) for SSO/SAML and stable bookmarks
+9. **Support account** — Enable a support account user (minimum 1 year, infinite recommended) for Sumo Support access
+10. **Admin recommended folder** — Create a Sumo Admin folder in Admin Recommended; import admin apps; grant manage permissions to admin role only
+11. **Audit partition retention** — Set Sumo Audit partition retention to 365 days
+12. **Register for release notes** — Subscribe to RSS feed; register at `status.sumologic.com`
+13. **Weekly usage report** — Set up email for weekly usage report from Admin settings
+14. **Content management governance** — Establish naming conventions for monitors, scheduled views, and folders before users proliferate content
+
+**Full CIP onboarding checklist tracks:**
+- **Track 1-2:** Log ingestion (throttling, processing rules, FER, lookup tables, partitions, scheduled views, scheduled search)
+- **Track 1-4:** Alerting (monitors, alert groups, mute, subscriptions)
+- **Track 1-5:** Dashboards and reports (panels, public dashboards, scheduled reports)
+- **Track 1-6:** Org management (credit usage, Sumo orgs)
+- **Track 1-7:** SLOs (definition, dashboards, alerts)
+- **Track 1-8:** Security (access keys, ACL, role search filter, SAML)
+- **Track 2-1:** BP Application (partition management, subdomains, audit apps, support account)
+- **Track 2-2:** BP Process (sourceCategory/partition naming governance, regular training, Infrequent tier usage review)
+- **Track 3-1:** Admin training (content management naming rules, Admin Recommended folder usage)
+- **Track 3-2:** User training (field naming conventions, Infrequent tier best practices, Scheduled Search vs Monitor)
 
 ---
 
@@ -338,6 +411,8 @@ All skills in this library are relevant — consult this guide to find the right
 - [Scheduled Views Admin](./search-scheduled-views.md) — Layer 3 acceleration
 - [Admin Alerting](./admin-alerting-and-monitoring.md) — operational health foundation
 - [Monitors](./alerting-monitors.md) — production alerting setup
+- [RBAC and Security](./admin-rbac-security.md) — access control design
+- [Data Collection Patterns](./data-collection-patterns.md) — logging standards, processing rules, collection architecture
 
 ## MCP Tools for Context Gathering
 
@@ -354,8 +429,8 @@ Use these before advising to understand the user's environment:
 
 ---
 
-**Version:** 1.0.0
-**Last Updated:** 2026-03-09
+**Version:** 1.1.0
+**Last Updated:** 2026-03-11
 **Domain:** Architecture & Consulting
 **Complexity:** Meta-skill (references all other skills)
 **Role:** Virtual Technical Account Engineer entry point

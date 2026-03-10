@@ -5598,9 +5598,11 @@ async def get_skill(
                 "single value", "chart type", "timeslice required"
 
     Data Collection:
-    - `data-collection-patterns` - 7 collection patterns, decision guide, source category naming
+    - `data-collection-patterns` - 7 collection patterns, logging standards, processing rules, technical best practices
       Triggers: "how to collect data", "collection architecture", "source category naming",
-                "OpenTelemetry", "HTTPS source", "Installed Collector", "C2C", "hosted collector"
+                "OpenTelemetry", "HTTPS source", "Installed Collector", "C2C", "hosted collector",
+                "processing rules", "exclude logs", "mask PII", "logging standard", "log format",
+                "timestamp issue", "multiline events", "HTTPS headers", "x-sumo-category"
 
     Discovery:
     - `discovery-logs-without-metadata` - Multi-phase discovery when metadata unknown
@@ -5629,6 +5631,10 @@ async def get_skill(
     - `admin-field-extraction-rules` - FER patterns, histogram/stripe case study (342x speedup)
       Triggers: "field extraction rules", "FER", "index-time field", "parse at ingest",
                 "speed up where filter", "stripe pattern", "histogram speedup"
+    - `admin-rbac-security` - SAML/SSO, role design, search scope, service accounts, user lifecycle
+      Triggers: "set up RBAC", "access control", "SAML", "SSO", "user roles", "search scope",
+                "service account", "API key", "installation token", "user lifecycle", "offboard user",
+                "who can see what", "restrict data access", "role design", "SAML provisioning"
 
     Content Management:
     - `content-library-navigation` - Browse and export dashboards/searches, URL generation
