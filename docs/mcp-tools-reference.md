@@ -1224,7 +1224,7 @@ Get usage forecast for specified number of days based on recent consumption patt
 
 **Parameters:**
 
-- `number_of_days` (int) - Number of days to forecast (1-365, typically 7, 30, or 90)
+- `number_of_days` (int, optional) - Number of days to forecast (1-365, typically 7, 30, or 90). If not specified, defaults to current contract term.
 - `instance` (str, default='default') - Instance name
 
 **Returns:** Forecasted usage including:
@@ -1234,6 +1234,11 @@ Get usage forecast for specified number of days based on recent consumption patt
 - Forecasted frequent ingest
 - Forecasted storage
 - Forecasted metrics ingest
+
+**Notes:**
+
+- When `number_of_days` is omitted, the API returns forecast for the entire current contract period
+- This allows comparison between different forecast horizons vs. full contract term
 
 **API Reference:** <https://api.sumologic.com/docs/#operation/getUsageForecast>
 

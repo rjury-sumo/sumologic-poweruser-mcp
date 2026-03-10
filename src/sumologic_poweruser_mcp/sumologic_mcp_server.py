@@ -619,6 +619,10 @@ class SumoLogicClient:
         params = {"numberOfDays": number_of_days}
         return await self._request("GET", "/account/usageForecast", api_version="v1", params=params)
 
+    async def get_usage_forecast_default(self) -> Dict[str, Any]:
+        """Get usage forecast for current contract term (no numberOfDays parameter)."""
+        return await self._request("GET", "/account/usageForecast", api_version="v1")
+
     async def start_usage_export(
         self,
         start_date: str,
@@ -3216,7 +3220,10 @@ async def get_account_status(
 
 @mcp.tool()
 async def get_usage_forecast(
-    number_of_days: int = Field(description="Number of days to forecast (e.g., 7, 30, 90)"),
+    number_of_days: Optional[int] = Field(
+        default=None,
+        description="Number of days to forecast (e.g., 7, 30, 90). If not specified, defaults to current contract term.",
+    ),
     instance: str = Field(default="default", description="Sumo Logic instance name"),
 ) -> str:
     """
@@ -3232,7 +3239,8 @@ async def get_usage_forecast(
     Useful for capacity planning and predicting credit consumption.
 
     Args:
-        number_of_days: Number of days to forecast (typically 7, 30, or 90)
+        number_of_days: Number of days to forecast (typically 7, 30, or 90).
+                       If not provided, defaults to current contract term.
 
     API Reference: https://api.sumologic.com/docs/#operation/getUsageForecast
     """
@@ -3241,15 +3249,21 @@ async def get_usage_forecast(
         config = get_config()
         instance = validate_instance_name(instance)
 
-        # Validate number_of_days
-        if number_of_days < 1 or number_of_days > 365:
+        # Validate number_of_days if provided
+        if number_of_days is not None and (number_of_days < 1 or number_of_days > 365):
             raise ValidationError("number_of_days must be between 1 and 365")
 
         client = await get_sumo_client(instance)
         limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
 
         await limiter.acquire("get_usage_forecast")
-        result = await client.get_usage_forecast(number_of_days)
+
+        # Only pass numberOfDays param if specified by user
+        if number_of_days is not None:
+            result = await client.get_usage_forecast(number_of_days)
+        else:
+            # Call without numberOfDays to get contract term default
+            result = await client.get_usage_forecast_default()
 
         return json.dumps(result, indent=2)
 
