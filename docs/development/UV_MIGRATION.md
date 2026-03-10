@@ -17,7 +17,7 @@ python -m sumologic_mcp_server.sumologic_mcp_server
 
 ```bash
 uv sync --all-extras
-uv run sumologic-mcp-server
+uv run sumologic-poweruser-mcp
 ```
 
 ## Key Benefits
@@ -100,9 +100,9 @@ To:
   "command": "uv",
   "args": [
     "--directory",
-    "/absolute/path/to/sumologic-python-mcp",
+    "/absolute/path/to/sumologic-poweruser-mcp",
     "run",
-    "sumologic-mcp-server"
+    "sumologic-poweruser-mcp"
   ]
 }
 ```
@@ -114,7 +114,7 @@ To:
 uv run python test_setup.py
 
 # Or start the server manually
-uv run sumologic-mcp-server
+uv run sumologic-poweruser-mcp
 ```
 
 ## Common Commands
@@ -148,7 +148,7 @@ uv run bandit -r src/
 
 ```bash
 # Run via entry point
-uv run sumologic-mcp-server
+uv run sumologic-poweruser-mcp
 
 # Or run module directly
 uv run python -m sumologic_mcp_server.sumologic_mcp_server

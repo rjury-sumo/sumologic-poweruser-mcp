@@ -36,7 +36,7 @@ uv --version
 ```bash
 # Clone the repository
 git clone https://github.com/rjury-sumo/sumologic-poweruser-mcp.git
-cd sumologic-python-mcp
+cd sumologic-poweruser-mcp
 
 # Install dependencies
 uv sync
@@ -96,7 +96,7 @@ Verify the server starts correctly:
 
 ```bash
 # Test with uv
-uv run sumologic-mcp-server
+uv run sumologic-poweruser-mcp
 
 # You should see output like:
 # Configured instances: default
@@ -115,11 +115,11 @@ Press `Ctrl+C` to stop the test server.
 
 ### Method A: Using Claude CLI with Explicit Credentials (Working Method)
 
-Replace `/path/to/sumologic-python-mcp` with your actual path and update the credentials:
+Replace `/path/to/sumologic-poweruser-mcp` with your actual path and update the credentials:
 
 ```bash
-node ~/.vscode/extensions/anthropic.claude-code-*/resources/claude-code/cli.js mcp add-json sumologic \
-  '{"command":"uv","args":["run","--directory","/path/to/sumologic-python-mcp","sumologic-mcp-server"],"env":{"SUMO_ACCESS_ID":"your_access_id","SUMO_ACCESS_KEY":"your_access_key","SUMO_ENDPOINT":"https://api.au.sumologic.com","SUMO_SUBDOMAIN":"your_subdomain"}}' \
+node ~/.vscode/extensions/anthropic.claude-code-*/resources/claude-code/cli.js mcp add-json sumologic-poweruser \
+  '{"command":"uv","args":["run","--directory","/path/to/sumologic-poweruser-mcp","sumologic-poweruser-mcp"],"env":{"SUMO_ACCESS_ID":"your_access_id","SUMO_ACCESS_KEY":"your_access_key","SUMO_ENDPOINT":"https://api.au.sumologic.com","SUMO_SUBDOMAIN":"your_subdomain"}}' \
   -s user
 ```
 
@@ -128,7 +128,7 @@ node ~/.vscode/extensions/anthropic.claude-code-*/resources/claude-code/cli.js m
 ```bash
 # Run this in your project directory
 pwd
-# Example output: /Users/yourname/Documents/sumologic-python-mcp
+# Example output: /Users/yourname/Documents/sumologic-poweruser-mcp
 ```
 
 **Verify Configuration:**
@@ -156,7 +156,7 @@ If you want to keep credentials in your `.env` file, use the wrapper script:
 
 ```bash
 node ~/.vscode/extensions/anthropic.claude-code-*/resources/claude-code/cli.js mcp add-json sumologic \
-  '{"command":"python3","args":["/path/to/sumologic-python-mcp/scripts/run_with_env.py"]}' \
+  '{"command":"python3","args":["/path/to/sumologic-poweruser-mcp/scripts/run_with_env.py"]}' \
   -s user
 ```
 
@@ -283,9 +283,9 @@ Update `.vscode/mcp.json`:
       "command": "/Users/yourname/.local/bin/uv",
       "args": [
         "--directory",
-        "/absolute/path/to/sumologic-python-mcp",
+        "/absolute/path/to/sumologic-poweruser-mcp",
         "run",
-        "sumologic-mcp-server"
+        "sumologic-poweruser-mcp"
       ]
     }
   }
@@ -488,7 +488,7 @@ SUMO_SUBDOMAIN=mycompany          # For generating web UI URLs
 
 - Review logs in VSCode Output → "Claude Code"
 - Check `.env` file has correct credentials
-- Verify server starts: `uv run sumologic-mcp-server`
+- Verify server starts: `uv run sumologic-poweruser-mcp`
 - Enable debug logging: `LOG_LEVEL=DEBUG` in `.env`
 
 ---

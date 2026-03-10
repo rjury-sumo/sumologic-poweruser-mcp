@@ -349,7 +349,7 @@ black --check src/
      "mcpServers": {
        "sumologic": {
          "command": "uv",
-         "args": ["--directory", "/path/to/repo", "run", "sumologic-mcp-server"],
+         "args": ["--directory", "/path/to/repo", "run", "sumologic-poweruser-mcp"],
          "env": {}
        }
      }

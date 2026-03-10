@@ -14,4 +14,4 @@ fi
 
 # Run the MCP server using uv
 cd "$PROJECT_DIR"
-exec uv run sumologic-mcp-server
+exec uv run sumologic-poweruser-mcp

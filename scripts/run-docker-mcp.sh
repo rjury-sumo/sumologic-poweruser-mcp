@@ -6,4 +6,4 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_DIR="$( cd "$SCRIPT_DIR/.." && pwd )"
 
 # Run Docker container with the .env file from project directory
-exec docker run -i --rm --env-file "$PROJECT_DIR/.env" sumologic-mcp-server
+exec docker run -i --rm --env-file "$PROJECT_DIR/.env" sumologic-poweruser-mcp

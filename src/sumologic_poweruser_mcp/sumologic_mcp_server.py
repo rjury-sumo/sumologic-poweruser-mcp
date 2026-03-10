@@ -8,9 +8,9 @@ It exposes tools for searching logs, querying metrics, and retrieving account in
 Supports multiple Sumo Logic instances with separate credentials.
 
 Usage:
-    uvx sumologic-mcp-server
+    uvx sumologic-poweruser-mcp
     # or
-    python -m sumologic_poweruser_mcp.sumologic_poweruser_mcp
+    python -m sumologic_poweruser_mcp.sumologic_mcp_server
 
 Environment Variables:
     See .env.example for configuration options

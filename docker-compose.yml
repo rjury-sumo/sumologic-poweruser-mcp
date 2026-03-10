@@ -1,10 +1,10 @@
 services:
-  sumologic-mcp-server:
+  sumologic-poweruser-mcp:
     build:
       context: .
       dockerfile: Dockerfile
-    image: sumologic-mcp-server:latest
-    container_name: sumologic-mcp-server
+    image: sumologic-poweruser-mcp:latest
+    container_name: sumologic-poweruser-mcp
     env_file:
       - .env
     environment:

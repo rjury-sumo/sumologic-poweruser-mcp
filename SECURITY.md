@@ -108,7 +108,7 @@ ls -la .env  # Should show -rw------- (600)
   "mcpServers": {
     "sumologic": {
       "command": "uv",
-      "args": ["run", "sumologic-mcp-server"],
+      "args": ["run", "sumologic-poweruser-mcp"],
       "env": {
         "SUMO_ACCESS_ID": "${SUMO_ACCESS_ID}",
         "SUMO_ACCESS_KEY": "${SUMO_ACCESS_KEY}",

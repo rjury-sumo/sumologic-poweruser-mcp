@@ -24,7 +24,7 @@ pip install uv
 ```bash
 # Clone the repository
 git clone https://github.com/rjury-sumo/sumologic-poweruser-mcp.git
-cd sumologic-python-mcp
+cd sumologic-poweruser-mcp
 
 # Install all dependencies (uv handles virtualenv automatically)
 uv sync
@@ -102,7 +102,7 @@ SUMO_STAGING_ENDPOINT=https://api.eu.sumologic.com
     "sumologic": {
       "command": "python3",
       "args": [
-        "/absolute/path/to/sumologic-python-mcp/scripts/run_with_env.py"
+        "/absolute/path/to/sumologic-poweruser-mcp/scripts/run_with_env.py"
       ]
     }
   }
@@ -120,9 +120,9 @@ SUMO_STAGING_ENDPOINT=https://api.eu.sumologic.com
       "command": "uv",
       "args": [
         "--directory",
-        "/absolute/path/to/sumologic-python-mcp",
+        "/absolute/path/to/sumologic-poweruser-mcp",
         "run",
-        "sumologic-mcp-server"
+        "sumologic-poweruser-mcp"
       ],
       "env": {
         "SUMO_ACCESS_ID": "your_access_id",
@@ -134,7 +134,7 @@ SUMO_STAGING_ENDPOINT=https://api.eu.sumologic.com
 }
 ```
 
-**Important:** Replace `/absolute/path/to/sumologic-python-mcp` with the actual full path to your cloned repository.
+**Important:** Replace `/absolute/path/to/sumologic-poweruser-mcp` with the actual full path to your cloned repository.
 
 ## 5. Restart Claude Desktop
 
@@ -182,7 +182,7 @@ source ~/.bashrc  # or ~/.zshrc
 
 1. Make sure the path in `claude_desktop_config.json` is absolute (not relative)
 2. Check that `uv sync` completed successfully
-3. Try running manually: `uv run sumologic-mcp-server` to see error messages
+3. Try running manually: `uv run sumologic-poweruser-mcp` to see error messages
 4. Check Claude Desktop logs:
    - macOS: `~/Library/Logs/Claude/`
    - Windows: `%APPDATA%\Claude\logs\`

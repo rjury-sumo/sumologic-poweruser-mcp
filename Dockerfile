@@ -42,4 +42,4 @@ ENV PYTHONUNBUFFERED=1 \
 #   CMD python -c "import sys; sys.exit(0)"
 
 # Run the MCP server
-CMD ["uv", "run", "sumologic-mcp-server"]
+CMD ["uv", "run", "sumologic-poweruser-mcp"]

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Wrapper script to load .env file and run the MCP server."""
+"""Wrapper script to load .env file and run the Sumo Logic Power User MCP server."""
 
 import os
 import sys
@@ -28,7 +28,7 @@ if env_file.exists():
 # Run the MCP server using uv
 os.chdir(project_dir)
 result = subprocess.run(
-    ["uv", "run", "sumologic-mcp-server"],
+    ["uv", "run", "sumologic-poweruser-mcp"],
     env=os.environ
 )
 sys.exit(result.returncode)
