@@ -240,6 +240,193 @@ For incidents:
 
 ---
 
+### Heatmap Panels
+
+A newer categorical panel type designed for metrics but works for logs too. Aggregates data by value on the y-axis and over time on the x-axis. Useful for spotting patterns across many entities (e.g., CPU across all EC2 instances).
+
+**Metrics example:**
+```
+instanceid=* namespace=aws/ec2 metric=CPUUtilization Statistic=average
+| avg by instanceid
+```
+
+**Logs example** (requires timeslice + transpose since the heatmap expects time series format):
+```
+exception
+| timeslice 15m
+| count by _timeslice, host
+| transpose row _timeslice column host
+```
+
+---
+
+### Bubble and Scatter Panels
+
+Scatter and bubble chart types display correlations between two numeric axes. Bubble charts add a third dimension via bubble size. Useful for correlating metrics like request rate (x) vs error rate (y) per service.
+
+---
+
+### Transpose Without Timeslice (Grouped Stacked Bar)
+
+One of the most advanced — and underused — panel patterns: using `transpose` on a **categorical** (non-time) query to create a compact, high-density grouped view.
+
+**"No one is an advanced Sumo user until they have done a transpose without timeslice."**
+
+Use this pattern to show variable groups (e.g., error codes) as separate series on a stacked bar chart grouped by another dimension (e.g., AWS region). This enables much higher view density than a table.
+
+```
+// Error codes by AWS region — stacked bar showing all error codes per region
+_sourceCategory=*cloudtrail* errorcode
+| json field=_raw "errorCode"
+| count by errorcode, aws_region
+| transpose row aws_region column errorcode
+```
+
+The result: one bar per `aws_region`, with separate stacked segments for each `errorcode`. Use **stacked bar chart** for this pattern.
+
+---
+
+### Timeless Dashboards with Cat (Lookup State Tables)
+
+Sumo Logic is a time-series database — by default you need to search all historical time to find the "current state" of something. But using a lookup table as a state store, you can build dashboards that show current state with a `-15m` query window.
+
+**How it works:**
+1. A scheduled search saves new state changes to a lookup table (using `save append` with the ID as key)
+2. Dashboard queries use `cat /path/to/lookup` to read the lookup table instantly
+3. Because lookups are timeless, the dashboard time range makes no difference — set all panels to `-15m`
+
+```
+// Dashboard panel: current status of all CSE insights (regardless of when they occurred)
+cat path://"/Library/Admin Recommended/CSIEM/Lookups/cse_insights_status"
+| where time > (now() - (1000 * 60 * 60 * 24 * 90))   // last 90 days
+| formatdate(tolong(time), "yyyy-MM") as month
+| count by status, month
+```
+
+**For time series charts from a lookup table:** The lookup stores the actual event time as an epoch column. Convert it back to a timeslice field at query time:
+
+```
+cat path://"/Library/Admin Recommended/CSIEM/Lookups/cse_insights_status"
+| tolong(time) as _messagetime
+| timeslice 1w
+| count by _timeslice, status
+```
+
+**Important notes:**
+- Filtering on time must use math against your stored time column: `where time > (now() - (1000 * 60 * 60 * 24 * 90))`
+- Use custom JSON axis config for long-range time charts: `"interval": 1, "intervalType": "week"`
+- Lookup v2 tables have a 100MB size limit — monitor usage for high-volume sources
+
+---
+
+### Clickable URL Columns in Tables
+
+Use `tourl`, `urlencode`, and `concat` to create clickable links in table panels that open external systems, other Sumo Logic dashboards, or new searches with pre-filled time ranges.
+
+```
+// Clickable link to open a new Sumo Logic search for this source IP
+_view=threat_geo_asn_v1
+| min(_timeslice) as f, max(_timeslice) as l, count by src_ip, country_code
+| "live.us2.sumologic.com" as dp
+| num(l - (1000 * 60 * 60 * 3)) as f
+| format("%.0f", f) as f
+| format("%.0f", l) as l
+| tourl(
+    concat("https://", dp, "/ui/#/search/@", f, ",", l, "@", urlencode(src_ip)),
+    src_ip
+  ) as src_ip
+| fields -dp, f, l
+```
+
+You can link to:
+- External systems (Jira, PagerDuty, SIEM) by constructing the appropriate URL
+- Another Sumo Logic dashboard with template variable values pre-filled
+- A new search window with the time range and query pre-populated (the example above)
+
+---
+
+### Emoji / Visual Bar Columns in Tables
+
+Sumo Logic supports emojis in dashboard tables and single-value panels (string type). This enables visual status bars or indicator columns using query logic.
+
+```
+// Visual bar showing error rate per URL
+_sourceCategory=*apache* status_code=*
+| if(status_code > 499, 1, 0) as http5xx
+| count as requests, sum(http5xx) as http5xx by url
+| where http5xx > 0
+| ceil((http5xx / requests) * 10) as dec
+| pow(10, dec) as base_ten
+| replace(tostring(round(base_ten)), "1", "") as zeros
+| replace(zeros, "0", "■") as bar
+```
+
+The `bar` column renders as a visual indicator in the table. Replace `"■"` with any emoji for colorful status indicators.
+
+---
+
+## Advanced Dashboard Configuration
+
+### Panel Overrides (Series Customisation)
+
+Panel overrides let you customise individual series independently within a chart panel:
+
+- **Custom color per series** — colour important series differently (e.g., production vs. staging)
+- **Alias names** — rename series labels, including `{{moustache}}` template variable values
+- **Left/right axes with different scales** — overlay latency (ms) and request count on the same chart
+- **Mixed chart formats** — combine line and column charts in one panel (e.g., line for trend, bars for volume)
+
+Access overrides via: Dashboard panel → Edit → **Overrides** tab.
+
+### JSON Panel Editing
+
+Every panel in Sumo Logic can be edited directly in JSON mode. This unlocks configuration options not exposed in the UI.
+
+**Access:** Edit a panel → click the JSON edit icon (top right of panel editor).
+
+**Common JSON config use cases:**
+
+```json
+// Shrink pie chart segment labels (useful for many or long category names)
+"general": {
+  "indexLabelFontSize": 8
+}
+
+// Custom time interval labels on time series (e.g., weekly intervals)
+"axisX": {
+  "titleFontSize": 12,
+  "labelFontSize": 12,
+  "interval": 1,
+  "intervalType": "week"
+}
+
+// Add export button (PNG/JPEG) to a panel
+"general": {
+  "mode": "timeSeries",
+  "exportEnabled": true
+}
+
+// Labels inside bars (for bar charts)
+"axisX": {
+  "labelPlacement": "inside",
+  "labelWrap": false,
+  "labelMaxWidth": 250
+}
+
+// Auto-compress blank areas in sparse time series
+"axisX": {
+  "scaleBreaks": {
+    "type": "wavy",
+    "fillOpacity": 1,
+    "autoCalculate": true
+  }
+}
+```
+
+**Copy panels between dashboards:** Use JSON edit → "Copy to Clipboard", then paste into a new panel on another dashboard — all settings including overrides are preserved.
+
+---
+
 ## Common Issues
 
 ### Panel Shows No Data
@@ -278,6 +465,6 @@ For incidents:
 
 ---
 
-**Version:** 1.0.0
-**Last Updated:** 2026-03-09
-**Source:** SumoLogic Logs Basics Training (August 2025)
+**Version:** 1.1.0
+**Last Updated:** 2026-03-11
+**Source:** SumoLogic Logs Basics Training (August 2025); Sumo Logic Advanced Topics Workshop (2025/2026)

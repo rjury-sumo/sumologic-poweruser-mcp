@@ -152,6 +152,38 @@ _sourceCategory=prod/app {{environment}} error
 | count by service
 ```
 
+#### Advanced Template Variable Usage
+
+Template variables can go anywhere in a query that produces valid query syntax — not just in `where matches "{{var}}"` clauses.
+
+```
+// Use as a keyword expression in scope (very fast — bloom filter):
+_sourceCategory=prod/app {{service_name}}
+
+// Variable timeslice interval:
+| timeslice {{interval}}
+| count by _timeslice
+
+// Switch the breakdown column dynamically:
+| count by {{breakdown_field}}
+
+// Same variable more than once in a query:
+_sourceCategory=prod/{{env}} "{{env}}"
+| count by host
+```
+
+**Default values:** Use `*` as default for keyword-based variables (matches all). Use `// ignoreme` as a comment-style default to effectively disable the filter when nothing is selected.
+
+**Note:** In search templates (not dashboards), use `{{{var}}}` (triple braces) for advanced use cases involving punctuation.
+
+#### Suggestion Lists for Dashboard Variables
+
+Dashboard variable dropdowns can be populated from:
+- A **static list** of values (e.g., `prod`, `staging`, `dev`)
+- A **dynamic query** against live data, a scheduled view, or a lookup table
+
+This makes it easy for users to select valid values rather than typing free text — especially valuable for high-cardinality dimensions like account IDs, namespace names, or region codes.
+
 ### Time Range
 
 Dashboards have a global time range control. Individual panels can override with a fixed time range if needed.
@@ -159,8 +191,8 @@ Dashboards have a global time range control. Individual panels can override with
 ### Drill-Down Workflows
 
 - **Entity Explorer**: available from many chart panels — opens related logs, metrics, or traces for the selected entity
-- **Linked Dashboards**: configure panels to navigate to another dashboard when clicked, passing context (e.g., service name)
-- **Clickable URLs**: add URL columns in table panels to link to external systems (Jira, PagerDuty, etc.)
+- **Linked Dashboards**: configure panels to navigate to another dashboard when clicked, passing context as template variable values. To set up: build template variables in target dashboard → create panels that group by the variable name → enable "linked dashboards" on the panel → users click a series to open the linked dashboard with that value in context
+- **Clickable URLs**: use `tourl`, `urlencode`, and `concat` operators to build clickable links in table panels that open external systems (Jira, PagerDuty), other Sumo dashboards, or new search windows with time range pre-filled (see `dashboards-panel-types` for query patterns)
 
 ### Text Panels
 
@@ -194,6 +226,6 @@ Text panels transform an investigation dashboard into a true guided workflow.
 
 ---
 
-**Version:** 1.0.0
-**Last Updated:** 2026-03-09
-**Source:** SumoLogic Logs Basics Training (August 2025)
+**Version:** 1.1.0
+**Last Updated:** 2026-03-11
+**Source:** SumoLogic Logs Basics Training (August 2025); Sumo Logic Advanced Topics Workshop (2025/2026)

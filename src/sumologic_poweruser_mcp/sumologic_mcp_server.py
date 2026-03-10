@@ -5565,12 +5565,17 @@ async def get_skill(
                 "architecture review", "design my partitions/alerting/collection"
 
     Search & Query:
-    - `search-log-search-basics` - Core pipeline, metadata fields, parse operators
-      Triggers: "how does search work", "what is _sourceCategory", "how do I parse", new user questions
+    - `search-log-search-basics` - Core pipeline, metadata fields, parse operators, cardinality reduction
+      Triggers: "how does search work", "what is _sourceCategory", "how do I parse", new user questions,
+                "logreduce", "logcompare", "normalize field", "high cardinality"
     - `search-write-queries` - Complete 5-phase query construction guide
       Triggers: writing any new Sumo Logic query
     - `search-optimize-queries` - SKEFE framework, bloom filter, query rewriting, search audit
       Triggers: "query is slow", "too expensive", "scans too much", "reduce scan", "performance"
+    - `search-subquery` - Subquery patterns: compose/keywords, sneaky save, cat filters, aggregation-as-transaction
+      Triggers: "subquery", "compose", "correlate two log sources", "filter parent query", "child query",
+                "cross-source correlation", "transactionize alternative", "sneaky save", "cat subquery",
+                "join alternative", "compose keywords", "multi-state transaction"
     - `search-indexes-partitions` - Data tiers, finding which partition holds data
       Triggers: "_index=", "_view=", "which partition", "Infrequent tier", "Flex tier", "data tier"
     - `search-optimize-with-views` - Transform slow queries using scheduled views (user guide)
@@ -5591,11 +5596,15 @@ async def get_skill(
                 "outlier", "seasonality", "relative alerting"
 
     Dashboards:
-    - `dashboards-overview` - Four dashboard types, App Catalog, template variables
-      Triggers: "what dashboard should I build", "dashboard types", "template variable", "drill-down"
-    - `dashboards-panel-types` - Panel types, time series, transpose, honeycomb, map
+    - `dashboards-overview` - Four dashboard types, App Catalog, template variables, linked dashboards
+      Triggers: "what dashboard should I build", "dashboard types", "template variable", "drill-down",
+                "linked dashboards", "suggestion list", "variable dropdown", "advanced template variable"
+    - `dashboards-panel-types` - Panel types, time series, transpose, honeycomb, heatmap, overrides, JSON editing
       Triggers: "panel type", "time series panel", "transpose", "honeycomb", "geoip map",
-                "single value", "chart type", "timeslice required"
+                "single value", "chart type", "timeslice required", "heatmap", "bubble chart",
+                "scatter chart", "panel override", "dual axis", "JSON panel edit", "mixed chart",
+                "timeless dashboard", "cat dashboard", "clickable url", "tourl", "emoji table",
+                "transpose without timeslice"
 
     Data Collection:
     - `data-collection-patterns` - 7 collection patterns, logging standards, processing rules, technical best practices

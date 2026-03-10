@@ -153,9 +153,10 @@ Links to official documentation
 
 | Skill | Category | Description | MCP Tools |
 |-------|----------|-------------|-----------|
-| **[Log Search Basics](./search-log-search-basics.md)** | **Search** | **Core pipeline, metadata fields, parse operators** | **No** |
+| **[Log Search Basics](./search-log-search-basics.md)** | **Search** | **Core pipeline, metadata fields, parse operators, cardinality reduction** | **No** |
 | **[Writing Queries](./search-write-queries.md)** | **Search** | **Complete query construction guide (5 phases)** | **Yes** |
 | [Query Optimization](./search-optimize-queries.md) | Search | SKEFE framework, bloom filter, query rewriting, search audit | Yes |
+| **[Subquery Patterns](./search-subquery.md)** | **Search** | **compose/keywords, sneaky save, cat filters, aggregation-as-transaction** | **No** |
 | [Scheduled Views — Admin Design](./search-scheduled-views.md) | Search | View patterns, creation, multi-layer architecture | Yes |
 | [Optimize with Views — User Guide](./search-optimize-with-views.md) | Search | Transform slow queries using scheduled views | Yes |
 | [Indexes and Partitions](./search-indexes-partitions.md) | Search | Data tiers, finding which partition holds your data | No |
@@ -168,8 +169,8 @@ Links to official documentation
 |-------|----------|-------------|-----------|
 | [Monitors](./alerting-monitors.md) | Alerting | Monitor types, detection methods, alert grouping | Yes |
 | [Time Compare & Anomaly](./alerting-time-compare-anomaly.md) | Alerting | Dynamic threshold alerting, anomaly vs outlier | Yes |
-| [Dashboard Design](./dashboards-overview.md) | Dashboards | Four dashboard types, App Catalog, drill-down | Yes |
-| [Panel Types & Patterns](./dashboards-panel-types.md) | Dashboards | Categorical, time series, honeycomb, map, transpose | No |
+| [Dashboard Design](./dashboards-overview.md) | Dashboards | Four dashboard types, App Catalog, template variables, linked dashboards | Yes |
+| **[Panel Types & Patterns](./dashboards-panel-types.md)** | **Dashboards** | **Categorical, time series, honeycomb, heatmap, transpose, overrides, JSON editing, timeless dashboards** | **No** |
 
 ### Data Collection
 
@@ -289,14 +290,23 @@ See [CLAUDE.md](../CLAUDE.md) for developer guidelines on keeping skills synchro
 - Pattern 2: Caching heavy compute (threat intel + geoip)
 - Multi-layer architecture (1m → 1h → 1d)
 
+**[Subquery Patterns](./search-subquery.md)** - Correlate data across sources
+
+- `compose` vs `compose keywords` — how results are passed to parent
+- Search expression syntax (before `|`) vs where-clause syntax — performance trade-off
+- Subquery with `cat` — lookup table as flexible dashboard filter
+- Sneaky subquery save — cache enrichment data for lookup in parent (v1 lookups only)
+- Aggregation-as-transaction — scale-friendly alternative to `transactionize`/`join`
+
 **Combined Query Workflow:**
 
 1. Use **UI Navigation** to explore and build queries interactively
 2. Apply **Log Search Basics** and **Writing Queries** for proper structure
-3. Optimize with **Query Optimization** techniques (SKEFE + platform features)
-4. If slow/expensive: Use **Optimize with Views** to find scheduled view alternatives
-5. If admin: Design new views using **Scheduled Views — Admin Design**
-6. Execute via MCP tools for automation
+3. Use **Subquery Patterns** for cross-source correlation
+4. Optimize with **Query Optimization** techniques (SKEFE + platform features)
+5. If slow/expensive: Use **Optimize with Views** to find scheduled view alternatives
+6. If admin: Design new views using **Scheduled Views — Admin Design**
+7. Execute via MCP tools for automation
 
 ### Alerting Skills
 
@@ -319,12 +329,21 @@ See [CLAUDE.md](../CLAUDE.md) for developer guidelines on keeping skills synchro
 
 - History, Snapshot, Investigation, Business dashboards
 - App Catalog, Content Library, template variables, drill-down features
+- Advanced template variables (keywords, timeslice, column switching, multi-use)
+- Suggestion lists from queries/views/lookup tables
+- Linked dashboards with context-passing via template variables
 
 **[Panel Types & Patterns](./dashboards-panel-types.md)** - Panel implementation guide
 
 - Categorical (pie/bar/table — no timeslice needed)
 - Time series (requires `timeslice` + `transpose` for multi-series)
+- Transpose without timeslice — high-density grouped stacked bar
 - Single value, honeycomb, map (`geoip`), text panels
+- Heatmap, Bubble/Scatter panel types
+- Timeless dashboards with `cat` (state table pattern)
+- Clickable URL columns (`tourl`, `urlencode`, `concat`)
+- Panel overrides (color, dual-axis, mixed chart types)
+- JSON panel editing — advanced config options
 
 ### Admin Skills
 
@@ -362,8 +381,8 @@ See [CLAUDE.md](../CLAUDE.md) for developer guidelines on keeping skills synchro
 
 ---
 
-**Version:** 2.1.0
-**Last Updated:** 2026-03-09
+**Version:** 2.3.0
+**Last Updated:** 2026-03-11
 **Maintained by:** sumologic-python-mcp project
 
 **Changelog v2.0:**
@@ -380,3 +399,22 @@ See [CLAUDE.md](../CLAUDE.md) for developer guidelines on keeping skills synchro
 - Added `consulting-guide.md` — virtual TAE meta-skill with question taxonomy, four-layer architecture framework, and trade-off tables
 - Updated CLAUDE.md Skills Reference with all 22 skills and trigger conditions
 - Updated `get_skill` MCP tool description with all skills and trigger phrases
+
+**Changelog v2.2:**
+
+- Incorporated CIP Onboarding Sessions I & II playbook content
+- Updated `consulting-guide.md` (v1.1): Focus Check, Customer Maturity Stages, RBAC section, deployment checklist
+- Updated `data-collection-patterns.md` (v1.1): Logging Standards, Processing Rules, HTTPS headers, Kubernetes native collection
+- Updated `alerting-monitors.md` (v1.1): SLOs section
+- Updated `admin-alerting-and-monitoring.md` (v1.1): Admin Setup Checklist / governance
+- Updated `search-log-search-basics.md` (v1.1): Three Phases, Advanced Operators, Ingest Lag Detection
+- New: `admin-rbac-security.md` (v1.0) — SAML, RBAC architecture, service accounts, user lifecycle
+
+**Changelog v2.3:**
+
+- Incorporated CIP Subquery Secrets Playbook and Sumo Logic Advanced Topics Workshop
+- New: `search-subquery.md` (v1.0) — comprehensive subquery skill: compose/keywords, search vs where syntax, cat filters, sneaky subquery save, aggregation-as-transaction pattern
+- Updated `dashboards-panel-types.md` (v1.1): heatmap, bubble/scatter, transpose without timeslice, timeless dashboards, clickable URLs, emoji bars, panel overrides, JSON editing
+- Updated `dashboards-overview.md` (v1.1): advanced template variables, suggestion lists, linked dashboards detail
+- Updated `search-log-search-basics.md` (v1.2): expanded LogReduce/LogCompare, logreduce field=, logreduce optimize, cardinality reduction patterns, outlier operator
+- Sources: CIP Subquery Secrets Playbook; Sumo Logic Advanced Topics Workshop (2025/2026)

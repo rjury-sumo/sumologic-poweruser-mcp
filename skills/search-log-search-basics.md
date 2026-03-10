@@ -307,12 +307,40 @@ Adjust `_sourcecategory` scope to the sources you want to audit.
 Sumo Logic has over **120 search operators**. Beyond the pipeline basics, these are frequently valuable:
 
 - **`compare with timeshift`** — compare current values against prior periods (daily/weekly baselines)
-- **`LogReduce`** — ML clustering to group similar log messages and surface patterns in large result sets
-- **`transaction`** / **`transactionize`** — correlate events into multi-event transactions by a key (e.g., user session, request ID)
-- **`subquery`** — use results of one query as input scope for another (correlated search)
-- **`predict`** — time series forecasting
-- **`threatip`** / **`geoip`** — threat intelligence and geolocation enrichment (best cached in a scheduled view for performance)
+- **`LogReduce`** — ML clustering to group similar log messages and surface unknown patterns. Works on the whole message by default or on a specific field: `| logreduce field=error_message`. Best on moderate-volume, structured-ish logs. For repeated use, `logreduce optimize` caches signatures for faster reuse.
+- **`LogCompare`** — like LogReduce but compares two time windows (e.g., before and after a deploy) to show what changed in log patterns
+- **`transaction`** / **`transactionize`** — correlate events into multi-event transactions by a key (e.g., user session, request ID). Has memory and event limits; for high-cardinality use, prefer the aggregation pattern (see `search-subquery`)
+- **`subquery`** — use results of one (child) query to filter or enrich another (parent) query. See the dedicated `search-subquery` skill for full patterns including `compose`, sneaky save, and cat-based filtering
+- **`predict`** — time series forecasting to project future values based on historical trends
+- **`outlier`** — statistical anomaly detection (standard deviation based). Legacy — prefer Anomaly monitors for new work
+- **`threatip`** / **`geoip`** — threat intelligence and geolocation enrichment (best cached in a scheduled view for performance since these are expensive operations)
 - **`lookup`** — enrich events with data from a lookup table
+- **`cat`** — read a lookup table as if it were a query result set; enables timeless dashboard queries from state tables
+
+### Field Cardinality Reduction
+
+When a field has very high cardinality (e.g., long ARN strings, full request paths with IDs), you can normalize it into a lower-cardinality version before aggregating. This makes charts readable and improves performance. Consider moving these transformations to a Field Extraction Rule (FER) if the pattern is queried frequently.
+
+```
+// Truncate long error strings to first 50 chars
+| if(length(error) > 50, concat(substring(error, 0, 50), "*"), error) as shorterr
+| count by shorterr
+
+// Extract first two URL segments (removes high-cardinality trailing IDs)
+// /myapi/api1/a/b/c/d/18923491982409231 → /myapi/api1
+| parse regex field=url "^(?<endpoint>\/[^\/]+\/[^\/]+)" nodrop
+| if(isempty(endpoint), substring(url, 0, 30), endpoint) as endpoint
+
+// Replace GUIDs/instance IDs with placeholder
+// /my/web/url/!9876fea1a3/inventory → /my/web/url/<code>/inventory
+| replace(url, /\/![a-zA-Z0-9\!\-]{4,}/, "/<code>") as path
+
+// Extract account and role from AWS ARN
+// arn:aws:sts::224012340808:assumed-role/myapp-external-dns/175430395977 → accountid + role
+| parse regex field=arn "^arn:aws:[a-z]+::(?<accountid>[0-9]+):assumed-role\/(?<role>[^\/]+)" nodrop
+```
+
+**Tip:** If a cardinality-reduction transformation is applied repeatedly in production queries, define it as a FER so the lower-cardinality field is indexed and available without re-computing at search time.
 
 ---
 
@@ -330,6 +358,6 @@ Sumo Logic has over **120 search operators**. Beyond the pipeline basics, these 
 
 ---
 
-**Version:** 1.1.0
+**Version:** 1.2.0
 **Last Updated:** 2026-03-11
-**Source:** SumoLogic Logs Basics Training (August 2025); CIP Onboarding Sessions I & II
+**Source:** SumoLogic Logs Basics Training (August 2025); CIP Onboarding Sessions I & II; Sumo Logic Advanced Topics Workshop (2025/2026)
