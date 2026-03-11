@@ -223,6 +223,32 @@ Aggregation transforms log events into summarised results for charts and alerts.
 | avg(duration_ms) as avg_ms, max(duration_ms) as max_ms, pct(duration_ms, 95) as p95_ms by service
 ```
 
+**Multiple percentiles in one call:** Pass comma-separated percentile values to `pct()` to get all distribution quantiles in a single aggregation. Sumo creates output columns `pct_25`, `pct_50`, `pct_75`, etc. automatically:
+
+```
+// Full distribution for latency analysis — output: pct_10, pct_50, pct_95, pct_99
+| pct(duration_ms, 10, 50, 95, 99) by service
+```
+
+**`count_distinct`** — count unique values of a field. Important: this is an approximation for large cardinalities.
+
+```
+| count_distinct(user_id) as unique_users by service
+```
+
+**Geographic average workaround for live dashboards:** Live dashboards apply a 1000-group output limit. When querying geo-location data, avoid aggregating directly by latitude/longitude (too many unique combinations). Instead, aggregate by a coarser dimension (country, city) and use `avg(latitude), avg(longitude)` to get centroid coordinates for map placement:
+
+```
+// Works within 1000-group limit for map panels
+_sourceCategory=web/access
+| parse "* * * * \"*\" * *" as src_ip, ident, user, time, request, status, bytes
+| geoip src_ip
+| where !isEmpty(country_name)
+| avg(latitude) as latitude, avg(longitude) as longitude, count by country_code, country_name
+```
+
+This approach aggregates by country (bounded cardinality) and places a single map marker per country at the geographic centroid.
+
 ---
 
 ## Stage 5 — Format (Shape the Output)
@@ -311,8 +337,9 @@ Sumo Logic has over **120 search operators**. Beyond the pipeline basics, these 
 - **`LogCompare`** — like LogReduce but compares two time windows (e.g., before and after a deploy) to show what changed in log patterns
 - **`transaction`** / **`transactionize`** — correlate events into multi-event transactions by a key (e.g., user session, request ID). Has memory and event limits; for high-cardinality use, prefer the aggregation pattern (see `search-subquery`)
 - **`subquery`** — use results of one (child) query to filter or enrich another (parent) query. See the dedicated `search-subquery` skill for full patterns including `compose`, sneaky save, and cat-based filtering
-- **`predict`** — time series forecasting to project future values based on historical trends
-- **`outlier`** — statistical anomaly detection (standard deviation based). Legacy — prefer Anomaly monitors for new work
+- **`predict`** — time series forecasting to project future values. Two models available: `model=ar` (auto-regression, good for repeating/seasonal patterns) and `model=linear` (simple linear trend). Example: `| predict _count by 1m model=ar, ar.window=5, forecast=100` forecasts 100 data points ahead using the last 5-point AR window. Requires a prior `timeslice` + aggregate.
+- **`smooth`** — moving average to reduce noise in time series charts. **Critical:** always `| sort _timeslice asc` BEFORE applying smooth, otherwise the moving average is computed on unsorted data and gives wrong results. Example: `| timeslice 5m | count by _timeslice | sort _timeslice asc | smooth _count, 5 as trend` — the `5` is the window size in data points.
+- **`outlier`** — statistical anomaly detection (standard deviation based). Configurable parameters: `window` (rolling window size), `threshold` (standard deviations), `consecutive` (how many consecutive out-of-band points to trigger), `direction` (`+` positive only, `-` negative only, `+-` both). Example: `| outlier error_count window=10, threshold=3, consecutive=3, direction=+-`. Legacy — prefer Anomaly monitors for ongoing alerting.
 - **`threatip`** / **`geoip`** — threat intelligence and geolocation enrichment (best cached in a scheduled view for performance since these are expensive operations)
 - **`lookup`** — enrich events with data from a lookup table
 - **`cat`** — read a lookup table as if it were a query result set; enables timeless dashboard queries from state tables
@@ -358,6 +385,6 @@ When a field has very high cardinality (e.g., long ARN strings, full request pat
 
 ---
 
-**Version:** 1.2.0
-**Last Updated:** 2026-03-11
-**Source:** SumoLogic Logs Basics Training (August 2025); CIP Onboarding Sessions I & II; Sumo Logic Advanced Topics Workshop (2025/2026)
+**Version:** 1.3.0
+**Last Updated:** 2026-03-12
+**Source:** SumoLogic Logs Basics Training (August 2025); CIP Onboarding Sessions I & II; Sumo Logic Advanced Topics Workshop (2025/2026); Sumo Logic Dashboard Cookbooks (2026)

@@ -176,6 +176,34 @@ _sourceCategory=prod/{{env}} "{{env}}"
 
 **Note:** In search templates (not dashboards), use `{{{var}}}` (triple braces) for advanced use cases involving punctuation.
 
+#### Template Variable Source Types
+
+Each dashboard template variable has a `sourceDefinition` that controls where its dropdown values come from:
+
+| Source Type | How Values Are Populated | Best For |
+|---|---|---|
+| `LogQueryVariableSourceDefinition` | Live query against log data — specify `query` and `field` | Dynamic values that change (services, hosts, namespaces) |
+| `CsvVariableSourceDefinition` | Static comma-separated list | Fixed option sets (timeslice intervals like `5m,15m,1h`; environments like `prod,staging,dev`) |
+| `cat`-based lookup source | Query from a lookup table: `cat /path/lookup \| count by field \| sort field asc` | Managed lists maintained by admins (account IDs, environment groups) |
+
+**Example static CSV variable** (for a timeslice interval picker):
+```
+Variable name: interval
+Default: 5m
+Values: 5m,15m,1h,6h,1d
+```
+
+Used in panel queries as: `| timeslice {{interval}} | count by _timeslice`
+
+**Example dynamic query variable** (for a namespace picker from live data):
+```
+Variable name: namespace
+Query: _sourceCategory=prod/k8s | json "namespace" | count by namespace | sort namespace asc
+Field: namespace
+```
+
+**Tip:** Use `allowMultiSelect: false` for variables used in scopes (keywords/metadata). Multi-select only works reliably in `where matches` clauses. Use `includeAllOption: true` to add an "All" entry that passes `*`.
+
 #### Suggestion Lists for Dashboard Variables
 
 Dashboard variable dropdowns can be populated from:
@@ -183,6 +211,24 @@ Dashboard variable dropdowns can be populated from:
 - A **dynamic query** against live data, a scheduled view, or a lookup table
 
 This makes it easy for users to select valid values rather than typing free text — especially valuable for high-cardinality dimensions like account IDs, namespace names, or region codes.
+
+#### Template Variables in Panel Titles and Series Aliases
+
+`{{var}}` syntax works beyond query strings:
+- **Panel titles**: `Error Rate — {{service}}` — title updates when the user changes the variable
+- **Series alias overrides** (in the Overrides tab): `{{_collector}} - {{_devname}}` — used in metrics panels to give each time series a meaningful label combining two dimensions
+
+#### Dashboard URL Deep Linking
+
+You can share a dashboard with specific template variable values pre-filled using URL parameters:
+
+```
+https://service.sumologic.com/ui/#/dashboardv2/?variables=errorCode:AccessDenied;keywords:s3
+```
+
+Format: `?variables=name:value;name2:value2` (semicolon-separated, no spaces). This enables linking from alerts, Slack messages, or runbooks directly to a pre-scoped dashboard view.
+
+---
 
 ### Time Range
 
@@ -226,6 +272,6 @@ Text panels transform an investigation dashboard into a true guided workflow.
 
 ---
 
-**Version:** 1.1.0
-**Last Updated:** 2026-03-11
-**Source:** SumoLogic Logs Basics Training (August 2025); Sumo Logic Advanced Topics Workshop (2025/2026)
+**Version:** 1.2.0
+**Last Updated:** 2026-03-12
+**Source:** SumoLogic Logs Basics Training (August 2025); Sumo Logic Advanced Topics Workshop (2025/2026); Sumo Logic Dashboard Cookbooks (2026)

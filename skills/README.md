@@ -170,7 +170,7 @@ Links to official documentation
 | [Monitors](./alerting-monitors.md) | Alerting | Monitor types, detection methods, alert grouping | Yes |
 | [Time Compare & Anomaly](./alerting-time-compare-anomaly.md) | Alerting | Dynamic threshold alerting, anomaly vs outlier | Yes |
 | [Dashboard Design](./dashboards-overview.md) | Dashboards | Four dashboard types, App Catalog, template variables, linked dashboards | Yes |
-| **[Panel Types & Patterns](./dashboards-panel-types.md)** | **Dashboards** | **Categorical, time series, honeycomb, heatmap, transpose, overrides, JSON editing, timeless dashboards** | **No** |
+| **[Panel Types & Patterns](./dashboards-panel-types.md)** | **Dashboards** | **Categorical, time series, honeycomb, heatmap, box plot, sankey, tracing panels, mixed queries, overrides, JSON config, timeless dashboards** | **No** |
 
 ### Data Collection
 
@@ -381,8 +381,8 @@ See [CLAUDE.md](../CLAUDE.md) for developer guidelines on keeping skills synchro
 
 ---
 
-**Version:** 2.3.0
-**Last Updated:** 2026-03-11
+**Version:** 2.4.0
+**Last Updated:** 2026-03-12
 **Maintained by:** sumologic-python-mcp project
 
 **Changelog v2.0:**
@@ -418,3 +418,11 @@ See [CLAUDE.md](../CLAUDE.md) for developer guidelines on keeping skills synchro
 - Updated `dashboards-overview.md` (v1.1): advanced template variables, suggestion lists, linked dashboards detail
 - Updated `search-log-search-basics.md` (v1.2): expanded LogReduce/LogCompare, logreduce field=, logreduce optimize, cardinality reduction patterns, outlier operator
 - Sources: CIP Subquery Secrets Playbook; Sumo Logic Advanced Topics Workshop (2025/2026)
+
+**Changelog v2.4:**
+
+- Incorporated Sumo Logic Dashboard Cookbooks I–IV (Categorical/Honeycomb, Time Series, Advanced Analytics, Advanced Techniques)
+- Updated `dashboards-panel-types.md` (v1.2): box plot (`boxAndWhisker`) with pct() query pattern, sankey/transaction flow panel, distributed tracing panels (TracesListPanel, ServiceMapPanel, `_trace_spans` span analytics), mixed logs+metrics panels with override JSON, text panel background color patterns, detailed SVP/HoneyComb/table conditional formatting JSON, per-panel query properties (outputCardinalityLimit, parseMode, timeSource)
+- Updated `dashboards-overview.md` (v1.2): template variable sourceDefinition types (LogQuery, CSV, cat-based lookup), dashboard URL deep linking format, `{{var}}` in panel titles and series alias overrides
+- Updated `search-log-search-basics.md` (v1.3): smooth operator with sort-first requirement, predict with AR/linear model detail, outlier configurable parameters, multiple pct() percentiles in one call, count_distinct, geo average workaround for live dashboard 1000-group limit
+- Sources: Sumo Logic Dashboard Cookbooks I–IV (2026)

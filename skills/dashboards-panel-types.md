@@ -237,12 +237,97 @@ For incidents:
 | Trend with historical comparison | Line with `compare with timeshift` |
 | Geographic distribution | Map |
 | Proportional share over time | Stacked Area or Stacked Bar |
+| Distribution of a metric with outliers | Box Plot |
+| Transaction/request flow between states | Sankey |
+| Distributed traces | TracesListPanel / ServiceMapPanel |
+
+---
+
+### Box Plot Panels (`boxAndWhisker`)
+
+Box plots show the **statistical distribution** of a numeric metric over time — minimum, maximum, median, and configurable percentile bands. Useful for latency analysis, response time distribution, and spotting outliers within a metric.
+
+**Required query shape:** `timeslice` + `min`, `max`, and `pct()` percentiles aggregated `by _timeslice`
+
+```
+// ALB target processing time distribution
+_sourceCategory=*alb*
+| parse "* * * * * * * * * * * * \"*\" \"*\" * * *" as Type, Time, elb, client, target, request_processing_time, target_processing_time, response_processing_time, elb_status_code, target_status_code, received_bytes, sent_bytes, request, user_agent, ssl_cipher, ssl_protocol, target_group_arn
+| where Type = "https"
+| timeslice 5m
+| min(target_processing_time), max(target_processing_time), pct(target_processing_time, 25, 50, 75) by _timeslice
+```
+
+**Visual settings for `boxAndWhisker`:**
+```json
+{
+  "general": { "type": "boxAndWhisker", "mode": "timeSeries" },
+  "overrides": []
+}
+```
+
+**Tips:**
+- Use `pct(field, 25, 50, 75)` to generate the interquartile range (IQR). Sumo will create columns `pct_25`, `pct_50`, `pct_75` automatically.
+- Add `pct(field, 5, 95)` or `pct(field, 1, 99)` for wider whiskers showing tail distribution.
+- Use `min` and `max` for the box plot whiskers.
+
+---
+
+### Sankey / Transaction Flow Panels
+
+Sankey diagrams visualise flow between states — showing how requests or transactions move between stages and where volume is concentrated. Useful for distributed tracing flow and business process visualisation.
+
+**Required query shape:** Use the `transaction` operator to generate `fromstate` and `tostate` columns, then aggregate.
+
+```
+// Transaction flow for a checkout process
+_sourceCategory=prod/app/checkout
+| parse "trace_id=*" as trace_id
+| parse regex "(?<stage>Payment in progress|Calculation result|Payment processed|Payment failed)"
+| transaction on trace_id with states "Payment in progress", "Calculation result", "Payment processed", "Payment failed" results by fromstate, tostate
+| count, max(latency) by fromstate, tostate
+```
+
+**Visual settings for `sankey`:**
+```json
+{
+  "general": { "type": "sankey", "mode": "distribution" },
+  "overrides": []
+}
+```
+
+**Tips:**
+- `from state` and `tostate` are the required output fields — the panel maps these to flow segments automatically.
+- Add a `count` column to control segment width (volume) and a latency column for colour intensity.
+- Sankey panels are best for showing where volume concentrates or diverges across a known set of stages.
+
+---
+
+### Distributed Tracing Panels
+
+Two special panel types support distributed tracing data natively:
+
+**`TracesListPanel`** — displays a list of distributed traces with filtering. Does not use a query string — it reads from the traces index directly. Configure via template variables for service, operation, and status.
+
+**`ServiceMapPanel`** — displays an interactive topology map of services and their dependencies, with latency and error rate annotations. Also reads from traces index natively.
+
+**Span analytics queries (logs style)** — for custom trace analytics, query the `_trace_spans` index as a log source:
+
+```
+_index=_trace_spans
+| json field=tags "$['deployment.env']" as environment
+| where environment matches "{{env}}"
+| count by service, statuscode, statusmessage, operation
+| sort _count desc
+```
+
+Use `_index=_trace_spans` to access span data in regular log queries — this enables custom breakdowns by service, operation, status code, and custom tags beyond what TracesListPanel provides.
 
 ---
 
 ### Heatmap Panels
 
-A newer categorical panel type designed for metrics but works for logs too. Aggregates data by value on the y-axis and over time on the x-axis. Useful for spotting patterns across many entities (e.g., CPU across all EC2 instances).
+A panel type designed for metrics but works for logs too. Aggregates data by value on the y-axis and over time on the x-axis. Useful for spotting patterns across many entities (e.g., CPU across all EC2 instances).
 
 **Metrics example:**
 ```
@@ -365,6 +450,180 @@ The `bar` column renders as a visual indicator in the table. Replace `"■"` wit
 
 ---
 
+### Mixed Logs and Metrics Panels
+
+A single panel can contain **multiple queries** with different `queryType` values — combining log queries and metric queries in one chart. This is powerful for overlaying application logs with infrastructure metrics.
+
+**Pattern:** Add query A (Logs) and query B (Metrics) in the same panel editor. Use overrides to style them differently.
+
+```
+// Query A (Logs): HTTP error rate from access logs
+_sourceCategory=prod/web/access
+| timeslice 5m
+| if(status_code >= 500, 1, 0) as http5xx
+| sum(http5xx) as errors, count as requests by _timeslice
+| (errors / requests) * 100 as error_rate
+
+// Query B (Metrics): CPU Utilization from CloudWatch
+namespace=AWS/EC2 metric=CPUUtilization Statistic=Average
+| avg by _timeslice
+```
+
+**Override configuration to style mixed queries:**
+```json
+{
+  "overrides": [
+    {
+      "queries": ["A"],
+      "properties": { "type": "column", "fillOpacity": 0.4 }
+    },
+    {
+      "queries": ["B"],
+      "properties": { "type": "line", "axisYType": "secondary", "lineThickness": 2 }
+    }
+  ]
+}
+```
+
+**Tips:**
+- Query labels ("A", "B", "C") in overrides match the query name in the panel editor
+- Use `axisYType: "secondary"` to put the metric on a second y-axis when scales are very different
+- Identify metric panels from log panels in JSON exports by checking `queryType`: `"Logs"` or `"Metrics"` on each query object
+
+---
+
+### Text Panel Configuration and Background Colors
+
+Text panels store their Markdown content in the top-level `text` field (not inside visualSettings). They support background and text colors for visual grouping within a dashboard.
+
+**Standard text panel:**
+```json
+{
+  "text": "## Section Title\n\nExplanation of what this section shows...\n\n[Docs Link](https://help.sumologic.com/)"
+}
+```
+
+**Color coding for visual grouping:**
+```json
+{
+  "text": {
+    "format": "markdown",
+    "backgroundColor": "#cbbfff",
+    "textColor": "black"
+  }
+}
+```
+
+Common color patterns from dashboard cookbooks:
+- **Purple `#cbbfff`** — tips, hints, and "how to use" panels
+- **Green `#98d9a8`** — section headers for content groups
+- **Blue `#a0d4f0`** — notes and information panels
+- **Light grey** — neutral section dividers
+
+Use coloured text panels to visually organise complex dashboards into functional sections. Place a green header panel above a group of related chart panels, and a purple tips panel at the top of the dashboard.
+
+---
+
+### Detailed Visual Settings JSON Reference
+
+For advanced panel configuration via JSON editing:
+
+**Single Value Panel (SVP) — full config:**
+```json
+{
+  "general": { "type": "svp", "mode": "singleValueMetrics" },
+  "svp": {
+    "option": "Average",
+    "label": "errors per minute",
+    "useBackgroundColor": true,
+    "useNoData": false,
+    "noDataString": "--",
+    "sparkline": { "show": true },
+    "gauge": { "show": false },
+    "thresholds": [
+      { "from": 0,    "to": 10,   "color": "#116b25" },
+      { "from": 10,   "to": 50,   "color": "#ffb704" },
+      { "from": 50,   "to": null, "color": "#bf2121" }
+    ]
+  }
+}
+```
+
+**Honeycomb Panel — full config:**
+```json
+{
+  "general": { "type": "honeyComb", "mode": "distribution", "aggregationType": "latest" },
+  "honeyComb": {
+    "thresholds": [
+      { "from": 0,    "to": 1,    "color": "#69DB4A" },
+      { "from": 1,    "to": null, "color": "#FFB704" }
+    ],
+    "groupBy": [
+      { "label": "namespace", "value": "namespace" }
+    ],
+    "boundaryType": "filled",
+    "fillOpacity": 1
+  }
+}
+```
+
+**Table with Conditional Formatting — config:**
+```json
+{
+  "thresholdsSettings": {
+    "type": "number",
+    "column": "A:events",
+    "formattingOption": "Conditional"
+  },
+  "overrides": [
+    {
+      "series": ["state"],
+      "properties": {
+        "type": "table",
+        "displayThreshold": true,
+        "thresholds": [
+          {
+            "color": "#78AEDA",
+            "conditions": [{ "column": "state", "value": "active", "operator": "==" }]
+          },
+          {
+            "color": "#BF2121",
+            "conditions": [{ "column": "state", "value": "closed", "operator": "==" }]
+          }
+        ]
+      }
+    }
+  ]
+}
+```
+
+**Smooth/Trend Line Override (dashed line style):**
+```json
+{
+  "overrides": [
+    {
+      "series": ["trend"],
+      "properties": { "lineDashType": "dash", "lineThickness": 2, "color": "#6a6a6a" }
+    }
+  ]
+}
+```
+
+---
+
+### Per-Panel Query Properties
+
+Each query in a panel has additional configuration properties beyond the query string:
+
+- **`outputCardinalityLimit`** — maximum number of result rows (default 1000). Set higher for large pivot tables, lower for performance-sensitive dashboards.
+- **`parseMode`** — `"Auto"` (default, tries auto-parsing) or `"Manual"` (disable auto-parsing, use explicit parse operators). Use `"Manual"` for structured logs where auto-parsing causes field name conflicts.
+- **`timeSource`** — `"Message"` (use log event timestamp, default) or `"Receipt"` (use ingest timestamp). Use `"Receipt"` for real-time panels or when log timestamps are unreliable.
+- **`timeRange`** — `null` means inherit from dashboard; set a fixed value (e.g., `-1h`) to override per-panel.
+
+These are set in the panel editor's advanced query settings or directly in the panel JSON export.
+
+---
+
 ## Advanced Dashboard Configuration
 
 ### Panel Overrides (Series Customisation)
@@ -465,6 +724,6 @@ Every panel in Sumo Logic can be edited directly in JSON mode. This unlocks conf
 
 ---
 
-**Version:** 1.1.0
-**Last Updated:** 2026-03-11
-**Source:** SumoLogic Logs Basics Training (August 2025); Sumo Logic Advanced Topics Workshop (2025/2026)
+**Version:** 1.2.0
+**Last Updated:** 2026-03-12
+**Source:** SumoLogic Logs Basics Training (August 2025); Sumo Logic Advanced Topics Workshop (2025/2026); Sumo Logic Dashboard Cookbooks (2026)
