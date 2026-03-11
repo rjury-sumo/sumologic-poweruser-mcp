@@ -54,6 +54,7 @@ _sourceCategory=prod/app error exception
 - Implicit AND: spaces = AND operator
 - Wildcards: `*cloudtrail*` for pattern matching
 - Explicit logic: `(error OR exception) AND prod`
+- **For raw messages:** Add `| limit N` on scope line for sampling (max 10,000)
 
 **Examples:**
 
@@ -64,9 +65,28 @@ _sourceCategory=aws/cloudtrail errorCode AccessDenied
 // Good scope - partition + source category
 _index=prod_logs _sourceCategory=app/service error
 
+// Good scope with sampling limit (raw messages)
+_sourceCategory=prod/app error | limit 1000
+
 // Poor scope - may scan all data
 error exception
 ```
+
+**⚠️ Result Size Consideration:**
+
+For raw message queries (no aggregation), **always add `| limit N` on the scope line** to prevent large result sets and reduce scan costs:
+
+```
+// FAST and size-limited - stops scanning after 1000 matches
+_sourceCategory=prod/app error | limit 1000
+
+// SLOW and unlimited - scans all data before limiting
+_sourceCategory=prod/app error
+| json "message" as msg
+| limit 1000  // ❌ Applied too late
+```
+
+Recommended limits: 100 for quick sampling, 500-1000 for investigation
 
 **MCP Tool Integration:**
 Use `explore_log_metadata` to discover optimal scope:
@@ -232,7 +252,28 @@ JSON logs are auto-parsed by default - all JSON keys become fields
 - Use `timeslice` without parameters for auto-sizing based on time range
 - Use `transpose` for dynamic field values in time series
 - Sort categorical results: `| sort _count desc`
-- Limit results: `| top 10 field by _count`
+- **Limit results for API/MCP integration:** `| sort _count desc | limit 100`
+- Use `topk(N, _count)` for optimized top-N queries
+
+**⚠️ Result Size Consideration:**
+
+For aggregate queries returning to MCP tools or APIs, **always limit result sets** to manageable sizes:
+
+```
+// Good - limited to top 50 results
+| count by error_code, service
+| sort _count desc
+| limit 50
+
+// Better - optimized top-N query
+| count by error_code
+| topk(50, _count)
+
+// Problem - may return thousands of rows
+| count by error_code  // ❌ No limit
+```
+
+For high-cardinality dimensions (>500 unique values), use "others" grouping pattern (see [search-result-size-optimization](search-result-size-optimization.md))
 
 ### 5. Format Phase (Optional)
 

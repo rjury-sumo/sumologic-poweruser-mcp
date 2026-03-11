@@ -156,6 +156,7 @@ Links to official documentation
 | **[Log Search Basics](./search-log-search-basics.md)** | **Search** | **Core pipeline, metadata fields, parse operators, cardinality reduction** | **No** |
 | **[Writing Queries](./search-write-queries.md)** | **Search** | **Complete query construction guide (5 phases)** | **Yes** |
 | [Query Optimization](./search-optimize-queries.md) | Search | SKEFE framework, bloom filter, query rewriting, search audit | Yes |
+| **[Result Size Optimization](./search-result-size-optimization.md)** | **Search** | **Managing API limits (1MB), cardinality reduction, limit/topk patterns, "others" grouping** | **Yes** |
 | **[Subquery Patterns](./search-subquery.md)** | **Search** | **compose/keywords, sneaky save, cat filters, aggregation-as-transaction** | **No** |
 | [Scheduled Views — Admin Design](./search-scheduled-views.md) | Search | View patterns, creation, multi-layer architecture | Yes |
 | [Optimize with Views — User Guide](./search-optimize-with-views.md) | Search | Transform slow queries using scheduled views | Yes |
@@ -275,6 +276,15 @@ See [CLAUDE.md](../CLAUDE.md) for developer guidelines on keeping skills synchro
 - Platform engine optimisations: bloom filter tokenisation, query rewriting, push-down, pushdown hack
 - Anti-patterns to avoid; search audit measurement queries
 - 10x–100x improvement potential
+
+**[Result Size Optimization](./search-result-size-optimization.md)** - Manage API limits and token costs
+
+- 1MB API response limit management for Claude and MCP integrations
+- 7 reduction strategies: top-N, topk, limit on scope, "others" grouping, substring truncation, time sampling, metadata pre-filtering
+- Cardinality reduction patterns with two-level aggregation
+- Decision tree for choosing right strategy
+- Performance benchmarks: limit on line 1 = 20x faster, 100x less scan
+- MCP tool integration best practices
 
 **[Optimize with Views — User Guide](./search-optimize-with-views.md)** - Transform slow queries to use scheduled views
 

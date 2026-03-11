@@ -851,14 +851,34 @@ Filter results where `scope` doesn't contain `_index=` or `_view=`
 | count by high_cardinality_field
 ```
 
-Returns 1M rows, OOM error
+Returns 1M rows, OOM error, exceeds API response limits
 
-**Fix:**
+**Fix Option 1 - Top N:**
 
 ```
 | count by high_cardinality_field
-| top 1000 by _count
+| sort _count desc
+| limit 100
 ```
+
+**Fix Option 2 - TopK (faster):**
+
+```
+| count by high_cardinality_field
+| topk(100, _count)
+```
+
+**Fix Option 3 - "Others" Grouping (preserves total):**
+
+```
+| count by high_cardinality_field
+| sort _count desc
+| 1 as n | accum n as rank
+| if (rank > 100, "others", high_cardinality_field) as high_cardinality_field
+| sum(_count) as total by high_cardinality_field
+```
+
+See [search-result-size-optimization](search-result-size-optimization.md) for complete patterns
 
 ### Anti-Pattern 5: The Brute Force Join
 

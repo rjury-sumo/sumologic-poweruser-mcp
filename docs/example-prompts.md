@@ -646,6 +646,27 @@ This capability covers the full range of TAE topics: collection architecture, pa
 - ✅ "Export the dashboard and show me the query definitions"
 - ❌ "Get some dashboard info"
 
+### Request Appropriate Result Sizes
+
+- ✅ "Show me the top 50 errors by count"
+- ✅ "Sample 1000 log messages for investigation"
+- ✅ "Limit to top 100 users by scan volume"
+- ⚠️ "Show me all errors" (may be thousands of results)
+
+**Why this matters:** Claude has a 1MB limit for API responses. Large result sets can:
+
+- Exceed API limits (causing failures)
+- Consume excessive tokens (increasing costs)
+- Slow down queries and responses
+- Make results harder to analyze
+
+**Best practices:**
+
+- For raw messages: Request 100-1000 samples
+- For aggregates: Request top 20-100 items
+- For time series: Use appropriate timeslice (5m for hours, 1h for days)
+- See `get_skill('search-result-size-optimization')` for complete patterns
+
 ### Combine Goals Clearly
 
 - ✅ "Find CloudTrail logs, show me the fields available, and give me example queries for security use cases"
@@ -705,6 +726,7 @@ This capability covers the full range of TAE topics: collection architecture, pa
 2. "Find similar queries" → `search_query_examples`
 3. "What fields are available?" → `profile_log_schema`
 4. "Give me examples for [use case]" → `search_query_examples` with filters
+5. "How do I limit result sizes for API integration?" → `get_skill('search-result-size-optimization')`
 
 ### "I Need to Set Up Alerting"
 
