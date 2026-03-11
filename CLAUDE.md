@@ -92,6 +92,13 @@ Read these when users ask open-ended, design, or "should I" questions rather tha
   - Search audit queries to find expensive queries; anti-patterns to avoid
   - Trigger phrases: "query is slow", "too expensive", "scans too much", "how do I speed up", "reduce scan"
 
+- **When working with MCP tools, API integrations, or queries returning large result sets**: Read [skills/search-result-size-optimization.md](skills/search-result-size-optimization.md)
+  - Managing 1MB API response limits for Claude and MCP integrations
+  - 7 reduction strategies: top-N, topk, limit on scope, "others" grouping, substring truncation, time sampling
+  - Cardinality reduction with two-level aggregation patterns
+  - Performance: limit on line 1 = 20x faster, 100x less scan
+  - Trigger phrases: "result set too large", "API limit exceeded", "reduce token costs", "limit results", "high cardinality"
+
 - **When user asks about partitions, indexes, `_index=`, `_view=`, data tiers, or which partition their data is in**: Read [skills/search-indexes-partitions.md](skills/search-indexes-partitions.md)
   - Enterprise Suite vs Flex tier behaviour, four methods to find data location
   - Trigger phrases: "what partition", "which index", "Infrequent tier", "Flex tier", "_index=", "_view="
