@@ -263,6 +263,75 @@ and `scheduled_views` sections of the pipeline report for existing acceleration 
 
 ---
 
+## Ingest Lag & Timestamp Diagnosis
+
+**Prompt:** "My CloudTrail dashboards are showing gaps. Check if there's an ingest lag problem with my AWS sources."
+
+**What it does:** Uses `analyze_ingest_lag` with `scope='_sourceCategory=aws/*'`, `from_time='-24h'`, `query_mode='summary'`
+to find sources with lag above 15 minutes. Returns avg/max lag per source with auto-generated interpretation
+and recommendations. For AWS S3 sources with multi-hour lag, flags missing SNS event notifications as
+the likely cause and provides the fix link.
+
+---
+
+**Prompt:** "My windows event logs are showing timestamps 5 hours in the future. What's wrong?"
+
+**What it does:** Uses `analyze_ingest_lag` with `query_mode='distribution'` on the Windows source
+category. Negative `min_lag_minutes` confirms future-dated events (timezone misconfiguration).
+Recommendations include running `get_sumo_collectors` and `get_sumo_sources` to inspect timezone
+settings — noting that if timezone is unset on the source, it inherits from the collector.
+
+---
+
+**Prompt:** "Check the ingest health of all our prod sources and flag anything with lag over 30 minutes"
+
+**What it does:** Uses `analyze_ingest_lag` with `scope='_sourceCategory=prod/*'`, `lag_threshold_minutes=30`,
+`query_mode='summary'`, sorted by worst lag first.
+
+---
+
+**Prompt:** "I think Sumo Logic is parsing the wrong timestamp field from our Java logs. How do I diagnose this?"
+
+**What it does:** Uses `analyze_ingest_lag` with `query_mode='format_debug'` on the Java log source category.
+Returns sample events with the `_format` field showing `t:<parse_type>,o:<offset>,l:<length>,p:<date_format>`.
+Comparing the offset `o` and length `l` against the raw log reveals which field Sumo Logic matched,
+exposing if it selected a timestamp embedded in an exception trace rather than the log prefix.
+
+---
+
+**Prompt:** "Our CloudTrail source is showing 8 hours of lag. Is this an SNS notification problem? Check the ingest pattern."
+
+**What it does:** Multi-step triage:
+
+1. `analyze_ingest_lag` with `query_mode='summary'` confirms the lag level and triggers SNS-related recommendation
+2. `analyze_data_volume_grouped` over `-7d` checks for spiky/intermittent ingest — large bursts every few hours
+   with gaps is the telltale pattern of polling-only (no SNS notifications)
+3. `get_sumo_collectors` + `get_sumo_sources` to retrieve source configuration and confirm SNS setup
+
+---
+
+**Prompt:** "Do a full ingest lag health check across all sources and give me a triage report"
+
+**What it does:**
+
+1. `analyze_ingest_lag` with `scope='*'`, `from_time='-6h'`, `query_mode='summary'` — flags all sources
+   above the 15-minute threshold
+2. For sources with negative lag: `query_mode='distribution'` to confirm timezone issue pattern
+3. For sources with >1h lag: `analyze_data_volume_grouped` over `-7d` to check ingest pattern
+4. `get_sumo_collectors` and `get_sumo_sources` for any collectors/sources with configuration problems
+5. Produces a prioritised list of findings with recommended fixes
+
+---
+
+**Prompt:** "Why are some of my logs arriving 2 days late?"
+
+**What it does:** Uses `analyze_ingest_lag` with `from_time='-48h'` and `query_mode='summary'` (byReceiptTime=true
+ensures the window captures when data actually arrived). Sources with `max_lag_minutes > 1440` (24 hours)
+are highlighted as severe. Auto-generated recommendations cover AWS S3 SNS notifications, batch collector
+flush intervals, and `analyze_data_volume_grouped` to confirm intermittent ingest pattern.
+
+---
+
 ## Log Volume Analysis
 
 **Prompt:** "What are my top 10 source categories by ingestion volume in the last 24 hours?"
@@ -772,6 +841,9 @@ This capability covers the full range of TAE topics: collection architecture, pa
 3. "Which monitors are noisy?" → `search_system_events` with monitor use case
 4. "Who changed this content?" → `search_audit_events`
 5. "Why is my data not arriving?" → `get_skill('audit-system-health')` + `search_system_events`
+6. "Why are my logs late / showing wrong timestamps?" → `analyze_ingest_lag` + `get_skill('data-ingest-lag-diagnosis')`
+7. "Is this an SNS notification issue on my S3 source?" → `analyze_ingest_lag` (summary) +
+   `analyze_data_volume_grouped` (check for spiky ingest pattern)
 
 ### "I Need to Build Queries"
 
@@ -790,8 +862,8 @@ This capability covers the full range of TAE topics: collection architecture, pa
 
 ---
 
-**Version:** 2.0
-**Last Updated:** 2026-03-09
+**Version:** 2.1
+**Last Updated:** 2026-03-27
 **Related:** [MCP Tools Reference](mcp-tools-reference.md), [Skills Library](../skills/README.md)
 
 **Changelog v2.0:**
@@ -801,3 +873,9 @@ This capability covers the full range of TAE topics: collection architecture, pa
 - Added "I Need to Set Up Alerting" to Common Use Case Scenarios
 - Expanded Skills Library Access section with new skills and consulting-guide entry
 - Updated existing scenario sections with skills-library shortcuts
+
+**Changelog v2.1:**
+
+- Added "Ingest Lag & Timestamp Diagnosis" section with 7 prompts covering lag detection, negative lag
+  (timezone), format_debug mode, SNS notification triage, and full health-check workflow
+- Added ingest lag entries to "I Need to Troubleshoot" common use case scenario
