@@ -5961,8 +5961,8 @@ async def describe_log_pipeline(
             # Clean up search job
             try:
                 await client.delete_search_job(dv_job_id)
-            except Exception:  # noqa: S110
-                pass
+            except Exception:  # noqa: S110  # nosec B110
+                pass  # Best effort cleanup - job deletion failure is acceptable
 
             if not dv_records:
                 return json.dumps(
@@ -6027,8 +6027,8 @@ async def describe_log_pipeline(
         # Clean up
         try:
             await client.delete_search_job(meta_job_id)
-        except Exception:  # noqa: S110
-            pass
+        except Exception:  # noqa: S110  # nosec B110
+            pass  # Best effort cleanup - job deletion failure is acceptable
 
         collectors_found = set()
         sources_found = set()
@@ -6230,8 +6230,8 @@ async def describe_log_pipeline(
             # Clean up
             try:
                 await client.delete_search_job(sample_job_id)
-            except Exception:  # noqa: S110
-                pass
+            except Exception:  # noqa: S110  # nosec B110
+                pass  # Best effort cleanup - job deletion failure is acceptable
 
             # Extract and analyze log samples
             for msg in messages:
