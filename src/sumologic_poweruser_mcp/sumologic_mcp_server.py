@@ -3566,16 +3566,25 @@ async def explore_log_metadata(
     instance: str = "default",
 ) -> str:
     """
-    Explore log metadata values for a given scope to help build efficient queries.
+    Explore log metadata to map source categories to partitions (STEP 2 after analyze_data_volume).
+
+    **When to use this tool:**
+    - AFTER you've found source categories using analyze_data_volume (which is FREE)
+    - When you need to map source categories to partitions (_view, _index)
+    - When you need collector/source/host details for specific logs
+    - When building scoped queries and need partition info
+
+    **NOT for initial discovery:** Use analyze_data_volume first (no scan cost).
+    This tool incurs scan costs, so use short time ranges (-15m default).
 
     This tool helps you discover:
     - Which partitions/views (_view, _index) contain your logs
-    - What source categories (_sourceCategory) exist in your scope
-    - Mapping of collectors, sources, and other metadata dimensions
+    - Collector and source mapping for metadata
     - Message counts per metadata combination
+    - Detailed metadata dimensions after initial discovery
 
-    Use this to learn your log structure before building queries, especially important
-    for Flex/Infrequent tier accounts where scan volume affects cost.
+    Important for Flex/Infrequent tier accounts where scan volume affects cost.
+    Keep time ranges short (-15m recommended) to minimize scan charges.
 
     Args:
         scope: Log search scope (e.g., "*", "_sourceCategory=*cloudtrail*", "sqlexception", "_index=sumologic_default")
@@ -4155,7 +4164,7 @@ async def profile_log_schema(
 @mcp.tool()
 async def analyze_data_volume(
     dimension: str = "sourceCategory",
-    from_time: str = "-24h",
+    from_time: str = "-3h",
     to_time: str = "now",
     time_zone: str = "UTC",
     include_credits: bool = True,
@@ -4168,36 +4177,46 @@ async def analyze_data_volume(
     instance: str = "default",
 ) -> str:
     """
-    Analyze data volume ingestion from the Sumo Logic Data Volume Index.
+    🔍 DISCOVER LOGS by keyword - FREE (no scan cost). Use this FIRST when you don't know where logs are.
 
-    This tool helps administrators understand ingestion patterns, detect anomalies,
-    and identify new or stopped data sources. Queries the sumologic_volume index
-    which tracks bytes, events, and credits consumed per metadata dimension.
+    This is the fastest way to find source categories when metadata is unknown. Also used for
+    capacity planning, cost analysis, and identifying stopped/new data sources.
+
+    **PRIMARY USE CASE - Log Discovery:**
+    Find logs by keyword (e.g., "cloudtrail", "nginx", "kubernetes") with zero scan cost.
+    Returns matching source categories with data tier info (Continuous/Infrequent/Flex/CSE).
+
+    Example: filter_pattern="*cloudtrail*" finds aws/cloudtrail, prod/cloudtrail/audit, etc.
+
+    **Discovery Workflow:**
+    1. Start with this tool: filter_pattern="*keyword*", from_time="-3h", include_credits=False
+    2. If no results: retry with from_time="-24h" or "-7d" (low-volume logs)
+    3. Next step: Use explore_log_metadata with found source categories for partition mapping
 
     Args:
         dimension: Metadata dimension to analyze (default: "sourceCategory")
-            - "sourceCategory": Volume by source category (most common)
+            - "sourceCategory": Volume by source category (most common for discovery)
             - "collector": Volume by collector
             - "source": Volume by source
             - "sourceHost": Volume by source host
             - "sourceName": Volume by source name
             - "view": Volume by partition/view
-        from_time: Start time (ISO8601, epoch ms, or relative like '-24h', '-7d')
+        from_time: Start time (default '-3h' for fast discovery, use '-24h' or '-7d' for trends/history)
         to_time: End time (default: 'now')
         time_zone: Timezone (default: 'UTC')
-        include_credits: Calculate credits based on standard tier rates (default: True)
-        include_timeshift: Compare with previous periods to detect changes (default: False)
-        timeshift_days: Days to shift back for comparison (default: 7, used if include_timeshift=True)
-        timeshift_periods: Number of periods to average (default: 3, used if include_timeshift=True)
+        include_credits: Calculate credits (default: True, set False for discovery)
+        include_timeshift: Compare with previous periods (default: False)
+        timeshift_days: Days to shift back for comparison (default: 7)
+        timeshift_periods: Number of periods to average (default: 3)
         sort_by: Field to sort by (default: 'gbytes', options: 'gbytes', 'events', 'credits')
         limit: Maximum results to return (default: 100)
-        filter_pattern: Filter pattern for dimension values (default: '*', e.g., '*prod*', 'collector-*')
+        filter_pattern: Filter pattern for dimension values (default: '*', e.g., '*nginx*', '*k8s*', '*cloudtrail*')
         instance: Instance name (default: 'default')
 
     Returns:
-        JSON with aggregated ingestion data including:
+        JSON with aggregated data including:
         - Dimension value (sourceCategory, collector, etc.)
-        - Data tier (Continuous, Frequent, Infrequent, CSE)
+        - Data tier (Continuous, Frequent, Infrequent, CSE, Flex) - critical for cost planning
         - Events count
         - GB ingested
         - Credits consumed (if include_credits=True)
@@ -4211,7 +4230,8 @@ async def analyze_data_volume(
         - CSE: 25 credits/GB
         Note: Flex customers use different rates
 
-    Use Cases:
+    Use Cases (in priority order):
+        - 🔍 LOG DISCOVERY: Find source categories by keyword (FREE - no scan cost)
         - Top consumers: Find which source categories use most ingestion
         - Trend analysis: Detect increases/decreases with timeshift comparison
         - Stopped collection: Identify collectors that stopped sending data
@@ -5614,8 +5634,10 @@ async def get_skill(
                 "timestamp issue", "multiline events", "HTTPS headers", "x-sumo-category"
 
     Discovery:
-    - `discovery-logs-without-metadata` - Multi-phase discovery when metadata unknown
-      Triggers: "don't know where data is", "find my logs", "what source category is my data"
+    - `discovery-logs-without-metadata` - Multi-phase discovery when metadata unknown (USE THIS FOR "FIND X LOGS")
+      Triggers: "find cloudtrail logs", "find nginx logs", "find kubernetes logs", "locate logs",
+                "don't know where data is", "find my logs", "what source category", "discover logs",
+                "where are the X logs", "help me find", "looking for logs"
     - `discovery-scheduled-views` - Inventory views, understand schemas, versioned view patterns
       Triggers: "what views exist", "find a view", "view schema", "reduceOnlyFields"
 

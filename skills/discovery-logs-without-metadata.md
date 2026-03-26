@@ -29,20 +29,9 @@ Discover and analyze logs in Sumo Logic when you don't know the source category,
 
 ### Phase 1: Metadata Discovery (Fast, No Scan Cost)
 
-#### Step 1.1: Search Data Volume Index
+#### Step 1.1: Search Data Volume Index (FREE - START HERE!)
 
-Start with the data volume index to find source categories - this is free and fast.
-
-**Pattern:**
-
-```
-_index=sumologic_volume sourceCategory=*{hint}*
-| parse regex field=sizeInBytes "\"sourceCategory\"\s*:\s*\"(?<sourceCategory>[^\"]+)\"" multi
-| sum(sizeInBytes) as bytes by sourceCategory
-| bytes / 1024 / 1024 / 1024 as gbytes
-| sort -gbytes
-| limit 20
-```
+**This is the fastest, cheapest way to discover logs.** The data volume index is pre-aggregated, so there's no scan cost.
 
 **MCP Tool:** `analyze_data_volume`
 
@@ -50,15 +39,30 @@ _index=sumologic_volume sourceCategory=*{hint}*
 {
   "dimension": "sourceCategory",
   "filter_pattern": "*cloudtrail*",
-  "from_time": "-7d",
+  "from_time": "-3h",
   "sort_by": "gbytes",
-  "limit": 20
+  "limit": 20,
+  "include_credits": false
 }
 ```
+
+**What you learn:**
+
+- Matching source categories (e.g., `aws/cloudtrail`, `prod/cloudtrail/audit`)
+- **Data tier** (Continuous/Infrequent/Flex/CSE) - tells you query cost model
+- Ingestion volume (GB) - helps prioritize which sources matter
+- **No scan cost** - queries pre-aggregated volume index
+
+**Discovery tips:**
+
+- Use `-3h` for active streaming logs (faster query)
+- If no results, retry with `-24h` or `-7d` (for low-volume or historical logs)
+- Wildcard patterns: `*nginx*`, `*k8s*`, `*cloudtrail*`, `*apache*`
 
 **Benefits:**
 
 - No scan cost (data volume index is free)
+- Shows data tier immediately (plan for Infrequent/Flex scan costs)
 - Shows ingestion volume (helps prioritize)
 - Reveals naming conventions used in your org
 
@@ -235,16 +239,17 @@ _index=sumologic_volume sourceCategory=*{hint}*
 
 **Scenario:** New to org, need to find Kubernetes logs.
 
-**Step 1:** Volume search
+**Step 1:** Volume search (fast, no scan cost)
 
 ```bash
 MCP: analyze_data_volume
   dimension: "sourceCategory"
   filter_pattern: "*k8s*"
-  from_time: "-7d"
+  from_time: "-3h"
+  include_credits: false
 ```
 
-**Result:** Finds `kubernetes/prod/pods`, `kubernetes/prod/nodes`
+**Result:** Finds `kubernetes/prod/pods`, `kubernetes/prod/nodes` in Continuous tier
 
 **Step 2:** Discover partition
 
@@ -311,15 +316,17 @@ MCP: export_installed_apps
 
 **Scenario:** Need to query Apache logs, don't know format.
 
-**Step 1:** Find source category
+**Step 1:** Find source category (fast discovery)
 
 ```bash
 MCP: analyze_data_volume
   dimension: "sourceCategory"
   filter_pattern: "*apache*"
+  from_time: "-3h"
+  include_credits: false
 ```
 
-**Result:** `apache/access`, `apache/error`
+**Result:** `apache/access`, `apache/error` in Frequent tier
 
 **Step 2:** Sample logs
 
@@ -361,15 +368,21 @@ _sourceCategory=apache/access
 
 ## Common Pitfalls
 
-### Pitfall 1: Searching All Data (`*`)
+### Pitfall 1: Searching All Data (`*`) Without Discovery
 
 **Problem:** `scope: "*"` scans all data, expensive in Flex/Infrequent tier
 
-**Solution:** Always use data volume index first to find source categories, then scope queries
+**Solution:** Always use `analyze_data_volume` first (free, no scan) to find source categories, then scope queries
 
-### Pitfall 2: Long Time Ranges in Discovery
+### Pitfall 1b: Using Long Time Ranges for Discovery
 
-**Problem:** Using `-24h` or `-7d` for schema profiling incurs high scan costs
+**Problem:** Using `-7d` or `-30d` for initial discovery is slower than needed
+
+**Solution:** Start with `-3h` for active logs, only use longer ranges if no results found
+
+### Pitfall 2: Long Time Ranges for Schema Profiling
+
+**Problem:** Using `-24h` or `-7d` for `explore_log_metadata` or `profile_log_schema` incurs high scan costs
 
 **Solution:** Use `-15m` for metadata exploration, only extend time range once you have good scope
 
@@ -418,12 +431,17 @@ MCP: search_query_examples
 
 Example: `"kubernetes pod errors"` returns proven query patterns
 
-### Tip 3: Build Incrementally
+### Tip 3: Build Incrementally with Smart Time Ranges
 
-1. Start with metadata discovery (free)
-2. Sample small time window (-15m)
-3. Profile schema to understand fields
-4. Test query on -15m before extending to -24h or -7d
+1. **Start with data volume discovery (free):** Use `-3h` for fast discovery
+2. **Fallback if no results:** Retry with `-24h` or `-7d` for low-volume logs
+3. **Sample small time window:** Use `-15m` for metadata/schema profiling
+4. **Test before extending:** Validate query on `-15m` before running on `-24h` or `-7d`
+
+**Time range strategy:**
+- Data volume discovery: `-3h` (fast) → `-24h` (fallback) → `-7d` (rare/historical)
+- Metadata exploration: `-15m` (minimize scan cost)
+- Production queries: `-1h` to `-24h` (after validation)
 
 ### Tip 4: Reuse Search Audit Insights
 

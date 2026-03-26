@@ -1366,6 +1366,13 @@ Analyze data volume ingestion from the Sumo Logic Data Volume Index for capacity
 
 **Use Cases:**
 
+- **🔍 Log Discovery (FREE - NO SCAN COST)**: Find source categories when metadata unknown
+  - First step in discovery workflow when you don't know where logs are
+  - Use `filter_pattern="*nginx*"` to search for service/app logs
+  - Shows **data tier** (Infrequent/Flex/Continuous/CSE) for cost planning
+  - No scan cost - queries pre-aggregated volume index
+  - Use `-3h` for fast discovery, fallback to `-24h` or `-7d` if no results
+  - Example: `filter_pattern="*k8s*"` finds all Kubernetes source categories
 - **Top consumers**: Find which source categories use most ingestion
 - **Trend analysis**: Detect increases/decreases with timeshift comparison
 - **Stopped collection**: Identify collectors that stopped sending data (state=GONE)
@@ -1375,20 +1382,36 @@ Analyze data volume ingestion from the Sumo Logic Data Volume Index for capacity
 
 **Example Scenarios:**
 
-1. **Find top 10 source categories by ingestion:**
+1. **🔍 Discover nginx logs (no scan cost - fast):**
+
+   ```json
+   {
+     "dimension": "sourceCategory",
+     "filter_pattern": "*nginx*",
+     "from_time": "-3h",
+     "limit": 20,
+     "include_credits": false
+   }
+   ```
+
+   **Returns:** `nginx/access`, `nginx/error`, `app/nginx/combined` with tier info (Continuous/Infrequent/Flex)
+
+   **If no results:** Retry with `from_time="-24h"` or `"-7d"` for low-volume logs
+
+2. **Find top 10 source categories by ingestion:**
 
    ```
    dimension="sourceCategory", from_time="-24h", sort_by="gbytes", limit=10
    ```
 
-2. **Detect collectors with increasing ingestion (>50%):**
+3. **Detect collectors with increasing ingestion (>50%):**
 
    ```
    dimension="collector", include_timeshift=True, timeshift_days=7, timeshift_periods=3
    Filter results where pct_increase_gb > 50
    ```
 
-3. **Find stopped collectors:**
+4. **Find stopped collectors:**
 
    ```
    dimension="collector", include_timeshift=True
