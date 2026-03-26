@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from sumologic_poweruser_mcp.sumologic_mcp_server import get_skill
+from sumologic_poweruser_mcp.sumologic_mcp_server import get_skill, get_version
 
 
 class TestGetSkill:
@@ -84,3 +84,25 @@ class TestGetSkill:
         else:
             # Success - got markdown content
             assert len(result) > 100
+
+
+class TestGetVersion:
+    """Test cases for get_version tool."""
+
+    @pytest.mark.asyncio
+    async def test_get_version_returns_json(self):
+        """Test that get_version returns valid JSON."""
+        result = await get_version()
+        data = json.loads(result)
+        assert "version" in data
+        assert "name" in data
+        assert "description" in data
+
+    @pytest.mark.asyncio
+    async def test_get_version_values(self):
+        """Test that get_version returns expected values."""
+        result = await get_version()
+        data = json.loads(result)
+        assert data["name"] == "sumologic-poweruser-mcp"
+        assert isinstance(data["version"], str)
+        assert len(data["version"]) > 0

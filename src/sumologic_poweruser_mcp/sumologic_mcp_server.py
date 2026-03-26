@@ -183,9 +183,12 @@ class SumoLogicClient:
                         )
                         await asyncio.sleep(wait)
                         continue
-                    logger.warning(f"Rate limited by Sumo Logic API: {self.instance_name} (all retries exhausted)")
+                    logger.warning(
+                        f"Rate limited by Sumo Logic API: {self.instance_name} (all retries exhausted)"
+                    )
                     raise APIError(
-                        "Sumo Logic API rate limit exceeded. Please try again later.", status_code=429
+                        "Sumo Logic API rate limit exceeded. Please try again later.",
+                        status_code=429,
                     )
                 else:
                     logger.error(
@@ -6417,6 +6420,32 @@ async def describe_log_pipeline(
 
     except Exception as e:
         return handle_tool_error(e, "describe_log_pipeline")
+
+
+@mcp.tool()
+async def get_version() -> str:
+    """
+    Return the version and build metadata for this MCP server.
+
+    Returns a JSON object with:
+    - `version`: Package version string
+    - `name`: Package name
+    - `description`: Short description
+
+    Use Cases:
+    - Confirm which server version is running
+    - Debug version mismatches between client and server
+    """
+    from . import __description__, __version__
+
+    return json.dumps(
+        {
+            "version": __version__,
+            "name": "sumologic-poweruser-mcp",
+            "description": __description__,
+        },
+        indent=2,
+    )
 
 
 # Cleanup handler

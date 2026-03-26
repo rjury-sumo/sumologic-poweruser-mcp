@@ -2,7 +2,7 @@
 
 ## Overview
 
-Total Tools: **47**
+Total Tools: **48**
 
 ---
 
@@ -1739,7 +1739,7 @@ Discover and describe the complete log ingestion pipeline for a given log scope.
 
 ---
 
-## Utility Tools (1)
+## Utility Tools (2)
 
 ### 47. `get_skill`
 
@@ -1794,6 +1794,31 @@ Get a skill definition from the skills library. Skills are reusable knowledge ar
 See `skills/README.md` for complete list of available skills.
 
 **Note:** Skills can also be accessed directly by reading files from the `skills/` directory.
+
+---
+
+### 48. `get_version`
+
+Return the version and build metadata for this MCP server.
+
+**Parameters:** None
+
+**Returns:** JSON object with `version`, `name`, and `description` fields
+
+**Use Cases:**
+
+- Confirm which server version is running
+- Debug version mismatches between client and server
+
+**Example Response:**
+
+```json
+{
+  "version": "0.1.0",
+  "name": "sumologic-poweruser-mcp",
+  "description": "Sumo Logic Power User MCP Server - provides read-only access to Sumo Logic APIs through the Model Context Protocol"
+}
+```
 
 ---
 

@@ -2,7 +2,7 @@
 
 from .sumologic_mcp_server import main
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 __author__ = "Your Name"
 __email__ = "your.email@example.com"
 __description__ = "Sumo Logic Power User MCP Server - provides read-only access to Sumo Logic APIs through the Model Context Protocol"
