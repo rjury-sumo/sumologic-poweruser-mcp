@@ -330,22 +330,80 @@ Brief description.
 
 #### 5. Write Tests
 
+**IMPORTANT:** Follow the CI-compatible test pattern. See "Testing Standards > CI-Compatible Test Pattern" section below for details.
+
 ```python
-# In tests/test_new_module.py or tests/integration/test_integration.py
+# In tests/test_new_module.py
 
-def test_new_tool_basic():
-    """Test basic functionality."""
-    # Test implementation
-    pass
+"""Tests for new_tool_name functionality."""
 
-def test_new_tool_with_custom_params():
-    """Test with various parameters."""
-    pass
+import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
+import json
 
-def test_new_tool_error_handling():
-    """Test error conditions."""
-    pass
+
+@pytest.fixture
+def mock_config():
+    """Create a mock config for CI compatibility."""
+    config = MagicMock()
+    config.server_config.rate_limit_per_minute = 60
+    return config
+
+
+class TestNewToolName:
+    """Tests for new_tool_name."""
+
+    @pytest.mark.asyncio
+    async def test_basic_functionality(self, mock_config):
+        """Test basic use case."""
+        with patch(
+            "sumologic_poweruser_mcp.sumologic_mcp_server._ensure_config_initialized"
+        ), patch(
+            "sumologic_poweruser_mcp.sumologic_mcp_server.get_config",
+            return_value=mock_config
+        ), patch(
+            "sumologic_poweruser_mcp.sumologic_mcp_server.get_sumo_client"
+        ) as mock_get_client, patch(
+            "sumologic_poweruser_mcp.sumologic_mcp_server.get_rate_limiter"
+        ) as mock_limiter:
+
+            mock_limiter.return_value.acquire = AsyncMock()
+            mock_client = AsyncMock()
+            mock_get_client.return_value = mock_client
+
+            # Mock API response
+            mock_client.get_new_resource.return_value = {"status": "success"}
+
+            from sumologic_poweruser_mcp.sumologic_mcp_server import new_tool_name
+
+            # Pass explicit parameters
+            result_str = await new_tool_name(
+                param1="test_value",
+                param2=100,
+                instance="default"
+            )
+
+            result = json.loads(result_str)
+            assert result["status"] == "success"
+
+    @pytest.mark.asyncio
+    async def test_with_custom_params(self, mock_config):
+        """Test with various parameters."""
+        # Similar pattern with different parameters
+        pass
+
+    @pytest.mark.asyncio
+    async def test_error_handling(self, mock_config):
+        """Test error conditions."""
+        # Test error handling with same mocking pattern
+        pass
 ```
+
+**Key requirements:**
+- Use `mock_config` fixture
+- Mock all initialization functions
+- Use `AsyncMock()` for async client methods
+- Pass explicit parameter values
 
 #### 6. Run Tests and Validation
 
@@ -703,6 +761,223 @@ class TestFunctionName:
 - Use descriptive test names
 - Group related tests in classes
 
+### CI-Compatible Test Pattern for MCP Tools
+
+**CRITICAL:** All MCP tool tests MUST follow this pattern to ensure compatibility with CI environments (GitHub Actions, etc.).
+
+#### Problem
+Tests that work locally may fail in CI because:
+- CI environments don't have `.env` files with credentials
+- Configuration initialization fails without proper mocking
+- Rate limiter initialization requires config objects
+
+#### Solution: Mock Config Pattern
+
+**Reference implementation:** `tests/test_usage_forecast.py` (lines 11-16)
+
+```python
+"""Tests for MCP tool functionality."""
+
+import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
+import json
+
+
+@pytest.fixture
+def mock_config():
+    """Create a mock config for CI compatibility.
+
+    This fixture ensures tests work both locally and in CI environments
+    by providing a mock configuration that doesn't require .env files.
+    """
+    config = MagicMock()
+    config.server_config.rate_limit_per_minute = 60
+    return config
+
+
+class TestYourMCPTool:
+    """Tests for your_mcp_tool."""
+
+    @pytest.mark.asyncio
+    async def test_tool_basic(self, mock_config):
+        """Test basic tool functionality."""
+        # Mock all initialization and config functions
+        with patch(
+            "sumologic_poweruser_mcp.sumologic_mcp_server._ensure_config_initialized"
+        ), patch(
+            "sumologic_poweruser_mcp.sumologic_mcp_server.get_config",
+            return_value=mock_config
+        ), patch(
+            "sumologic_poweruser_mcp.sumologic_mcp_server.get_sumo_client"
+        ) as mock_get_client, patch(
+            "sumologic_poweruser_mcp.sumologic_mcp_server.get_rate_limiter"
+        ) as mock_limiter:
+
+            # Setup rate limiter mock
+            mock_limiter.return_value.acquire = AsyncMock()
+
+            # Setup client mock
+            mock_client = AsyncMock()
+            mock_get_client.return_value = mock_client
+
+            # Mock API responses
+            mock_client.your_api_method.return_value = {
+                "data": "test_response"
+            }
+
+            # Import and call tool
+            from sumologic_poweruser_mcp.sumologic_mcp_server import your_mcp_tool
+
+            # Call with EXPLICIT parameters (don't rely on Field() defaults)
+            result_str = await your_mcp_tool(
+                param1="value1",
+                param2="value2",
+                instance="default",
+            )
+
+            # Verify results
+            result = json.loads(result_str)
+            assert result["data"] == "test_response"
+
+            # Verify API was called correctly
+            mock_client.your_api_method.assert_called_once()
+```
+
+#### Required Mocking Pattern Checklist
+
+For every MCP tool test:
+
+- [ ] **Create `mock_config` fixture** - Provides configuration without `.env`
+- [ ] **Mock `_ensure_config_initialized()`** - Prevents config file access
+- [ ] **Mock `get_config()`** - Returns `mock_config` fixture
+- [ ] **Mock `get_sumo_client()`** - Returns AsyncMock client
+- [ ] **Mock `get_rate_limiter()`** - Returns mock with AsyncMock `acquire()`
+- [ ] **Pass explicit parameters** - Don't rely on Field() defaults in tests
+- [ ] **Use AsyncMock for async methods** - `mock_client.api_method = AsyncMock()`
+
+#### Common Mistakes to Avoid
+
+**❌ WRONG - Missing config mocks (will fail in CI):**
+```python
+async def test_tool():
+    with patch("...get_sumo_client") as mock_get_client:
+        # Missing: _ensure_config_initialized, get_config, get_rate_limiter
+        result = await your_mcp_tool(scope="test")  # FAILS in CI!
+```
+
+**❌ WRONG - Field() objects instead of values:**
+```python
+from mcp.server.fastmcp import Field
+
+result = await your_mcp_tool(
+    param1=Field(default="value"),  # ❌ Passes FieldInfo object!
+    instance=Field(default='default')  # ❌ Validation error!
+)
+```
+
+**✅ CORRECT - Full mocking with explicit values:**
+```python
+@pytest.mark.asyncio
+async def test_tool(self, mock_config):
+    with patch("...._ensure_config_initialized"), \
+         patch("....get_config", return_value=mock_config), \
+         patch("....get_sumo_client") as mock_get_client, \
+         patch("....get_rate_limiter") as mock_limiter:
+
+        mock_limiter.return_value.acquire = AsyncMock()
+        # ... rest of test
+
+        result = await your_mcp_tool(
+            param1="explicit_value",  # ✅ Explicit parameter
+            instance="default"         # ✅ Explicit parameter
+        )
+```
+
+#### Example: Complete Test File Structure
+
+```python
+"""Tests for describe_log_pipeline tool."""
+
+import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
+import json
+
+
+@pytest.fixture
+def mock_config():
+    """Create a mock config."""
+    config = MagicMock()
+    config.server_config.rate_limit_per_minute = 60
+    return config
+
+
+class TestDescribeLogPipeline:
+    """Tests for describe_log_pipeline tool."""
+
+    @pytest.mark.asyncio
+    async def test_keyword_scope(self, mock_config):
+        """Test with keyword scope."""
+        with patch(
+            "sumologic_poweruser_mcp.sumologic_mcp_server._ensure_config_initialized"
+        ), patch(
+            "sumologic_poweruser_mcp.sumologic_mcp_server.get_config",
+            return_value=mock_config
+        ), patch(
+            "sumologic_poweruser_mcp.sumologic_mcp_server.get_sumo_client"
+        ) as mock_get_client, patch(
+            "sumologic_poweruser_mcp.sumologic_mcp_server.get_rate_limiter"
+        ) as mock_limiter:
+
+            mock_limiter.return_value.acquire = AsyncMock()
+            mock_client = AsyncMock()
+            mock_get_client.return_value = mock_client
+
+            # Mock all API responses needed
+            mock_client.search_logs.return_value = {"messages": []}
+            mock_client.create_search_job.return_value = {"id": "job123"}
+            # ... more mocks
+
+            from sumologic_poweruser_mcp.sumologic_mcp_server import describe_log_pipeline
+
+            result_str = await describe_log_pipeline(
+                scope="cloudtrail",
+                from_time="-3h",
+                to_time="now",
+                max_collectors=20,
+                instance="default",
+            )
+
+            result = json.loads(result_str)
+            assert "pipeline_report" in result
+
+    @pytest.mark.asyncio
+    async def test_metadata_scope(self, mock_config):
+        """Test with metadata scope."""
+        # Similar pattern...
+        pass
+```
+
+#### Verification
+
+Before committing tests:
+
+```bash
+# Tests should pass locally
+uv run pytest tests/test_your_tool.py -v
+
+# Tests should also pass with minimal environment
+env -i PATH=$PATH uv run pytest tests/test_your_tool.py -v
+
+# All tests should pass
+uv run pytest -v
+```
+
+#### Related Files
+
+- **Reference:** [tests/test_usage_forecast.py](tests/test_usage_forecast.py) - Perfect example
+- **Reference:** [tests/test_describe_log_pipeline.py](tests/test_describe_log_pipeline.py) - Multi-phase tool example
+- **Anti-pattern:** Tests without `mock_config` fixture (will fail in CI)
+
 ## Git Commit Guidelines
 
 ### Commit Message Format
@@ -757,6 +1032,15 @@ Before committing any code:
 - [ ] No bare `except:` clauses (use `except Exception:` with `# noqa: S110`)
 - [ ] Security scan passes with `uv run bandit -r src/`
 - [ ] All tests pass with `uv run pytest`
+
+**Testing (CI Compatibility):**
+
+- [ ] New MCP tool tests use `mock_config` fixture pattern
+- [ ] All tests mock: `_ensure_config_initialized`, `get_config`, `get_rate_limiter`
+- [ ] Test parameters are explicit values (not `Field()` objects)
+- [ ] AsyncMock used for all async method mocks
+- [ ] Tests reference `test_usage_forecast.py` or `test_describe_log_pipeline.py` pattern
+- [ ] Verified tests work without `.env` file (see Testing Standards section)
 
 **Security:**
 
@@ -1045,5 +1329,9 @@ See `.gitignore` for complete list.
 
 ---
 
-**Last Updated:** 2026-03-04
-**Version:** 1.0.0
+**Last Updated:** 2026-03-26
+**Version:** 1.1.0
+
+**Changelog:**
+- v1.1.0 (2026-03-26): Added comprehensive CI-compatible test patterns section
+- v1.0.0 (2026-03-04): Initial version
