@@ -52,6 +52,59 @@ This document provides example prompts for using the Sumo Logic MCP tools effect
 
 ---
 
+### Log Pipeline Discovery
+
+**Prompt:** "Describe the complete ingestion pipeline for my CloudTrail logs"
+
+**What it does:** Uses `describe_log_pipeline` with `scope='cloudtrail'` to discover collectors, sources,
+field extraction rules, partition routing, scheduled views, and sample log formats end-to-end.
+
+---
+
+**Prompt:** "How are logs from _sourceCategory=prod/app/payments processed and stored?"
+
+**What it does:** Uses `describe_log_pipeline` with `scope='_sourceCategory=prod/app/payments'` to map
+collection config, FERs, partition assignment, data tier, retention, and any pre-aggregated views.
+
+---
+
+**Prompt:** "I'm onboarding a new team. Show them everything about how our Kubernetes logs flow into Sumo Logic."
+
+**What it does:** Uses `describe_log_pipeline` with `scope='kubernetes'` to produce a structured report
+covering the full pipeline — collection, parsing, routing, views, and installed apps — useful as
+onboarding documentation.
+
+---
+
+**Prompt:** "Something changed in my nginx logs. Show me the pipeline to check collection config, FERs, and partition routing."
+
+**What it does:** Uses `describe_log_pipeline` with `scope='nginx'` and a longer `from_time` (e.g. `'-24h'`)
+to capture the current pipeline state, then highlights FER parse expressions and processing rules that
+could affect log content.
+
+---
+
+**Prompt:** "Which partition and data tier are my prod/api logs routed to, and what's the retention period?"
+
+**What it does:** Uses `describe_log_pipeline` with `scope='_sourceCategory=prod/api'` and reads the
+`partition_routing` section of the report for tier, routing expression, and retention.
+
+---
+
+**Prompt:** "Are there any pre-built apps or scheduled views that cover my AWS VPC Flow logs?"
+
+**What it does:** Uses `describe_log_pipeline` with `scope='vpc flow'` — inspects the `installed_apps`
+and `scheduled_views` sections of the pipeline report for existing acceleration and app coverage.
+
+---
+
+**Prompt:** "Describe the pipeline for collector 'prod-k8s-collector-01' and limit to 10 collectors to keep output manageable"
+
+**What it does:** Uses `describe_log_pipeline` with `scope='collector=prod-k8s-collector-01'` and
+`max_collectors=10` — useful when many ephemeral pods register as collectors.
+
+---
+
 ### Log Discovery & Exploration
 
 **Prompt:** "I'm getting CloudTrail logs but don't know which partitions they're in. Help me find them."
