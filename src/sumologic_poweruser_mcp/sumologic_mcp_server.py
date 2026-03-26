@@ -4210,7 +4210,11 @@ async def analyze_data_volume(
         timeshift_periods: Number of periods to average (default: 3)
         sort_by: Field to sort by (default: 'gbytes', options: 'gbytes', 'events', 'credits')
         limit: Maximum results to return (default: 100)
-        filter_pattern: Filter pattern for dimension values (default: '*', e.g., '*nginx*', '*k8s*', '*cloudtrail*')
+        filter_pattern: Filter pattern for dimension values (default: '*')
+            - Accepts glob patterns (e.g., '*cloudtrail*', '*nginx*', 'aws/*')
+            - Wildcards (*) are auto-converted to regex (.*)
+            - All matching is case-insensitive (CloudTrail = cloudtrail = CLOUDTRAIL)
+            - Advanced: provide regex directly (e.g., '.*trail.*', '^aws/.*', '(prod|dev).*')
         instance: Instance name (default: 'default')
 
     Returns:
@@ -4292,9 +4296,13 @@ async def analyze_data_volume(
             "| bytes/1Gi as gbytes",
         ]
 
-        # Add filter if specified
+        # Add filter if specified (convert glob pattern to case-insensitive regex)
         if filter_pattern != "*":
-            query_parts.append(f"| where {field_name} matches /{filter_pattern}/")
+            # Convert glob wildcard * to regex .* (if present)
+            # If user provided glob pattern like *cloudtrail*, convert to .*cloudtrail.*
+            regex_pattern = filter_pattern.replace("*", ".*")
+            # Use case-insensitive regex with /(?i)pattern/ syntax
+            query_parts.append(f"| where {field_name} matches /(?i){regex_pattern}/")
 
         # Aggregation
         query_parts.append(AggregationPatterns.volume_by_dimension(field_name, include_tier=True))
@@ -4350,6 +4358,35 @@ async def analyze_data_volume(
 
         # Format the response
         records = results.get("results", [])
+
+        # Check if no data was found
+        if not records:
+            return json.dumps(
+                {
+                    "dimension": dimension,
+                    "time_range": {"from": from_time, "to": to_time, "timezone": time_zone},
+                    "query_options": {
+                        "include_credits": include_credits,
+                        "include_timeshift": include_timeshift,
+                        "filter_pattern": filter_pattern,
+                        "sort_by": sort_by,
+                        "limit": limit,
+                    },
+                    "summary": {
+                        "total_records": 0,
+                        "message": "No data found in data volume index for the specified time range and filters",
+                    },
+                    "data": [],
+                    "query": query,  # Include the actual query for debugging
+                    "recommendations": [
+                        "Try a longer time range (e.g., from_time='-7d' or '-30d')",
+                        "Verify data is being ingested into this Sumo Logic instance",
+                        "Check if this is a production instance with active data collection",
+                        "Try removing filter_pattern (use '*') to see all source categories",
+                    ],
+                },
+                indent=2,
+            )
 
         output = {
             "dimension": dimension,

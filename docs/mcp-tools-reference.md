@@ -1334,7 +1334,10 @@ Analyze data volume ingestion from the Sumo Logic Data Volume Index for capacity
 - `timeshift_periods` (int, default=3) - Number of periods to average
 - `sort_by` (str, default='gbytes') - Sort field (gbytes, events, credits)
 - `limit` (int, default=100) - Maximum results
-- `filter_pattern` (str, default='*') - Filter pattern for dimension values
+- `filter_pattern` (str, default='*') - Filter pattern for dimension values (glob or regex, case-insensitive)
+  - Glob patterns: `*cloudtrail*`, `*nginx*`, `aws/*` (wildcards auto-converted to regex)
+  - Regex patterns: `.*trail.*`, `^aws/.*`, `(prod|dev).*` (used as-is)
+  - All patterns are case-insensitive by default
 - `instance` (str, default='default') - Instance name
 
 **Dimension Options:**
