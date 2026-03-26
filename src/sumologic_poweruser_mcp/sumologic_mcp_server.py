@@ -385,6 +385,17 @@ class SumoLogicClient:
 
         return await self._request("POST", "/search/jobs", api_version="v1", json=search_data)
 
+    async def delete_search_job(self, job_id: str) -> Dict[str, Any]:
+        """Delete a search job.
+
+        Args:
+            job_id: Search job ID to delete
+
+        Returns:
+            Empty dictionary on success
+        """
+        return await self._request("DELETE", f"/search/jobs/{job_id}", api_version="v1")
+
     async def get_collectors(self, limit: int = 100, offset: int = 0) -> Dict[str, Any]:
         """Get list of collectors."""
         params = {"limit": limit, "offset": offset}
@@ -5755,6 +5766,623 @@ async def get_skill(
 
     except Exception as e:
         return handle_tool_error(e, "get_skill")
+
+
+@mcp.tool()
+async def describe_log_pipeline(
+    scope: str = Field(
+        description="Log scope to analyze (e.g., '_sourceCategory=foo/bar', 'collector=myCollector', 'cloudtrail', 'nginx logs')"
+    ),
+    from_time: str = Field(
+        default="-3h",
+        description="Start time for metadata discovery (ISO8601, epoch ms, or relative like '-3h', '-24h')",
+    ),
+    to_time: str = Field(default="now", description="End time (ISO8601, epoch ms, or relative)"),
+    max_collectors: int = Field(
+        default=20,
+        description="Maximum number of collectors to detail (prevents overwhelming output for ephemeral collectors)",
+    ),
+    instance: str = Field(default="default", description="Sumo Logic instance name"),
+) -> str:
+    """
+    Discover and describe the complete log ingestion pipeline for given log scope.
+
+    This tool orchestrates multiple discovery phases to build a comprehensive view of how logs
+    flow into Sumo Logic, including collection configuration, processing rules, field extraction,
+    partition routing, and scheduled views.
+
+    **Pipeline Phases Discovered:**
+
+    1. **Collection** - Collector and source configuration
+       - Collector details (name, type, category)
+       - Source configuration (timestamp parsing, timezone, multiline)
+       - Processing rules (include/exclude/mask)
+       - Metadata and field assignments
+
+    2. **Field Extraction** - Index-time field extraction rules
+       - FER scope and parse expressions
+       - Fields created at ingestion
+
+    3. **Partition Routing** - Index assignment and data tier
+       - Partition routing expressions
+       - Data tier (Continuous/Frequent/Infrequent/Flex/CSE)
+       - Retention period
+
+    4. **Scheduled Views** - Pre-aggregated views that may include this data
+       - View definitions matching log scope
+       - View schemas and indexed fields
+
+    5. **Sample Logs** - Actual log samples and format detection
+       - Up to 5 sample log events
+       - Log format analysis (JSON, CSV, key-value, unstructured)
+       - Parsing operator suggestions
+
+    6. **Installed Apps** - Pre-built apps matching log type
+       - Installed Sumo Logic apps with relevant dashboards
+       - App recommendations based on log keywords
+
+    **Discovery Process:**
+
+    - If scope is a keyword (e.g., "cloudtrail", "nginx"), discovers matching source categories
+    - If scope is metadata (e.g., "_sourceCategory=foo"), uses directly
+    - Performs log metadata discovery to find collectors, sources, partitions, fields
+    - Gathers collector and source configurations
+    - Identifies matching field extraction rules
+    - Determines partition routing and retention
+    - Finds relevant scheduled views
+    - Collects sample log events and analyzes format
+    - Searches for installed apps matching log type
+
+    **Parameters:**
+    - `scope`: Log identifier (source category, collector, keyword, or metadata filter)
+    - `from_time`: Time range for metadata discovery (shorter = faster, longer = more coverage)
+    - `to_time`: End time for discovery
+    - `max_collectors`: Limit collector details (useful for ephemeral/auto-scaled collectors)
+    - `instance`: Instance name
+
+    **Returns:**
+    Structured pipeline report in JSON format with sections:
+    - `summary`: Quick overview of log pipeline
+    - `metadata_discovered`: Source categories, collectors, sources, partitions found
+    - `collection`: Collector and source details with configuration
+    - `field_extraction`: Matching field extraction rules
+    - `partition_routing`: Partition details and routing logic
+    - `scheduled_views`: Relevant scheduled views
+    - `sample_logs`: Sample log events with format analysis
+    - `installed_apps`: Matching installed apps
+    - `recommendations`: Suggestions for optimization or investigation
+
+    **Example Use Cases:**
+
+    1. Understand CloudTrail ingestion:
+       ```
+       scope="cloudtrail"
+       ```
+
+    2. Analyze specific source category:
+       ```
+       scope="_sourceCategory=prod/app/logs"
+       ```
+
+    3. Investigate collector configuration:
+       ```
+       scope="collector=prod-web-servers"
+       ```
+
+    4. Find nginx log pipeline with 24h lookback:
+       ```
+       scope="nginx"
+       from_time="-24h"
+       ```
+
+    **API References:**
+    - Data Volume: https://help.sumologic.com/docs/manage/ingestion-volume/data-volume-index/
+    - Collectors: https://api.sumologic.com/docs/#operation/getCollector
+    - Sources: https://help.sumologic.com/docs/send-data/use-json-configure-sources/
+    - Partitions: https://api.sumologic.com/docs/#operation/listPartitions
+    - Field Extraction Rules: https://api.sumologic.com/docs/#operation/listExtractionRules
+    """
+    try:
+        _ensure_config_initialized()
+        config = get_config()
+        limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
+        await limiter.acquire("describe_log_pipeline")
+
+        instance = validate_instance_name(instance)
+        client = await get_sumo_client(instance)
+
+        pipeline_report = {
+            "summary": {},
+            "metadata_discovered": {},
+            "collection": {},
+            "field_extraction": {},
+            "partition_routing": {},
+            "scheduled_views": {},
+            "sample_logs": {},
+            "installed_apps": {},
+            "recommendations": [],
+        }
+
+        # Phase 1: Resolve scope to source categories if needed
+        logger.info(f"Phase 1: Resolving scope '{scope}'")
+
+        # Determine if scope is a keyword search or metadata filter
+        is_metadata_scope = any(
+            x in scope.lower()
+            for x in [
+                "_sourcecategory=",
+                "_collector=",
+                "_source=",
+                "_index=",
+                "_view=",
+                "sourcecategory=",
+            ]
+        )
+
+        source_categories = []
+        dimension = "sourceCategory"
+
+        if is_metadata_scope:
+            # Scope is already a metadata filter
+            pipeline_report["summary"]["scope_type"] = "metadata_filter"
+            pipeline_report["summary"]["original_scope"] = scope
+
+            # Extract dimension if specified
+            if "_collector=" in scope.lower() or "collector=" in scope.lower():
+                dimension = "collector"
+            elif "_source=" in scope.lower():
+                dimension = "source"
+
+        else:
+            # Scope is a keyword - discover matching source categories
+            pipeline_report["summary"]["scope_type"] = "keyword_search"
+            pipeline_report["summary"]["search_keyword"] = scope
+
+            # Use analyze_data_volume to find matching source categories
+            logger.info(f"Discovering source categories matching keyword: {scope}")
+
+            dv_query = f'_index=* _view=sumologic_volume\n| where dimension="{dimension}"\n| where value matches /{scope}/i\n| sum(sizeInBytes) as bytes by value, tier\n| bytes / 1024 / 1024 / 1024 as gb\n| sort by bytes desc\n| limit 20'
+
+            dv_job = await client.create_search_job(
+                query=dv_query, from_time=from_time, to_time=to_time, timezone_str="UTC"
+            )
+            dv_job_id = dv_job["id"]
+
+            # Poll for completion
+            for _ in range(60):
+                await asyncio.sleep(2)
+                status = await client.get_search_job_status(dv_job_id)
+                if status["state"] == "DONE GATHERING RESULTS":
+                    break
+
+            dv_results = await client.get_search_job_records(dv_job_id, limit=20)
+            dv_records = dv_results.get("records", [])
+
+            # Clean up search job
+            try:
+                await client.delete_search_job(dv_job_id)
+            except Exception:  # noqa: S110
+                pass
+
+            if not dv_records:
+                return json.dumps(
+                    {
+                        "error": f"No source categories found matching keyword '{scope}'",
+                        "suggestion": "Try a different keyword or time range, or use a metadata filter like '_sourceCategory=pattern'",
+                    },
+                    indent=2,
+                )
+
+            for record in dv_records:
+                map_data = record.get("map", {})
+                value = map_data.get("value", "")
+                tier = map_data.get("tier", "")
+                gb = map_data.get("gb", 0)
+
+                if dimension == "sourceCategory":
+                    source_categories.append(
+                        {"sourceCategory": value, "tier": tier, "gb": round(gb, 3)}
+                    )
+
+            pipeline_report["metadata_discovered"]["source_categories"] = source_categories
+            pipeline_report["summary"][
+                "found_source_categories"
+            ] = f"{len(source_categories)} categories found"
+
+        # Phase 2: Log metadata discovery
+        logger.info("Phase 2: Discovering log metadata")
+
+        # Build metadata scope
+        if is_metadata_scope:
+            metadata_scope = scope
+        else:
+            # Use first source category
+            if source_categories:
+                first_sc = source_categories[0]["sourceCategory"]
+                metadata_scope = f"_sourceCategory={first_sc}"
+            else:
+                metadata_scope = scope
+
+        # Discover metadata: _sourceCategory, _collector, _source, _index
+        metadata_query = f"""{metadata_scope}
+| count by _sourceCategory, _collector, _source, _index
+| sort by _count desc
+| limit {max_collectors}"""
+
+        meta_job = await client.create_search_job(
+            query=metadata_query, from_time=from_time, to_time=to_time, timezone_str="UTC"
+        )
+        meta_job_id = meta_job["id"]
+
+        # Poll for completion
+        for _ in range(60):
+            await asyncio.sleep(2)
+            status = await client.get_search_job_status(meta_job_id)
+            if status["state"] == "DONE GATHERING RESULTS":
+                break
+
+        meta_results = await client.get_search_job_records(meta_job_id, limit=max_collectors)
+        meta_records = meta_results.get("records", [])
+
+        # Clean up
+        try:
+            await client.delete_search_job(meta_job_id)
+        except Exception:  # noqa: S110
+            pass
+
+        collectors_found = set()
+        sources_found = set()
+        partitions_found = set()
+        source_categories_found = set()
+
+        for record in meta_records:
+            map_data = record.get("map", {})
+            collectors_found.add(map_data.get("_collector", ""))
+            sources_found.add(map_data.get("_source", ""))
+            partitions_found.add(map_data.get("_index", ""))
+            source_categories_found.add(map_data.get("_sourceCategory", ""))
+
+        pipeline_report["metadata_discovered"]["collectors"] = sorted(
+            [c for c in collectors_found if c]
+        )
+        pipeline_report["metadata_discovered"]["sources"] = sorted([s for s in sources_found if s])
+        pipeline_report["metadata_discovered"]["partitions"] = sorted(
+            [p for p in partitions_found if p]
+        )
+        pipeline_report["metadata_discovered"]["source_categories_discovered"] = sorted(
+            [sc for sc in source_categories_found if sc]
+        )
+
+        # Phase 3: Get partition details
+        logger.info("Phase 3: Analyzing partition routing")
+
+        partitions_response = await client.get_partitions(limit=100)
+        all_partitions = partitions_response.get("data", [])
+
+        matching_partitions = []
+        for partition in all_partitions:
+            partition_name = partition.get("name", "")
+            if partition_name in partitions_found:
+                matching_partitions.append(
+                    {
+                        "name": partition_name,
+                        "routingExpression": partition.get("routingExpression", ""),
+                        "retentionPeriod": partition.get("retentionPeriod", 0),
+                        "isActive": partition.get("isActive", False),
+                        "dataForwardingId": partition.get("dataForwardingId"),
+                        "totalBytes": partition.get("totalBytes", 0),
+                        "analyticsTier": partition.get("analyticsTier", ""),
+                    }
+                )
+
+        pipeline_report["partition_routing"]["partitions"] = matching_partitions
+
+        # Phase 4: Get collector and source details
+        logger.info("Phase 4: Gathering collector and source configuration")
+
+        collectors_response = await client.get_collectors(limit=1000)
+        all_collectors = collectors_response.get("collectors", [])
+
+        collector_details = []
+        source_details = []
+
+        for collector in all_collectors:
+            collector_name = collector.get("name", "")
+            if collector_name in collectors_found:
+                collector_id = collector.get("id")
+
+                collector_details.append(
+                    {
+                        "id": collector_id,
+                        "name": collector_name,
+                        "collectorType": collector.get("collectorType", ""),
+                        "category": collector.get("category"),
+                        "timeZone": collector.get("timeZone"),
+                        "fields": collector.get("fields", {}),
+                    }
+                )
+
+                # Get sources for this collector
+                try:
+                    sources_response = await client.get_sources(collector_id)
+                    sources = sources_response.get("sources", [])
+
+                    for source in sources:
+                        source_name = source.get("name", "")
+                        # Only include sources we discovered
+                        if source_name in sources_found or len(sources_found) == 0:
+                            source_details.append(
+                                {
+                                    "collector_name": collector_name,
+                                    "source_name": source_name,
+                                    "sourceType": source.get("sourceType", ""),
+                                    "category": source.get("category"),
+                                    "timeZone": source.get("timeZone"),
+                                    "automaticDateParsing": source.get("automaticDateParsing"),
+                                    "multilineProcessingEnabled": source.get(
+                                        "multilineProcessingEnabled"
+                                    ),
+                                    "useAutolineMatching": source.get("useAutolineMatching"),
+                                    "forceTimeZone": source.get("forceTimeZone"),
+                                    "fields": source.get("fields", {}),
+                                    "filters": source.get("filters", []),
+                                }
+                            )
+                except Exception as e:
+                    logger.warning(f"Failed to get sources for collector {collector_id}: {e}")
+
+        pipeline_report["collection"]["collectors"] = collector_details
+        pipeline_report["collection"]["sources"] = source_details
+
+        # Phase 5: Check field extraction rules
+        logger.info("Phase 5: Checking field extraction rules")
+
+        fers_response = await client.list_field_extraction_rules(limit=100)
+        all_fers = fers_response.get("data", [])
+
+        matching_fers = []
+        for fer in all_fers:
+            fer_scope = fer.get("scope", "")
+            enabled = fer.get("enabled", False)
+
+            # Check if FER scope might match our logs
+            # This is a simple heuristic - could be improved
+            matches = False
+            for sc in source_categories_found:
+                if sc in fer_scope or any(p in fer_scope for p in partitions_found):
+                    matches = True
+                    break
+
+            if matches or fer_scope == "*":
+                matching_fers.append(
+                    {
+                        "name": fer.get("name", ""),
+                        "scope": fer_scope,
+                        "parseExpression": fer.get("parseExpression", ""),
+                        "enabled": enabled,
+                    }
+                )
+
+        pipeline_report["field_extraction"]["rules"] = matching_fers
+
+        # Phase 6: Find relevant scheduled views
+        logger.info("Phase 6: Finding relevant scheduled views")
+
+        views_response = await client.list_scheduled_views(limit=100)
+        all_views = views_response.get("data", [])
+
+        matching_views = []
+        for view in all_views:
+            view_query = view.get("query", "")
+
+            # Check if view query references our source categories or partitions
+            matches = False
+            for sc in source_categories_found:
+                if sc in view_query:
+                    matches = True
+                    break
+
+            if not matches:
+                for partition in partitions_found:
+                    if partition in view_query or f"_index={partition}" in view_query:
+                        matches = True
+                        break
+
+            if matches:
+                matching_views.append(
+                    {
+                        "indexName": view.get("indexName", ""),
+                        "query": view_query,
+                        "retentionPeriod": view.get("retentionPeriod", 0),
+                        "reduceOnlyFields": view.get("reduceOnlyFields", []),
+                        "indexedFields": view.get("indexedFields", []),
+                    }
+                )
+
+        pipeline_report["scheduled_views"]["views"] = matching_views
+
+        # Phase 7: Get sample log events
+        logger.info("Phase 7: Collecting sample log events")
+
+        sample_logs = []
+        log_format_analysis = {}
+
+        try:
+            # Get 5 sample log messages using the metadata scope
+            sample_query = f"{metadata_scope}\n| limit 5"
+
+            sample_job = await client.create_search_job(
+                query=sample_query, from_time=from_time, to_time=to_time, timezone_str="UTC"
+            )
+            sample_job_id = sample_job["id"]
+
+            # Poll for completion (shorter timeout for samples)
+            for _ in range(30):
+                await asyncio.sleep(1)
+                status = await client.get_search_job_status(sample_job_id)
+                if status["state"] == "DONE GATHERING RESULTS":
+                    break
+
+            # Get raw messages
+            sample_results = await client.get_search_job_messages(sample_job_id, limit=5)
+            messages = sample_results.get("messages", [])
+
+            # Clean up
+            try:
+                await client.delete_search_job(sample_job_id)
+            except Exception:  # noqa: S110
+                pass
+
+            # Extract and analyze log samples
+            for msg in messages:
+                map_data = msg.get("map", {})
+                raw_message = map_data.get("_raw", "")
+
+                if raw_message:
+                    sample_logs.append(
+                        {
+                            "raw": raw_message[:500],  # Truncate to 500 chars
+                            "timestamp": map_data.get("_messagetime", ""),
+                            "sourceCategory": map_data.get("_sourcecategory", ""),
+                        }
+                    )
+
+            # Simple log format analysis
+            if sample_logs:
+                first_log = sample_logs[0]["raw"]
+
+                # Detect format
+                if first_log.startswith("{"):
+                    log_format_analysis["format"] = "JSON"
+                    log_format_analysis["suggestion"] = "Use 'json auto' operator for parsing"
+                elif "|" in first_log or "\t" in first_log:
+                    log_format_analysis["format"] = "Delimited (CSV/TSV)"
+                    log_format_analysis["suggestion"] = (
+                        "Use 'csv' or 'parse' operator with delimiters"
+                    )
+                elif "=" in first_log and ("," in first_log or " " in first_log):
+                    log_format_analysis["format"] = "Key-Value pairs"
+                    log_format_analysis["suggestion"] = (
+                        "Use 'keyvalue' operator or parse with key=value pattern"
+                    )
+                else:
+                    log_format_analysis["format"] = "Unstructured text"
+                    log_format_analysis["suggestion"] = (
+                        "Use 'parse' operator with custom patterns or regex"
+                    )
+
+                log_format_analysis["sample_count"] = len(sample_logs)
+                log_format_analysis["avg_length"] = sum(len(s["raw"]) for s in sample_logs) // len(
+                    sample_logs
+                )
+
+        except Exception as e:
+            logger.warning(f"Failed to get sample logs: {e}")
+            log_format_analysis["error"] = f"Failed to retrieve sample logs: {str(e)}"
+
+        pipeline_report["sample_logs"] = {
+            "samples": sample_logs,
+            "format_analysis": log_format_analysis,
+        }
+
+        # Phase 8: Find matching installed apps
+        logger.info("Phase 8: Searching for relevant installed apps")
+
+        matching_apps = []
+
+        try:
+            # Search for apps that might match our source categories or keywords
+            search_keywords = []
+
+            # Extract keywords from source categories
+            for sc in source_categories_found:
+                # Split on / and _ to get keywords
+                parts = sc.replace("/", " ").replace("_", " ").split()
+                search_keywords.extend([p.lower() for p in parts if len(p) > 3])
+
+            # Add original scope if it was a keyword
+            if not is_metadata_scope:
+                search_keywords.append(scope.lower())
+
+            # Get unique keywords
+            search_keywords = list(set(search_keywords))
+
+            # Search for apps matching these keywords
+            apps_response = await client.list_apps()
+            all_apps = apps_response.get("applications", [])
+
+            for app in all_apps:
+                app_name = app.get("name", "").lower()
+
+                # Check if any keyword matches app name
+                for keyword in search_keywords:
+                    if keyword in app_name or app_name in keyword:
+                        matching_apps.append(
+                            {
+                                "name": app.get("name", ""),
+                                "appDefinitionId": app.get("appDefinitionId", ""),
+                                "uuid": app.get("uuid", ""),
+                                "matched_keyword": keyword,
+                            }
+                        )
+                        break  # Only add once per app
+
+        except Exception as e:
+            logger.warning(f"Failed to search installed apps: {e}")
+            pipeline_report["installed_apps"] = {"error": f"Failed to search apps: {str(e)}"}
+        else:
+            pipeline_report["installed_apps"] = {
+                "apps": matching_apps,
+                "search_keywords": search_keywords,
+            }
+
+        # Phase 9: Generate summary and recommendations
+        pipeline_report["summary"]["collectors_discovered"] = len(collector_details)
+        pipeline_report["summary"]["sources_discovered"] = len(source_details)
+        pipeline_report["summary"]["partitions_used"] = len(matching_partitions)
+        pipeline_report["summary"]["field_extraction_rules"] = len(matching_fers)
+        pipeline_report["summary"]["relevant_scheduled_views"] = len(matching_views)
+        pipeline_report["summary"]["sample_logs_collected"] = len(sample_logs)
+        pipeline_report["summary"]["matching_apps_found"] = len(matching_apps)
+
+        # Add recommendations
+        if len(matching_partitions) > 1:
+            pipeline_report["recommendations"].append(
+                "Logs are routed to multiple partitions. Review partition routing expressions to ensure optimal data organization."
+            )
+
+        if len(matching_fers) == 0:
+            pipeline_report["recommendations"].append(
+                "No field extraction rules found. Consider adding FERs to pre-parse common fields for better query performance."
+            )
+
+        if len(matching_views) > 0:
+            pipeline_report["recommendations"].append(
+                f"Found {len(matching_views)} scheduled view(s) that may pre-aggregate this data. Use these for faster dashboard queries."
+            )
+
+        if len(source_details) > max_collectors:
+            pipeline_report["recommendations"].append(
+                f"Found more than {max_collectors} sources. Some details were truncated. Increase max_collectors parameter for full details."
+            )
+
+        if len(matching_apps) > 0:
+            app_names = ", ".join([app["name"] for app in matching_apps[:3]])
+            if len(matching_apps) > 3:
+                app_names += f" and {len(matching_apps) - 3} more"
+            pipeline_report["recommendations"].append(
+                f"Found {len(matching_apps)} installed app(s) that may provide pre-built dashboards and searches: {app_names}"
+            )
+
+        if sample_logs and log_format_analysis.get("format"):
+            pipeline_report["recommendations"].append(
+                f"Detected log format: {log_format_analysis['format']}. {log_format_analysis.get('suggestion', '')}"
+            )
+
+        return json.dumps(pipeline_report, indent=2)
+
+    except Exception as e:
+        return handle_tool_error(e, "describe_log_pipeline")
 
 
 # Cleanup handler

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Total Tools: **46**
+Total Tools: **47**
 
 ---
 
@@ -1565,9 +1565,183 @@ Advanced data volume analysis with cardinality reduction for large-scale environ
 
 ---
 
+### 46. `describe_log_pipeline`
+
+Discover and describe the complete log ingestion pipeline for a given log scope. This orchestration tool performs multi-phase discovery to build a comprehensive view of how logs flow into Sumo Logic.
+
+**Parameters:**
+
+- `scope` (str) - Log scope to analyze (e.g., '_sourceCategory=foo/bar', 'collector=myCollector', 'cloudtrail', 'nginx logs')
+- `from_time` (str, default='-3h') - Start time for metadata discovery (ISO8601, epoch ms, or relative)
+- `to_time` (str, default='now') - End time for discovery
+- `max_collectors` (int, default=20) - Maximum number of collectors to detail (prevents overwhelming output)
+- `instance` (str, default='default') - Instance name
+
+**Returns:** Structured pipeline report with sections:
+
+- `summary` - Quick overview (collectors, sources, partitions, FERs, views found)
+- `metadata_discovered` - Source categories, collectors, sources, partitions discovered
+- `collection` - Collector and source details with configuration (timezone, timestamp parsing, processing rules, fields)
+- `field_extraction` - Matching field extraction rules with scope and parse expressions
+- `partition_routing` - Partition details (routing expressions, data tier, retention, forwarding)
+- `scheduled_views` - Relevant scheduled views with schemas
+- `sample_logs` - Sample log events (up to 5) with format analysis (format type, parsing suggestions, avg length)
+- `installed_apps` - Matching installed apps with app names and matched keywords
+- `recommendations` - Optimization suggestions
+
+**Pipeline Phases Discovered:**
+
+1. **Collection** - Collector/source configuration, processing rules, metadata/field assignments
+2. **Field Extraction** - Index-time field extraction rules (FERs)
+3. **Partition Routing** - Index assignment, data tier (Continuous/Frequent/Infrequent/Flex/CSE), retention
+4. **Scheduled Views** - Pre-aggregated views that may include this data
+5. **Sample Logs** - Actual log samples (up to 5 events) with format detection and parsing suggestions
+6. **Installed Apps** - Pre-built Sumo Logic apps matching log type with relevant dashboards
+
+**Discovery Process:**
+
+- If scope is a keyword (e.g., "cloudtrail", "nginx"), discovers matching source categories via data volume index
+- If scope is metadata (e.g., "_sourceCategory=foo"), uses directly
+- Performs log metadata discovery to find collectors, sources, partitions, fields
+- Gathers collector and source configurations including processing rules
+- Identifies matching field extraction rules
+- Determines partition routing logic and retention policies
+- Finds relevant scheduled views
+- Collects sample log events and detects log format (JSON, CSV, key-value, unstructured)
+- Searches for installed apps that match discovered log types
+
+**Use Cases:**
+
+- Understand complete CloudTrail ingestion pipeline: `scope="cloudtrail"`
+- Analyze specific source category configuration: `scope="_sourceCategory=prod/app/logs"`
+- Investigate collector setup: `scope="collector=prod-web-servers"`
+- Find nginx log pipeline with broader time range: `scope="nginx"`, `from_time="-24h"`
+- Troubleshoot data flow and routing issues
+- Document ingestion architecture
+- Optimize collection configuration
+- Identify opportunities for field extraction rules
+- Find pre-aggregated views for dashboard optimization
+
+**Example Output Structure:**
+
+```json
+{
+  "summary": {
+    "scope_type": "keyword_search",
+    "found_source_categories": "3 categories found",
+    "collectors_discovered": 2,
+    "sources_discovered": 4,
+    "partitions_used": 1,
+    "field_extraction_rules": 2,
+    "relevant_scheduled_views": 1
+  },
+  "metadata_discovered": {
+    "source_categories": [...],
+    "collectors": [...],
+    "sources": [...],
+    "partitions": [...]
+  },
+  "collection": {
+    "collectors": [{
+      "id": 12345,
+      "name": "prod-collector",
+      "collectorType": "Installable",
+      "category": "prod/logs",
+      "timeZone": "America/Los_Angeles",
+      "fields": {...}
+    }],
+    "sources": [{
+      "collector_name": "prod-collector",
+      "source_name": "app-logs",
+      "sourceType": "LocalFile",
+      "category": "prod/app/logs",
+      "timeZone": "UTC",
+      "automaticDateParsing": true,
+      "multilineProcessingEnabled": true,
+      "fields": {...},
+      "filters": [...]
+    }]
+  },
+  "partition_routing": {
+    "partitions": [{
+      "name": "prod_logs",
+      "routingExpression": "_sourceCategory=prod/*",
+      "retentionPeriod": 30,
+      "analyticsTier": "Continuous",
+      "isActive": true
+    }]
+  },
+  "field_extraction": {
+    "rules": [{
+      "name": "extract_request_fields",
+      "scope": "_sourceCategory=prod/app/*",
+      "parseExpression": "parse \"method=* url=*\" as method, url",
+      "enabled": true
+    }]
+  },
+  "scheduled_views": {
+    "views": [{
+      "indexName": "prod_app_metrics_1m",
+      "query": "_sourceCategory=prod/app/* | ...",
+      "retentionPeriod": 90,
+      "reduceOnlyFields": ["status_code", "_count"],
+      "indexedFields": ["status_code"]
+    }]
+  },
+  "sample_logs": {
+    "samples": [{
+      "raw": "{\"timestamp\":\"2024-03-26T10:15:30Z\",\"level\":\"INFO\",\"message\":\"Request processed\"}",
+      "timestamp": "1711447530000",
+      "sourceCategory": "prod/app/logs"
+    }],
+    "format_analysis": {
+      "format": "JSON",
+      "suggestion": "Use 'json auto' operator for parsing",
+      "sample_count": 5,
+      "avg_length": 156
+    }
+  },
+  "installed_apps": {
+    "apps": [{
+      "name": "Generic Application Logs",
+      "appDefinitionId": "abc-123",
+      "uuid": "uuid-456",
+      "matched_keyword": "application"
+    }],
+    "search_keywords": ["prod", "application", "logs"]
+  },
+  "recommendations": [
+    "Found 1 scheduled view(s) that may pre-aggregate this data. Use these for faster dashboard queries.",
+    "Found 1 installed app(s) that may provide pre-built dashboards and searches: Generic Application Logs",
+    "Detected log format: JSON. Use 'json auto' operator for parsing"
+  ]
+}
+```
+
+**API References:**
+
+- Data Volume: <https://help.sumologic.com/docs/manage/ingestion-volume/data-volume-index/>
+- Collectors: <https://api.sumologic.com/docs/#operation/getCollector>
+- Sources: <https://help.sumologic.com/docs/send-data/use-json-configure-sources/>
+- Partitions: <https://api.sumologic.com/docs/#operation/listPartitions>
+- Field Extraction Rules: <https://api.sumologic.com/docs/#operation/listExtractionRules>
+- Scheduled Views: <https://api.sumologic.com/docs/#operation/listScheduledViews>
+
+**Related Tools:**
+
+- `analyze_data_volume` - Discover source categories by keyword
+- `explore_log_metadata` - Discover log structure and fields
+- `get_sumo_partitions` - List all partitions
+- `get_sumo_collectors` - List collectors
+- `get_sumo_sources` - Get sources for a collector
+- `list_field_extraction_rules` - List field extraction rules
+- `list_scheduled_views` - List scheduled views
+
+---
+
 ## Utility Tools (1)
 
-### 46. `get_skill`
+### 47. `get_skill`
 
 Get a skill definition from the skills library. Skills are reusable knowledge artifacts that describe **how to accomplish specific tasks** in Sumo Logic using MCP tools and best practices.
 
