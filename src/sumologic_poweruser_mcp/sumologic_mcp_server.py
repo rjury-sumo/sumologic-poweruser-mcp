@@ -6448,6 +6448,374 @@ async def get_version() -> str:
     )
 
 
+@mcp.tool()
+async def analyze_ingest_lag(
+    scope: str = Field(
+        description="Search scope expression (e.g., '_sourceCategory=aws/cloudtrail*', '_collector=prod-collector', '*')"
+    ),
+    from_time: str = Field(
+        default="-3h",
+        description="Start time for the analysis window (ISO8601, epoch ms, or relative like '-3h', '-24h')",
+    ),
+    to_time: str = Field(
+        default="now",
+        description="End time (ISO8601, epoch ms, or relative like 'now')",
+    ),
+    lag_threshold_minutes: float = Field(
+        default=15.0,
+        description="Lag threshold in minutes. Events with abs(lag) above this are flagged. Default: 15.",
+    ),
+    query_mode: str = Field(
+        default="summary",
+        description=(
+            "Analysis mode: "
+            "'summary' - aggregate lag stats per source/collector (default), "
+            "'distribution' - percentile breakdown per sourceCategory with negative-lag detection, "
+            "'format_debug' - sample raw events with _format field to diagnose timestamp parsing"
+        ),
+    ),
+    top_n: int = Field(
+        default=50,
+        description="Maximum number of result rows to return. Default: 50.",
+    ),
+    instance: str = Field(default="default", description="Sumo Logic instance name"),
+) -> str:
+    """
+    Detect and triage ingest lag and source timestamp parsing issues by comparing _receipttime vs _messagetime.
+
+    Searches by receipt time (byReceiptTime=true) so the time window captures when data arrived at Sumo Logic,
+    not when the events claim to have occurred. This is essential for catching sources with severely wrong
+    timestamps that would otherwise fall outside a normal message-time query window.
+
+    The tool calculates lag_minutes = (_receipttime - _messagetime) / 60000:
+    - Negative lag  →  timestamp is set in the future (bad timezone or format config)
+    - 0–5 min       →  healthy
+    - 5–15 min      →  sub-optimal but often acceptable
+    - >15 min       →  problematic; investigate source configuration or pipeline saturation
+    - Hours/days    →  severe; AWS S3 sources missing SNS notifications are a common cause
+
+    Query Modes:
+    - **summary**: Returns avg/max lag and event counts grouped by _sourceCategory, _collector, _source.
+      Filtered to rows where abs(lag) > lag_threshold_minutes. Best starting point.
+    - **distribution**: Returns min/max/pct25/50/75 by _sourceCategory. Rows where max>threshold OR min<0.
+      Shows whether lag affects all events or just a subset.
+    - **format_debug**: Returns a sample of raw events with _format aliased to timestampFormat.
+      Use when you suspect auto timestamp detection is picking the wrong value in a log line.
+      _format structure: t:<parse_type>,o:<offset>,l:<length>,p:<date_format>
+      parse_type values: fail=no timestamp found, cache=cached format, def=user-specified default,
+      full=pattern library, none=receipt time used, ac1=auto-corrected >1 day drift,
+      ac2=auto-corrected outside -1yr/+2day window
+
+    Parameters:
+    - scope: Log scope — metadata filter or keyword
+    - from_time: Start of receipt-time window (default: -3h)
+    - to_time: End of receipt-time window (default: now)
+    - lag_threshold_minutes: Flag threshold in minutes (default: 15)
+    - query_mode: 'summary', 'distribution', or 'format_debug' (default: 'summary')
+    - top_n: Result row limit (default: 50)
+    - instance: Sumo Logic instance name (default: 'default')
+
+    Returns:
+    A JSON object with:
+    - query_parameters: Echo of inputs including the executed query
+    - summary: Total records returned and threshold used
+    - results: Array of lag analysis rows (fields vary by query_mode)
+    - interpretation: List of diagnostic observations derived from the results
+    - recommendations: Actionable next steps based on findings
+
+    Use Cases:
+    - Identify sources with stale or future-dated timestamps
+    - Diagnose AWS S3/CloudTrail/CloudWatch sources missing SNS event notifications (hours of lag)
+    - Find sources where auto timestamp parsing is selecting the wrong field
+    - Measure overall ingest health across a collector or source category tree
+    - Confirm timezone misconfiguration (negative lag pattern)
+
+    Example — summary scan of all AWS sources:
+        scope="_sourceCategory=aws/*", from_time="-6h", query_mode="summary"
+
+    Example — deep dive with distribution mode:
+        scope="_sourceCategory=aws/cloudtrail*", query_mode="distribution"
+
+    Example — debug timestamp format for a specific source:
+        scope="_sourceCategory=nginx/access", query_mode="format_debug", top_n=20
+
+    API Reference:
+    - Search Job API: https://api.sumologic.com/docs/#tag/searchJobManagement
+    - Timestamp Reference: https://www.sumologic.com/help/docs/send-data/reference-information/time-reference/
+    """
+    try:
+        _ensure_config_initialized()
+        config = get_config()
+        limiter = get_rate_limiter(config.server_config.rate_limit_per_minute)
+        await limiter.acquire("analyze_ingest_lag")
+
+        instance = validate_instance_name(instance)
+        scope = validate_query_input(scope)
+        client = await get_sumo_client(instance)
+
+        if query_mode not in ("summary", "distribution", "format_debug"):
+            raise ValueError(
+                f"Invalid query_mode '{query_mode}'. Must be 'summary', 'distribution', or 'format_debug'."
+            )
+
+        # Build mode-specific query
+        if query_mode == "summary":
+            query = f"""{scope}
+| (_receipttime - _messagetime) / 60000 as lag_minutes
+| where abs(lag_minutes) > {lag_threshold_minutes}
+| avg(lag_minutes) as avg_lag_minutes, max(lag_minutes) as max_lag_minutes, count as events by _sourceCategory, _collector, _source
+| sort by max_lag_minutes desc
+| limit {top_n}"""
+
+        elif query_mode == "distribution":
+            query = f"""{scope}
+| (_receipttime - _messagetime) / 60000 as lag_minutes
+| min(lag_minutes) as min_lag_minutes, max(lag_minutes) as max_lag_minutes, pct(lag_minutes, 25, 50, 75) by _sourceCategory
+| where max_lag_minutes > {lag_threshold_minutes} or min_lag_minutes < 0
+| sort by max_lag_minutes desc
+| limit {top_n}"""
+
+        else:  # format_debug
+            query = f"""{scope}
+| (_receipttime - _messagetime) / 60000 as lag_minutes
+| _format as timestampFormat
+| limit {top_n}
+| fields _messagetime, _receipttime, lag_minutes, _sourcecategory, _collector, _source, timestampFormat, _raw"""
+
+        # Create search job using receipt time so the window captures when data arrived
+        job_response = await client.create_search_job(
+            query=query,
+            from_time=from_time,
+            to_time=to_time,
+            timezone_str="UTC",
+            by_receipt_time=True,
+        )
+
+        job_id = job_response["id"]
+
+        # Poll for completion
+        max_attempts = 300
+        for _ in range(max_attempts):
+            await asyncio.sleep(1)
+            status = await client.get_search_job_status(job_id)
+            state = status["state"]
+            if state == "DONE GATHERING RESULTS":
+                break
+            elif state == "CANCELLED":
+                raise APIError("Search job was cancelled")
+
+        # Fetch results (messages for format_debug, records for aggregates)
+        if query_mode == "format_debug":
+            response = await client.get_search_job_messages(job_id, limit=top_n)
+            raw_rows = [m.get("map", {}) for m in response.get("messages", [])]
+        else:
+            response = await client.get_search_job_records(job_id, limit=top_n)
+            raw_rows = [r.get("map", {}) for r in response.get("records", [])]
+
+        # Best-effort cleanup
+        try:
+            await client.delete_search_job(job_id)
+        except Exception:  # nosec B110
+            pass
+
+        def _f(val, default=0.0):
+            try:
+                return float(val) if val not in (None, "") else default
+            except (ValueError, TypeError):
+                return default
+
+        # Build typed result rows
+        results = []
+        for row in raw_rows:
+            if query_mode == "summary":
+                results.append(
+                    {
+                        "_sourceCategory": row.get(
+                            "_sourcecategory", row.get("_sourceCategory", "")
+                        ),
+                        "_collector": row.get("_collector", ""),
+                        "_source": row.get("_source", ""),
+                        "avg_lag_minutes": round(_f(row.get("avg_lag_minutes")), 2),
+                        "max_lag_minutes": round(_f(row.get("max_lag_minutes")), 2),
+                        "events": int(_f(row.get("events"))),
+                    }
+                )
+            elif query_mode == "distribution":
+                results.append(
+                    {
+                        "_sourceCategory": row.get(
+                            "_sourcecategory", row.get("_sourceCategory", "")
+                        ),
+                        "min_lag_minutes": round(_f(row.get("min_lag_minutes")), 2),
+                        "max_lag_minutes": round(_f(row.get("max_lag_minutes")), 2),
+                        "pct25_lag_minutes": round(_f(row.get("_pct_25")), 2),
+                        "pct50_lag_minutes": round(_f(row.get("_pct_50")), 2),
+                        "pct75_lag_minutes": round(_f(row.get("_pct_75")), 2),
+                    }
+                )
+            else:  # format_debug
+                results.append(
+                    {
+                        "_sourceCategory": row.get(
+                            "_sourcecategory", row.get("_sourceCategory", "")
+                        ),
+                        "_collector": row.get("_collector", ""),
+                        "_source": row.get("_source", ""),
+                        "_messagetime": row.get("_messagetime", ""),
+                        "_receipttime": row.get("_receipttime", ""),
+                        "lag_minutes": round(_f(row.get("lag_minutes")), 2),
+                        "timestampFormat": row.get(
+                            "timestampFormat", row.get("timestampformat", "")
+                        ),
+                        "_raw": row.get("_raw", ""),
+                    }
+                )
+
+        # Generate interpretation and recommendations
+        interpretation = []
+        recommendations = []
+
+        if query_mode in ("summary", "distribution") and results:
+            max_lags = [r.get("max_lag_minutes", 0) for r in results]
+            min_lags = [r.get("min_lag_minutes", r.get("avg_lag_minutes", 0)) for r in results]
+            overall_max = max(max_lags) if max_lags else 0
+            has_negative = any(m < 0 for m in min_lags)
+
+            if has_negative:
+                interpretation.append(
+                    "NEGATIVE LAG detected: some events have timestamps set in the future relative to receipt time. "
+                    "This almost always indicates a timezone misconfiguration — the source timezone is set incorrectly "
+                    "or logs are being read as UTC when they carry local time."
+                )
+                recommendations.append(
+                    "Review the timezone setting on the affected collector sources. Compare _messagetime vs _receipttime "
+                    "on a few raw events to confirm. Fix: set the correct timezone in the Source advanced options."
+                )
+                recommendations.append(
+                    "Use get_sumo_collectors and get_sumo_sources to retrieve the source configuration and check "
+                    "timezone settings. Note: if timezone is unset on the source, it inherits from the collector."
+                )
+                recommendations.append(
+                    "Use 'format_debug' mode on the same scope to inspect the _format field — look for t:ac1 or "
+                    "t:ac2 entries which indicate auto-correction is masking the underlying timezone problem."
+                )
+
+            if overall_max > 1440:  # >24 hours
+                interpretation.append(
+                    f"SEVERE LAG detected: max lag is {round(overall_max / 60, 1)} hours. "
+                    "For AWS S3-based sources (CloudTrail, CloudWatch, S3 Access), this commonly indicates "
+                    "SNS event notifications are not configured on the S3 source — only the slow polling process is running."
+                )
+                recommendations.append(
+                    "For AWS S3 sources: configure SNS event notifications on the Sumo Logic S3 source. "
+                    "See: https://www.sumologic.com/help/docs/send-data/hosted-collectors/amazon-aws/aws-s3-source/#s3-event-notifications-integration"
+                )
+                recommendations.append(
+                    "Use analyze_data_volume_grouped with the affected _sourceCategory and from_time='-7d' "
+                    "to check for an intermittent/spiky ingest pattern — irregular bursts of data are a strong "
+                    "indicator of a polling-only source without SNS notifications."
+                )
+                recommendations.append(
+                    "Use get_sumo_collectors and get_sumo_sources to retrieve the source configuration. "
+                    "Check the source timestamp and timezone settings — if none are specified on the source, "
+                    "timezone is inherited from the collector. Verify both are set correctly."
+                )
+            elif overall_max > 60:
+                interpretation.append(
+                    f"HIGH LAG detected: max lag is {round(overall_max / 60, 1)} hours. "
+                    "Possible causes: slow forwarding pipeline, batch-mode collector flush interval too long, "
+                    "or AWS S3 source without SNS notifications."
+                )
+                recommendations.append(
+                    "Check collector/source configuration for batch send intervals. "
+                    "For AWS S3 sources verify SNS event notification setup."
+                )
+                recommendations.append(
+                    "Use analyze_data_volume_grouped with the affected _sourceCategory and from_time='-7d' "
+                    "to check whether ingest is continuous or arrives in intermittent bursts."
+                )
+                recommendations.append(
+                    "Use get_sumo_collectors and get_sumo_sources to inspect the source timestamp/timezone "
+                    "configuration. If timezone is unset on the source it is inherited from the collector."
+                )
+            elif overall_max > lag_threshold_minutes:
+                interpretation.append(
+                    f"MODERATE LAG detected: max lag is {round(overall_max, 1)} minutes. "
+                    "Sub-optimal but may be acceptable depending on SLA requirements. "
+                    "Could indicate pipeline saturation or log forwarding delays."
+                )
+                recommendations.append(
+                    "Monitor lag trend over time. If lag is growing, investigate pipeline saturation. "
+                    "Use 'distribution' mode to check whether lag affects all events or only a subset."
+                )
+                recommendations.append(
+                    "Use get_sumo_collectors and get_sumo_sources to review the source timestamp/timezone "
+                    "configuration for the affected sources."
+                )
+
+        if query_mode == "format_debug" and results:
+            formats = [r.get("timestampFormat", "") for r in results if r.get("timestampFormat")]
+            fail_count = sum(1 for f in formats if f.startswith("t:fail"))
+            ac_count = sum(1 for f in formats if "t:ac" in f)
+            none_count = sum(1 for f in formats if f.startswith("t:none"))
+            if fail_count:
+                interpretation.append(
+                    f"{fail_count} events have t:fail in _format — Sumo Logic could not locate a timestamp. "
+                    "Receipt time is being assigned as _messagetime."
+                )
+                recommendations.append(
+                    "Specify a custom timestamp format on the Source (Advanced Options → Timestamp Format). "
+                    "Provide a Timestamp Locator regex matching your log's timestamp field."
+                )
+            if ac_count:
+                interpretation.append(
+                    f"{ac_count} events show auto-correction (t:ac1 or t:ac2) — timestamps were outside "
+                    "the expected window and were adjusted. This often indicates a timezone offset issue."
+                )
+                recommendations.append(
+                    "Verify the source timezone. If logs carry a timezone offset, ensure the Source is "
+                    "configured to 'Use time zone from log file' or set the correct fixed timezone."
+                )
+            if none_count:
+                interpretation.append(
+                    f"{none_count} events have t:none — timestamp parsing is disabled for this source. "
+                    "_messagetime equals _receipttime."
+                )
+
+        if not results:
+            interpretation.append(
+                f"No results returned. For 'summary'/'distribution' modes this means no events exceeded "
+                f"the {lag_threshold_minutes}-minute threshold in the given time window — lag looks healthy. "
+                "If unexpected, try widening the time range or lowering lag_threshold_minutes."
+            )
+
+        return json.dumps(
+            {
+                "query_parameters": {
+                    "scope": scope,
+                    "from_time": from_time,
+                    "to_time": to_time,
+                    "lag_threshold_minutes": lag_threshold_minutes,
+                    "query_mode": query_mode,
+                    "top_n": top_n,
+                    "by_receipt_time": True,
+                    "query": query,
+                },
+                "summary": {
+                    "total_records": len(results),
+                    "lag_threshold_minutes": lag_threshold_minutes,
+                },
+                "results": results,
+                "interpretation": interpretation,
+                "recommendations": recommendations,
+            },
+            indent=2,
+        )
+
+    except Exception as e:
+        return handle_tool_error(e, "analyze_ingest_lag")
+
+
 # Cleanup handler
 async def cleanup():
     """Clean up resources when the server shuts down."""

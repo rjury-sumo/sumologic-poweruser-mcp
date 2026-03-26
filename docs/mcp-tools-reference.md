@@ -2,7 +2,7 @@
 
 ## Overview
 
-Total Tools: **48**
+Total Tools: **49**
 
 ---
 
@@ -460,7 +460,7 @@ Search through 11,000+ real Sumo Logic queries from 280+ published apps using in
 
 ---
 
-## Log Volume Analysis Tools (2)
+## Log Volume Analysis Tools (3)
 
 ### 13. `analyze_log_volume`
 
@@ -507,6 +507,71 @@ Discover available fields and suggest good dimensions for volume analysis using 
 - Discover what fields are available in logs before analyzing volume
 - Identify high-cardinality fields that may not work well for aggregation
 - Find good candidate fields for volume analysis
+
+---
+
+### 49. `analyze_ingest_lag`
+
+Detect and triage ingest lag and source timestamp parsing issues by comparing `_receipttime` vs
+`_messagetime`. Searches by receipt time so the window captures when data arrived at Sumo Logic,
+enabling detection of sources whose event timestamps are severely wrong (future-dated or hours/days
+in the past).
+
+**Parameters:**
+
+- `scope` (str) - Search scope expression (e.g., `'_sourceCategory=aws/cloudtrail*'`)
+- `from_time` (str, default=`'-3h'`) - Start of receipt-time window
+- `to_time` (str, default=`'now'`) - End of receipt-time window
+- `lag_threshold_minutes` (float, default=`15.0`) - Minutes above which events are flagged
+- `query_mode` (str, default=`'summary'`) - `'summary'`, `'distribution'`, or `'format_debug'`
+- `top_n` (int, default=`50`) - Maximum result rows
+- `instance` (str, default=`'default'`) - Instance name
+
+**Query Modes:**
+
+| Mode | Description |
+|------|-------------|
+| `summary` | avg/max lag + event count by `_sourceCategory`, `_collector`, `_source` |
+| `distribution` | min/max/pct25/50/75 lag by `_sourceCategory` |
+| `format_debug` | Sample raw events with `_format` aliased to `timestampFormat` |
+
+**Returns:** JSON with `query_parameters` (including the executed query), `summary`, `results`,
+`interpretation` (diagnostic observations), and `recommendations` (actionable next steps including
+suggestions to run `analyze_data_volume_grouped`, `get_sumo_collectors`, and `get_sumo_sources`).
+
+**_format field:** `t:<parse_type>,o:<offset>,l:<length>,p:<date_format>` — parse_type values:
+`full`/`cache` (healthy), `def` (user-specified), `none` (parsing disabled), `fail` (not found),
+`ac1`/`ac2` (auto-corrected out-of-range timestamp)
+
+**Use Cases:**
+
+- Identify AWS S3 sources (CloudTrail, CloudWatch) with hours/days of lag due to missing SNS
+  event notifications
+- Detect timezone misconfiguration causing negative lag (future-dated events)
+- Diagnose sources where auto timestamp detection picks the wrong field in the log line
+- Health check ingest timing across a collector or source category tree
+- Confirm whether pipeline saturation is causing log forwarding delays
+
+**Example:**
+
+```python
+# Initial scan across all AWS sources
+analyze_ingest_lag(scope="_sourceCategory=aws/*", from_time="-6h", query_mode="summary")
+
+# Deep dive on a specific category
+analyze_ingest_lag(scope="_sourceCategory=aws/cloudtrail*", query_mode="distribution")
+
+# Debug timestamp format parsing
+analyze_ingest_lag(scope="_sourceCategory=app/nginx", query_mode="format_debug", top_n=20)
+```
+
+**Related Tools:**
+
+- `analyze_data_volume_grouped` — Check ingest volume pattern for spiky/intermittent ingest
+- `get_sumo_collectors` / `get_sumo_sources` — Inspect timezone and timestamp configuration
+- `create_sumo_search_job` — Custom lag queries with `by_receipt_time: true`
+
+**API Reference:** [Timestamp Reference](https://www.sumologic.com/help/docs/send-data/reference-information/time-reference/)
 
 ---
 

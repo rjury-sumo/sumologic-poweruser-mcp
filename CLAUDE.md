@@ -52,6 +52,7 @@ Use `get_skill` MCP tool to fetch dynamically. Full index: `skills/README.md`.
 | Partition design / strategy | `admin-partition-design.md` |
 | FERs, index-time fields, parse at ingest | `admin-field-extraction-rules.md` |
 | Content library, exporting dashboards | `content-library-navigation.md` |
+| Ingest lag, timestamp parsing, `_receipttime` vs `_messagetime` | `data-ingest-lag-diagnosis.md` |
 
 ## Adding a New MCP Tool — Exact Sequence
 

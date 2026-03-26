@@ -179,6 +179,12 @@ Links to official documentation
 |-------|----------|-------------|-----------|
 | [Collection Patterns](./data-collection-patterns.md) | Collection | 7 patterns, selection guide, source category naming | Yes |
 
+### Ingest Health
+
+| Skill | Category | Description | MCP Tools |
+|-------|----------|-------------|-----------|
+| **[Ingest Lag Diagnosis](./data-ingest-lag-diagnosis.md)** | **Ingest** | **Detect/triage lag and timestamp parsing issues via _receipttime vs _messagetime** | **Yes** |
+
 ### Discovery
 
 | Skill | Category | Description | MCP Tools |

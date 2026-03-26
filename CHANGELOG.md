@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.1.2] - 2026-03-27
+
+### Added
+
+- **`analyze_ingest_lag` tool**: Detect and triage ingest lag and source timestamp parsing issues
+  - Compares `_receipttime` vs `_messagetime` to measure lag in minutes per source
+  - Searches by receipt time (`byReceiptTime=true`) to catch sources with severely wrong timestamps
+  - Three query modes: `summary` (avg/max lag by source), `distribution` (percentile breakdown),
+    `format_debug` (sample events with `_format` field for timestamp parse diagnosis)
+  - Auto-generates `interpretation` and `recommendations` from results:
+    - Negative lag → timezone misconfiguration detection
+    - >24h lag → AWS S3 SNS notification missing (with fix link)
+    - Recommends `analyze_data_volume_grouped` to check for spiky/intermittent ingest pattern
+    - Recommends `get_sumo_collectors`/`get_sumo_sources` to inspect timezone config
+  - `_format` parse_type decoding: `fail`, `none`, `ac1`, `ac2` trigger specific recommendations
+- **`data-ingest-lag-diagnosis.md` skill**: 5-phase triage workflow for lag and timestamp issues
+  - Phase 1: Summary scan to identify problem sources
+  - Phase 2: Distribution analysis (universal vs partial lag)
+  - Phase 3: Ingest volume pattern check via `analyze_data_volume_grouped`
+  - Phase 4: Source configuration inspection via `get_sumo_collectors`/`get_sumo_sources`
+  - Phase 5: Timestamp format debug with `_format` field interpretation guide
+  - Covers: AWS S3 SNS notification pattern, timezone inheritance, auto-parse field selection
+
 ## [Unreleased] - 2026-03-10
 
 ### Changed
