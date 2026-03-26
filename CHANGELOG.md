@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.1.3] - 2026-03-27
+
+### Changed
+
+- **`analyze_ingest_lag` performance and signal-to-noise improvements**
+  - Added `min_events` parameter (default 100): sources with fewer lagging events are filtered out
+    at the query level — every environment has a small number of mis-timestamped events that are not
+    worth investigating; this prevents noise from inflating result sets and slowing follow-up work
+  - Added `count as events` to `distribution` mode query (was missing); `events` is now returned in
+    distribution result rows and used for `min_events` filtering
+  - `top_n` default lowered from 50 → 20
+  - Interpretation and recommendations now focus on **top 3 worst sources only** (`FOCUS_N = 3`);
+    all remaining results are returned but tagged `priority=low` with a summary note
+  - Recommendations name the specific `_sourceCategory` and `_collector` of the worst source in
+    `analyze_data_volume_grouped` and `get_sumo_collectors` callouts (previously generic text)
+  - `summary` response section now includes `high_priority_sources` and `min_events_filter` fields
+  - Updated tests: 12 tests covering priority tagging, `min_events` query injection, `events` field
+    in distribution rows, and source-specific recommendation text
+
 ## [0.1.2] - 2026-03-27
 
 ### Added

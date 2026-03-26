@@ -6474,9 +6474,17 @@ async def analyze_ingest_lag(
             "'format_debug' - sample raw events with _format field to diagnose timestamp parsing"
         ),
     ),
+    min_events: int = Field(
+        default=100,
+        description=(
+            "Minimum number of lagging events a source must have to be included in results and "
+            "generate recommendations. Sources below this threshold are common in any environment "
+            "and rarely worth investigating. Default: 100."
+        ),
+    ),
     top_n: int = Field(
-        default=50,
-        description="Maximum number of result rows to return. Default: 50.",
+        default=20,
+        description="Maximum number of result rows to return. Default: 20.",
     ),
     instance: str = Field(default="default", description="Sumo Logic instance name"),
 ) -> str:
@@ -6512,7 +6520,10 @@ async def analyze_ingest_lag(
     - to_time: End of receipt-time window (default: now)
     - lag_threshold_minutes: Flag threshold in minutes (default: 15)
     - query_mode: 'summary', 'distribution', or 'format_debug' (default: 'summary')
-    - top_n: Result row limit (default: 50)
+    - min_events: Minimum lagging-event count to include a source (default: 100). Sources below
+      this are filtered from results — every environment has a small number of mis-timestamped
+      events that are not worth investigating.
+    - top_n: Result row limit (default: 20)
     - instance: Sumo Logic instance name (default: 'default')
 
     Returns:
@@ -6564,14 +6575,16 @@ async def analyze_ingest_lag(
 | (_receipttime - _messagetime) / 60000 as lag_minutes
 | where abs(lag_minutes) > {lag_threshold_minutes}
 | avg(lag_minutes) as avg_lag_minutes, max(lag_minutes) as max_lag_minutes, count as events by _sourceCategory, _collector, _source
+| where events >= {min_events}
 | sort by max_lag_minutes desc
 | limit {top_n}"""
 
         elif query_mode == "distribution":
             query = f"""{scope}
 | (_receipttime - _messagetime) / 60000 as lag_minutes
-| min(lag_minutes) as min_lag_minutes, max(lag_minutes) as max_lag_minutes, pct(lag_minutes, 25, 50, 75) by _sourceCategory
+| min(lag_minutes) as min_lag_minutes, max(lag_minutes) as max_lag_minutes, pct(lag_minutes, 25, 50, 75), count as events by _sourceCategory
 | where max_lag_minutes > {lag_threshold_minutes} or min_lag_minutes < 0
+| where events >= {min_events}
 | sort by max_lag_minutes desc
 | limit {top_n}"""
 
@@ -6646,6 +6659,7 @@ async def analyze_ingest_lag(
                         "_sourceCategory": row.get(
                             "_sourcecategory", row.get("_sourceCategory", "")
                         ),
+                        "events": int(_f(row.get("events"))),
                         "min_lag_minutes": round(_f(row.get("min_lag_minutes")), 2),
                         "max_lag_minutes": round(_f(row.get("max_lag_minutes")), 2),
                         "pct25_lag_minutes": round(_f(row.get("_pct_25")), 2),
@@ -6671,86 +6685,107 @@ async def analyze_ingest_lag(
                     }
                 )
 
+        # Only the top FOCUS_N sources (worst lag, already sorted desc) get detailed recommendations.
+        # Remaining results are surfaced as lower-priority findings to avoid spurious follow-up work.
+        FOCUS_N = 3
+
         # Generate interpretation and recommendations
         interpretation = []
         recommendations = []
 
         if query_mode in ("summary", "distribution") and results:
-            max_lags = [r.get("max_lag_minutes", 0) for r in results]
-            min_lags = [r.get("min_lag_minutes", r.get("avg_lag_minutes", 0)) for r in results]
-            overall_max = max(max_lags) if max_lags else 0
-            has_negative = any(m < 0 for m in min_lags)
+            # Tag priority on every row before building interpretation
+            for i, r in enumerate(results):
+                r["priority"] = "high" if i < FOCUS_N else "low"
+
+            focus = results[:FOCUS_N]
+            others = results[FOCUS_N:]
+
+            if others:
+                interpretation.append(
+                    f"{len(results)} sources returned after filtering (min_events={min_events}). "
+                    f"Detailed recommendations cover the top {len(focus)} worst sources only. "
+                    f"The remaining {len(others)} sources are tagged priority=low — address top issues first."
+                )
+
+            focus_max_lags = [r.get("max_lag_minutes", 0) for r in focus]
+            focus_min_lags = [r.get("min_lag_minutes", r.get("avg_lag_minutes", 0)) for r in focus]
+            overall_max = max(focus_max_lags) if focus_max_lags else 0
+            has_negative = any(m < 0 for m in focus_min_lags)
+
+            # Identify the single worst source for specific callouts
+            worst = focus[0] if focus else {}
+            worst_sc = worst.get("_sourceCategory", "")
+            worst_collector = worst.get("_collector", "")
 
             if has_negative:
+                neg_sources = [
+                    r.get("_sourceCategory", "")
+                    for r in focus
+                    if r.get("min_lag_minutes", r.get("avg_lag_minutes", 0)) < 0
+                ]
                 interpretation.append(
-                    "NEGATIVE LAG detected: some events have timestamps set in the future relative to receipt time. "
-                    "This almost always indicates a timezone misconfiguration — the source timezone is set incorrectly "
+                    f"NEGATIVE LAG detected on {len(neg_sources)} top source(s) "
+                    f"({', '.join(neg_sources)}): timestamps are set in the future relative to receipt time. "
+                    "This almost always indicates a timezone misconfiguration — source timezone is wrong "
                     "or logs are being read as UTC when they carry local time."
                 )
                 recommendations.append(
-                    "Review the timezone setting on the affected collector sources. Compare _messagetime vs _receipttime "
-                    "on a few raw events to confirm. Fix: set the correct timezone in the Source advanced options."
+                    f"Run get_sumo_collectors (search='{worst_collector}') then get_sumo_sources to check "
+                    "timezone settings on the affected sources. If unset on the source, timezone inherits "
+                    "from the collector — verify both levels."
                 )
                 recommendations.append(
-                    "Use get_sumo_collectors and get_sumo_sources to retrieve the source configuration and check "
-                    "timezone settings. Note: if timezone is unset on the source, it inherits from the collector."
-                )
-                recommendations.append(
-                    "Use 'format_debug' mode on the same scope to inspect the _format field — look for t:ac1 or "
-                    "t:ac2 entries which indicate auto-correction is masking the underlying timezone problem."
+                    f"Run analyze_ingest_lag with scope='{worst_sc}' and query_mode='format_debug' "
+                    "to inspect the _format field — look for t:ac1 or t:ac2 indicating auto-correction "
+                    "is masking the underlying timezone problem."
                 )
 
             if overall_max > 1440:  # >24 hours
                 interpretation.append(
-                    f"SEVERE LAG detected: max lag is {round(overall_max / 60, 1)} hours. "
-                    "For AWS S3-based sources (CloudTrail, CloudWatch, S3 Access), this commonly indicates "
-                    "SNS event notifications are not configured on the S3 source — only the slow polling process is running."
+                    f"SEVERE LAG detected: worst source '{worst_sc}' has max lag of "
+                    f"{round(overall_max / 60, 1)} hours. For AWS S3-based sources (CloudTrail, CloudWatch, "
+                    "S3 Access) this almost always means SNS event notifications are not configured — "
+                    "only the slow poller is running."
                 )
                 recommendations.append(
-                    "For AWS S3 sources: configure SNS event notifications on the Sumo Logic S3 source. "
-                    "See: https://www.sumologic.com/help/docs/send-data/hosted-collectors/amazon-aws/aws-s3-source/#s3-event-notifications-integration"
+                    f"Run analyze_data_volume_grouped with filter_value='{worst_sc}' and from_time='-7d' "
+                    "to confirm the ingest pattern. Irregular bursts with multi-hour gaps = polling only."
                 )
                 recommendations.append(
-                    "Use analyze_data_volume_grouped with the affected _sourceCategory and from_time='-7d' "
-                    "to check for an intermittent/spiky ingest pattern — irregular bursts of data are a strong "
-                    "indicator of a polling-only source without SNS notifications."
-                )
-                recommendations.append(
-                    "Use get_sumo_collectors and get_sumo_sources to retrieve the source configuration. "
-                    "Check the source timestamp and timezone settings — if none are specified on the source, "
-                    "timezone is inherited from the collector. Verify both are set correctly."
+                    f"Run get_sumo_collectors (search='{worst_collector}') then get_sumo_sources to "
+                    "retrieve the source config and verify SNS notification setup. "
+                    "Fix guide: https://www.sumologic.com/help/docs/send-data/hosted-collectors/amazon-aws/"
+                    "aws-s3-source/#s3-event-notifications-integration"
                 )
             elif overall_max > 60:
                 interpretation.append(
-                    f"HIGH LAG detected: max lag is {round(overall_max / 60, 1)} hours. "
-                    "Possible causes: slow forwarding pipeline, batch-mode collector flush interval too long, "
-                    "or AWS S3 source without SNS notifications."
+                    f"HIGH LAG detected: worst source '{worst_sc}' has max lag of "
+                    f"{round(overall_max / 60, 1)} hours. Possible causes: slow forwarding pipeline, "
+                    "batch-mode collector flush interval too long, or AWS S3 source without SNS notifications."
                 )
                 recommendations.append(
-                    "Check collector/source configuration for batch send intervals. "
-                    "For AWS S3 sources verify SNS event notification setup."
-                )
-                recommendations.append(
-                    "Use analyze_data_volume_grouped with the affected _sourceCategory and from_time='-7d' "
+                    f"Run analyze_data_volume_grouped with filter_value='{worst_sc}' and from_time='-7d' "
                     "to check whether ingest is continuous or arrives in intermittent bursts."
                 )
                 recommendations.append(
-                    "Use get_sumo_collectors and get_sumo_sources to inspect the source timestamp/timezone "
-                    "configuration. If timezone is unset on the source it is inherited from the collector."
+                    f"Run get_sumo_collectors (search='{worst_collector}') then get_sumo_sources to inspect "
+                    "timestamp/timezone configuration. If unset on the source it inherits from the collector."
                 )
             elif overall_max > lag_threshold_minutes:
                 interpretation.append(
-                    f"MODERATE LAG detected: max lag is {round(overall_max, 1)} minutes. "
-                    "Sub-optimal but may be acceptable depending on SLA requirements. "
+                    f"MODERATE LAG detected: worst source '{worst_sc}' has max lag of "
+                    f"{round(overall_max, 1)} minutes. Sub-optimal but may be acceptable. "
                     "Could indicate pipeline saturation or log forwarding delays."
                 )
                 recommendations.append(
-                    "Monitor lag trend over time. If lag is growing, investigate pipeline saturation. "
-                    "Use 'distribution' mode to check whether lag affects all events or only a subset."
+                    "Use 'distribution' mode on the top source to check whether lag affects all events "
+                    "or only a subset — partial lag suggests intermittent pipeline pressure rather than "
+                    "a configuration problem."
                 )
                 recommendations.append(
-                    "Use get_sumo_collectors and get_sumo_sources to review the source timestamp/timezone "
-                    "configuration for the affected sources."
+                    f"Run get_sumo_collectors (search='{worst_collector}') then get_sumo_sources to review "
+                    "timestamp/timezone configuration for the affected sources."
                 )
 
         if query_mode == "format_debug" and results:
@@ -6796,6 +6831,7 @@ async def analyze_ingest_lag(
                     "from_time": from_time,
                     "to_time": to_time,
                     "lag_threshold_minutes": lag_threshold_minutes,
+                    "min_events": min_events,
                     "query_mode": query_mode,
                     "top_n": top_n,
                     "by_receipt_time": True,
@@ -6803,7 +6839,9 @@ async def analyze_ingest_lag(
                 },
                 "summary": {
                     "total_records": len(results),
+                    "high_priority_sources": min(len(results), FOCUS_N),
                     "lag_threshold_minutes": lag_threshold_minutes,
+                    "min_events_filter": min_events,
                 },
                 "results": results,
                 "interpretation": interpretation,
