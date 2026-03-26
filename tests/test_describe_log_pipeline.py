@@ -8,18 +8,32 @@ import pytest
 from sumologic_poweruser_mcp.sumologic_mcp_server import describe_log_pipeline
 
 
+@pytest.fixture
+def mock_config():
+    """Create a mock config."""
+    config = MagicMock()
+    config.server_config.rate_limit_per_minute = 60
+    return config
+
+
 class TestDescribeLogPipeline:
     """Tests for describe_log_pipeline orchestration tool."""
 
     @pytest.mark.asyncio
-    async def test_keyword_scope_basic(self):
+    async def test_keyword_scope_basic(self, mock_config):
         """Test basic keyword scope discovery (e.g., 'cloudtrail')."""
         # This test validates the tool structure and parameter handling
         # Integration tests should be used for full end-to-end validation
 
-        with patch(
+        with patch("sumologic_poweruser_mcp.sumologic_mcp_server._ensure_config_initialized"), patch(
+            "sumologic_poweruser_mcp.sumologic_mcp_server.get_config", return_value=mock_config
+        ), patch(
             "sumologic_poweruser_mcp.sumologic_mcp_server.get_sumo_client"
-        ) as mock_get_client:
+        ) as mock_get_client, patch(
+            "sumologic_poweruser_mcp.sumologic_mcp_server.get_rate_limiter"
+        ) as mock_limiter:
+            mock_limiter.return_value.acquire = AsyncMock()
+
             # Mock client
             mock_client = AsyncMock()
 
@@ -229,11 +243,16 @@ class TestDescribeLogPipeline:
                 assert isinstance(result["installed_apps"]["apps"], list)
 
     @pytest.mark.asyncio
-    async def test_metadata_scope(self):
+    async def test_metadata_scope(self, mock_config):
         """Test with metadata filter scope (e.g., '_sourceCategory=foo/bar')."""
-        with patch(
+        with patch("sumologic_poweruser_mcp.sumologic_mcp_server._ensure_config_initialized"), patch(
+            "sumologic_poweruser_mcp.sumologic_mcp_server.get_config", return_value=mock_config
+        ), patch(
             "sumologic_poweruser_mcp.sumologic_mcp_server.get_sumo_client"
-        ) as mock_get_client:
+        ) as mock_get_client, patch(
+            "sumologic_poweruser_mcp.sumologic_mcp_server.get_rate_limiter"
+        ) as mock_limiter:
+            mock_limiter.return_value.acquire = AsyncMock()
             mock_client = AsyncMock()
 
             # For metadata scope, we skip Phase 1 (data volume discovery)
@@ -280,11 +299,16 @@ class TestDescribeLogPipeline:
             assert result["summary"]["original_scope"] == "_sourceCategory=prod/app/logs"
 
     @pytest.mark.asyncio
-    async def test_no_results_found(self):
+    async def test_no_results_found(self, mock_config):
         """Test behavior when no source categories match keyword."""
-        with patch(
+        with patch("sumologic_poweruser_mcp.sumologic_mcp_server._ensure_config_initialized"), patch(
+            "sumologic_poweruser_mcp.sumologic_mcp_server.get_config", return_value=mock_config
+        ), patch(
             "sumologic_poweruser_mcp.sumologic_mcp_server.get_sumo_client"
-        ) as mock_get_client:
+        ) as mock_get_client, patch(
+            "sumologic_poweruser_mcp.sumologic_mcp_server.get_rate_limiter"
+        ) as mock_limiter:
+            mock_limiter.return_value.acquire = AsyncMock()
             mock_client = AsyncMock()
 
             # Mock empty data volume results
@@ -313,11 +337,16 @@ class TestDescribeLogPipeline:
             assert "suggestion" in result
 
     @pytest.mark.asyncio
-    async def test_max_collectors_limit(self):
+    async def test_max_collectors_limit(self, mock_config):
         """Test that max_collectors parameter limits output."""
-        with patch(
+        with patch("sumologic_poweruser_mcp.sumologic_mcp_server._ensure_config_initialized"), patch(
+            "sumologic_poweruser_mcp.sumologic_mcp_server.get_config", return_value=mock_config
+        ), patch(
             "sumologic_poweruser_mcp.sumologic_mcp_server.get_sumo_client"
-        ) as mock_get_client:
+        ) as mock_get_client, patch(
+            "sumologic_poweruser_mcp.sumologic_mcp_server.get_rate_limiter"
+        ) as mock_limiter:
+            mock_limiter.return_value.acquire = AsyncMock()
             mock_client = AsyncMock()
 
             # Mock responses with minimal data
