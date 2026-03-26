@@ -6005,7 +6005,7 @@ async def describe_log_pipeline(
 
         # Discover metadata: _sourceCategory, _collector, _source, _index
         metadata_query = f"""{metadata_scope}
-| count by _sourceCategory, _collector, _source, _index
+| count by _sourceCategory, _collector, _source, _view
 | sort by _count desc
 | limit {max_collectors}"""
 
@@ -6039,7 +6039,7 @@ async def describe_log_pipeline(
             map_data = record.get("map", {})
             collectors_found.add(map_data.get("_collector", ""))
             sources_found.add(map_data.get("_source", ""))
-            partitions_found.add(map_data.get("_index", ""))
+            partitions_found.add(map_data.get("_view", ""))
             source_categories_found.add(map_data.get("_sourceCategory", ""))
 
         pipeline_report["metadata_discovered"]["collectors"] = sorted(

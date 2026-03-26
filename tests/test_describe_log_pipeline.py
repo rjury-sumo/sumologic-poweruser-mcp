@@ -25,7 +25,9 @@ class TestDescribeLogPipeline:
         # This test validates the tool structure and parameter handling
         # Integration tests should be used for full end-to-end validation
 
-        with patch("sumologic_poweruser_mcp.sumologic_mcp_server._ensure_config_initialized"), patch(
+        with patch(
+            "sumologic_poweruser_mcp.sumologic_mcp_server._ensure_config_initialized"
+        ), patch(
             "sumologic_poweruser_mcp.sumologic_mcp_server.get_config", return_value=mock_config
         ), patch(
             "sumologic_poweruser_mcp.sumologic_mcp_server.get_sumo_client"
@@ -39,9 +41,7 @@ class TestDescribeLogPipeline:
 
             # Mock data volume search results (Phase 1)
             mock_client.create_search_job.return_value = {"id": "dv-job-123"}
-            mock_client.get_search_job_status.return_value = {
-                "state": "DONE GATHERING RESULTS"
-            }
+            mock_client.get_search_job_status.return_value = {"state": "DONE GATHERING RESULTS"}
             mock_client.get_search_job_records.return_value = {
                 "records": [
                     {
@@ -80,7 +80,7 @@ class TestDescribeLogPipeline:
                                 "_sourceCategory": "aws/cloudtrail/logs",
                                 "_collector": "aws-collector",
                                 "_source": "cloudtrail-source",
-                                "_index": "cloudtrail_index",
+                                "_view": "cloudtrail_index",
                                 "_count": 1000,
                             }
                         }
@@ -225,7 +225,10 @@ class TestDescribeLogPipeline:
             assert result["summary"]["matching_apps_found"] >= 0
 
             # Validate discovered metadata
-            assert "aws/cloudtrail/logs" in result["metadata_discovered"]["source_categories"][0]["sourceCategory"]
+            assert (
+                "aws/cloudtrail/logs"
+                in result["metadata_discovered"]["source_categories"][0]["sourceCategory"]
+            )
             assert "aws-collector" in result["metadata_discovered"]["collectors"]
             assert "cloudtrail-source" in result["metadata_discovered"]["sources"]
             assert "cloudtrail_index" in result["metadata_discovered"]["partitions"]
@@ -245,7 +248,9 @@ class TestDescribeLogPipeline:
     @pytest.mark.asyncio
     async def test_metadata_scope(self, mock_config):
         """Test with metadata filter scope (e.g., '_sourceCategory=foo/bar')."""
-        with patch("sumologic_poweruser_mcp.sumologic_mcp_server._ensure_config_initialized"), patch(
+        with patch(
+            "sumologic_poweruser_mcp.sumologic_mcp_server._ensure_config_initialized"
+        ), patch(
             "sumologic_poweruser_mcp.sumologic_mcp_server.get_config", return_value=mock_config
         ), patch(
             "sumologic_poweruser_mcp.sumologic_mcp_server.get_sumo_client"
@@ -259,9 +264,7 @@ class TestDescribeLogPipeline:
             # and go straight to Phase 2 (metadata discovery)
 
             mock_client.create_search_job.return_value = {"id": "meta-job-456"}
-            mock_client.get_search_job_status.return_value = {
-                "state": "DONE GATHERING RESULTS"
-            }
+            mock_client.get_search_job_status.return_value = {"state": "DONE GATHERING RESULTS"}
             mock_client.get_search_job_records.return_value = {
                 "records": [
                     {
@@ -269,7 +272,7 @@ class TestDescribeLogPipeline:
                             "_sourceCategory": "prod/app/logs",
                             "_collector": "prod-collector",
                             "_source": "app-source",
-                            "_index": "prod_logs",
+                            "_view": "prod_logs",
                             "_count": 5000,
                         }
                     }
@@ -301,7 +304,9 @@ class TestDescribeLogPipeline:
     @pytest.mark.asyncio
     async def test_no_results_found(self, mock_config):
         """Test behavior when no source categories match keyword."""
-        with patch("sumologic_poweruser_mcp.sumologic_mcp_server._ensure_config_initialized"), patch(
+        with patch(
+            "sumologic_poweruser_mcp.sumologic_mcp_server._ensure_config_initialized"
+        ), patch(
             "sumologic_poweruser_mcp.sumologic_mcp_server.get_config", return_value=mock_config
         ), patch(
             "sumologic_poweruser_mcp.sumologic_mcp_server.get_sumo_client"
@@ -313,9 +318,7 @@ class TestDescribeLogPipeline:
 
             # Mock empty data volume results
             mock_client.create_search_job.return_value = {"id": "dv-job-789"}
-            mock_client.get_search_job_status.return_value = {
-                "state": "DONE GATHERING RESULTS"
-            }
+            mock_client.get_search_job_status.return_value = {"state": "DONE GATHERING RESULTS"}
             mock_client.get_search_job_records.return_value = {"records": []}
             mock_client.get_search_job_messages.return_value = {"messages": []}
             mock_client.list_apps.return_value = {"applications": []}
@@ -339,7 +342,9 @@ class TestDescribeLogPipeline:
     @pytest.mark.asyncio
     async def test_max_collectors_limit(self, mock_config):
         """Test that max_collectors parameter limits output."""
-        with patch("sumologic_poweruser_mcp.sumologic_mcp_server._ensure_config_initialized"), patch(
+        with patch(
+            "sumologic_poweruser_mcp.sumologic_mcp_server._ensure_config_initialized"
+        ), patch(
             "sumologic_poweruser_mcp.sumologic_mcp_server.get_config", return_value=mock_config
         ), patch(
             "sumologic_poweruser_mcp.sumologic_mcp_server.get_sumo_client"
@@ -351,9 +356,7 @@ class TestDescribeLogPipeline:
 
             # Mock responses with minimal data
             mock_client.create_search_job.return_value = {"id": "job-limit"}
-            mock_client.get_search_job_status.return_value = {
-                "state": "DONE GATHERING RESULTS"
-            }
+            mock_client.get_search_job_status.return_value = {"state": "DONE GATHERING RESULTS"}
             mock_client.get_search_job_records.return_value = {"records": []}
             mock_client.get_partitions.return_value = {"data": []}
             mock_client.get_collectors.return_value = {"collectors": []}
@@ -377,3 +380,60 @@ class TestDescribeLogPipeline:
             # Verify structure is present
             assert "summary" in result
             assert "metadata_discovered" in result
+
+    @pytest.mark.asyncio
+    async def test_metadata_query_uses_view_not_index(self, mock_config):
+        """Regression test: metadata discovery query must use _view not _index.
+
+        Using _index in count by causes a 400 from the Search Job API because
+        _index is a routing keyword, not an aggregatable metadata field.
+        The correct field is _view (partition name).
+        """
+        with patch(
+            "sumologic_poweruser_mcp.sumologic_mcp_server._ensure_config_initialized"
+        ), patch(
+            "sumologic_poweruser_mcp.sumologic_mcp_server.get_config", return_value=mock_config
+        ), patch(
+            "sumologic_poweruser_mcp.sumologic_mcp_server.get_sumo_client"
+        ) as mock_get_client, patch(
+            "sumologic_poweruser_mcp.sumologic_mcp_server.get_rate_limiter"
+        ) as mock_limiter:
+            mock_limiter.return_value.acquire = AsyncMock()
+            mock_client = AsyncMock()
+
+            mock_client.create_search_job.return_value = {"id": "job-view-test"}
+            mock_client.get_search_job_status.return_value = {"state": "DONE GATHERING RESULTS"}
+            mock_client.get_search_job_records.return_value = {"records": []}
+            mock_client.get_partitions.return_value = {"data": []}
+            mock_client.get_collectors.return_value = {"collectors": []}
+            mock_client.list_field_extraction_rules.return_value = {"data": []}
+            mock_client.list_scheduled_views.return_value = {"data": []}
+            mock_client.get_search_job_messages.return_value = {"messages": []}
+            mock_client.list_apps.return_value = {"applications": []}
+            mock_get_client.return_value = mock_client
+
+            await describe_log_pipeline(
+                scope="_sourceCategory=kubernetes/*",
+                from_time="-3h",
+                to_time="now",
+                max_collectors=20,
+                instance="default",
+            )
+
+            # Find the metadata discovery search job call (the one with count by)
+            # It should use _view, not _index, in the group-by clause
+            calls = mock_client.create_search_job.call_args_list
+            metadata_calls = [
+                c
+                for c in calls
+                if "count by" in c.kwargs.get("query", "") or (c.args and "count by" in c.args[0])
+            ]
+            assert metadata_calls, "Expected at least one search job with 'count by'"
+            for call in metadata_calls:
+                query = call.kwargs.get("query", "") or (call.args[0] if call.args else "")
+                assert (
+                    "_view" in query
+                ), f"Metadata query must use '_view' not '_index' in count by clause. Got: {query}"
+                assert (
+                    "_index" not in query
+                ), f"Metadata query must NOT use '_index' in count by clause (causes 400). Got: {query}"
