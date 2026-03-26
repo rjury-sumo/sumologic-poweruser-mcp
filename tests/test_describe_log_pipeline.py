@@ -67,8 +67,8 @@ class TestDescribeLogPipeline:
                         {
                             "map": {
                                 "value": "aws/cloudtrail/logs",
-                                "tier": "Continuous",
-                                "gb": 10.5,
+                                "dataTier": "Continuous",
+                                "gb": "10.5",
                             }
                         }
                     ]

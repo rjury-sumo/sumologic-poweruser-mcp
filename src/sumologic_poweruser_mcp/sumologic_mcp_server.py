@@ -137,65 +137,78 @@ class SumoLogicClient:
         api_path = f"/api/{api_version}{path}"
         url = urljoin(self.endpoint, api_path)
 
-        try:
-            response = await self.session.request(method, url, **kwargs)
-            response.raise_for_status()
+        # Retry with exponential backoff on 429
+        max_retries = 3
+        retry_delays = [5, 10, 20]  # seconds
 
-            # Log successful request for audit
-            _ensure_config_initialized()
-            config = get_config()
-            if config.server_config.enable_audit_log:
-                audit_logger.info(
-                    f"instance={self.instance_name} method={method} "
-                    f"path={api_path} status={response.status_code}"
+        for attempt in range(max_retries + 1):
+            try:
+                response = await self.session.request(method, url, **kwargs)
+                response.raise_for_status()
+
+                # Log successful request for audit
+                _ensure_config_initialized()
+                config = get_config()
+                if config.server_config.enable_audit_log:
+                    audit_logger.info(
+                        f"instance={self.instance_name} method={method} "
+                        f"path={api_path} status={response.status_code}"
+                    )
+
+                return response.json()
+
+            except httpx.HTTPStatusError as e:
+                status_code = e.response.status_code
+
+                # Sanitize error message for client
+                if status_code == 401:
+                    logger.error(f"Authentication failed for instance {self.instance_name}")
+                    raise AuthenticationError(
+                        f"Authentication failed for instance '{self.instance_name}'. "
+                        "Please check your credentials.",
+                        details=f"status_code={status_code}",
+                    )
+                elif status_code == 403:
+                    logger.error(f"Authorization failed for {self.instance_name}: {path}")
+                    raise AuthenticationError(
+                        "Access denied. Your credentials may not have permission for this operation.",
+                        details=f"path={path}",
+                    )
+                elif status_code == 429:
+                    if attempt < max_retries:
+                        wait = retry_delays[attempt]
+                        logger.warning(
+                            f"Rate limited by Sumo Logic API ({self.instance_name}), "
+                            f"retrying in {wait}s (attempt {attempt + 1}/{max_retries})"
+                        )
+                        await asyncio.sleep(wait)
+                        continue
+                    logger.warning(f"Rate limited by Sumo Logic API: {self.instance_name} (all retries exhausted)")
+                    raise APIError(
+                        "Sumo Logic API rate limit exceeded. Please try again later.", status_code=429
+                    )
+                else:
+                    logger.error(
+                        f"HTTP error {status_code} for {self.instance_name}: {e.response.text}"
+                    )
+                    raise APIError(
+                        f"Sumo Logic API request failed with status {status_code}",
+                        status_code=status_code,
+                        details="Check server logs for details",
+                    )
+
+            except httpx.TimeoutException as e:
+                logger.error(f"Request timeout for {self.instance_name}: {str(e)}")
+                raise SumoTimeoutError(
+                    "Request to Sumo Logic API timed out. The query may be too complex or the service may be slow."
                 )
 
-            return response.json()
-
-        except httpx.HTTPStatusError as e:
-            status_code = e.response.status_code
-
-            # Sanitize error message for client
-            if status_code == 401:
-                logger.error(f"Authentication failed for instance {self.instance_name}")
-                raise AuthenticationError(
-                    f"Authentication failed for instance '{self.instance_name}'. "
-                    "Please check your credentials.",
-                    details=f"status_code={status_code}",
-                )
-            elif status_code == 403:
-                logger.error(f"Authorization failed for {self.instance_name}: {path}")
-                raise AuthenticationError(
-                    "Access denied. Your credentials may not have permission for this operation.",
-                    details=f"path={path}",
-                )
-            elif status_code == 429:
-                logger.warning(f"Rate limited by Sumo Logic API: {self.instance_name}")
+            except Exception as e:
+                logger.error(f"Request failed for {self.instance_name}: {str(e)}")
                 raise APIError(
-                    "Sumo Logic API rate limit exceeded. Please try again later.", status_code=429
-                )
-            else:
-                logger.error(
-                    f"HTTP error {status_code} for {self.instance_name}: {e.response.text}"
-                )
-                raise APIError(
-                    f"Sumo Logic API request failed with status {status_code}",
-                    status_code=status_code,
+                    "Unexpected error communicating with Sumo Logic API",
                     details="Check server logs for details",
                 )
-
-        except httpx.TimeoutException as e:
-            logger.error(f"Request timeout for {self.instance_name}: {str(e)}")
-            raise SumoTimeoutError(
-                "Request to Sumo Logic API timed out. The query may be too complex or the service may be slow."
-            )
-
-        except Exception as e:
-            logger.error(f"Request failed for {self.instance_name}: {str(e)}")
-            raise APIError(
-                "Unexpected error communicating with Sumo Logic API",
-                details="Check server logs for details",
-            )
 
     async def search_logs(
         self,
@@ -5941,7 +5954,28 @@ async def describe_log_pipeline(
             # Use analyze_data_volume to find matching source categories
             logger.info(f"Discovering source categories matching keyword: {scope}")
 
-            dv_query = f'_index=* _view=sumologic_volume\n| where dimension="{dimension}"\n| where value matches /{scope}/i\n| sum(sizeInBytes) as bytes by value, tier\n| bytes / 1024 / 1024 / 1024 as gb\n| sort by bytes desc\n| limit 20'
+            # _sourceCategory in the scope is the volume index routing label for the
+            # dimension type (e.g. "sourcecategory_and_tier_volume") — NOT a real source
+            # category. The actual source category being measured is only available as
+            # the "field" key inside each JSON record, parsed below as "value".
+            dimension_map = {
+                "sourceCategory": "sourcecategory_and_tier_volume",
+                "collector": "collector_and_tier_volume",
+                "source": "source_and_tier_volume",
+                "sourceHost": "sourcehost_and_tier_volume",
+                "sourceName": "sourcename_and_tier_volume",
+                "view": "view_and_tier_volume",
+            }
+            dv_source_category = dimension_map.get(dimension, "sourcecategory_and_tier_volume")
+
+            dv_query = f"""(_index=sumologic_volume) _sourceCategory={dv_source_category}
+| parse regex "(?<data>\\{{[^\\{{]+\\}})" multi
+| json field=data "field","dataTier","sizeInBytes","count" as value, dataTier, bytes, events
+| where tolowercase(value) matches tolowercase("*{scope}*")
+| sum(bytes) as totalBytes, sum(events) as totalEvents by value, dataTier
+| totalBytes / 1024 / 1024 / 1024 as gb
+| sort gb desc
+| limit 20"""
 
             dv_job = await client.create_search_job(
                 query=dv_query, from_time=from_time, to_time=to_time, timezone_str="UTC"
@@ -5976,8 +6010,8 @@ async def describe_log_pipeline(
             for record in dv_records:
                 map_data = record.get("map", {})
                 value = map_data.get("value", "")
-                tier = map_data.get("tier", "")
-                gb = map_data.get("gb", 0)
+                tier = map_data.get("dataTier", "")
+                gb = float(map_data.get("gb", 0) or 0)
 
                 if dimension == "sourceCategory":
                     source_categories.append(
